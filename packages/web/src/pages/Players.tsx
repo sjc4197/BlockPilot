@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import type { PlayerListKind, WhitelistEntry, OpEntry, BannedPlayerEntry, BannedIpEntry } from "@blockpilot/shared";
 import { useAddPlayer, usePlayerList, useRemovePlayer, useServer, useUpdateProperties } from "../api/hooks";
 import { btn, card, cx, input, ConfirmButton, EmptyState, Toggle, useToast, Spinner } from "../lib/ui";
@@ -13,7 +13,10 @@ const TABS: { id: PlayerListKind; label: string }[] = [
 
 export default function Players() {
   const { id = "" } = useParams();
-  const [tab, setTab] = useState<PlayerListKind>("whitelist");
+  const [params, setParams] = useSearchParams();
+  const tabParam = params.get("tab");
+  const tab: PlayerListKind = TABS.some((t) => t.id === tabParam) ? (tabParam as PlayerListKind) : "whitelist";
+  const setTab = (t: PlayerListKind) => setParams({ tab: t });
   const { data: server } = useServer(id);
   const updateProps = useUpdateProperties(id);
   const toast = useToast();
