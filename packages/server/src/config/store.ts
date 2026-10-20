@@ -15,7 +15,9 @@ interface ConfigFile {
   auth?: { token?: string };
 }
 
-const CONFIG_DIR = process.env.BLOCKPILOT_HOME ?? path.join(os.homedir(), ".blockpilot");
+/** BlockPilot 이 쓰는 앱 폴더 (설정, 작업 일지, 받아 둔 JDK) */
+export const BLOCKPILOT_HOME = process.env.BLOCKPILOT_HOME ?? path.join(os.homedir(), ".blockpilot");
+const CONFIG_DIR = BLOCKPILOT_HOME;
 const CONFIG_PATH = path.join(CONFIG_DIR, "config.json");
 
 let cache: ConfigFile | null = null;
