@@ -21,6 +21,7 @@ import { logsRoutes } from "./routes/logs.js";
 import { backupsRoutes } from "./routes/backups.js";
 import { shutdownAll } from "./services/process.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
+import { cancelAllJobs, recoverInterruptedJobs } from "./services/create/job.js";
 
 const PORT = Number(process.env.BLOCKPILOT_PORT ?? 4800);
 const HOST = process.env.BLOCKPILOT_HOST ?? "127.0.0.1";
@@ -71,10 +72,14 @@ if (webDist) {
 }
 
 startScheduler(app.log);
+// 지난번에 만들기 도중 꺼졌다면 그때 만들던 파일을 정리
+await recoverInterruptedJobs(app.log);
 
 const stop = async () => {
   app.log.info("종료 중: 실행 중인 서버를 정리합니다");
   stopScheduler();
+  // 만들던 서버가 있으면 취소하고 이번에 만든 파일을 지운 뒤 끈다
+  await cancelAllJobs();
   await shutdownAll();
   await app.close();
   process.exit(0);

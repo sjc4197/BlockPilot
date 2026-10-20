@@ -255,6 +255,64 @@ export interface AuthInfo {
   authenticated: boolean;
 }
 
+// ---------- 새 서버 만들기 ----------
+
+export const CreateServerInput = z.object({
+  path: z.string().min(1),
+  name: z.string().min(1).max(60),
+  mcVersion: z.string().min(1),
+  loaderVersion: z.string().min(1),
+  memory: z
+    .object({ minMb: z.number().int().min(512).max(65536), maxMb: z.number().int().min(1024).max(65536) })
+    .refine((m) => m.minMb <= m.maxMb, { message: "최소 메모리는 최대 메모리보다 클 수 없어요." }),
+  /** server.properties 에 미리 써 둘 값 */
+  properties: z.record(z.string(), z.string()).default({}),
+  /** 입력하면 OP(레벨 4) + 화이트리스트에 추가 */
+  ownerName: z
+    .string()
+    .regex(/^[A-Za-z0-9_]{1,16}$/, "닉네임은 영문·숫자·밑줄 1~16자예요.")
+    .optional(),
+  /** 사용자가 직접 체크해야 한다. 자동으로 true 를 넣는 코드 경로는 없다 */
+  eulaAccepted: z.literal(true, { errorMap: () => ({ message: "Minecraft EULA 에 동의해야 서버를 만들 수 있어요." }) }),
+});
+export type CreateServerInput = z.infer<typeof CreateServerInput>;
+
+export type CreateStepId = "preflight" | "versions" | "java" | "server-jar" | "fabric" | "config" | "first-run" | "register";
+export type CreateStepState = "pending" | "running" | "done" | "failed" | "skipped";
+
+export interface CreateStep {
+  id: CreateStepId;
+  label: string;
+  state: CreateStepState;
+  note?: string;
+  progress?: { done: number; total?: number };
+}
+
+export type CreateJobState = "running" | "succeeded" | "failed" | "cancelled";
+
+export interface CreateJobError {
+  code: string;
+  message: string;
+  hint?: string;
+  detail?: string;
+}
+
+export interface CreateJobStatus {
+  id: string;
+  state: CreateJobState;
+  input: { path: string; name: string; mcVersion: string; loaderVersion: string };
+  steps: CreateStep[];
+  log: string[];
+  error?: CreateJobError;
+  /** 실패·취소 후 지운 항목 (대상 폴더 기준 상대 경로) */
+  cleaned?: string[];
+  /** 지우지 않고 남긴 것과 이유 */
+  kept?: string[];
+  serverId?: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
 // ---------- 공통 ----------
 
 export interface ApiError {
