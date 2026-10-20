@@ -119,3 +119,19 @@ export function getJavaVersion(): Promise<string | undefined> {
     });
   });
 }
+
+/**
+ * 서버가 실제로 쓰는 Java 버전.
+ * start.sh 에 java 절대 경로가 적혀 있으면(새 서버 만들기로 만든 서버) 그 Java 를, 아니면 시스템 java 를 본다.
+ */
+export async function getServerJavaVersion(dir: string): Promise<string | undefined> {
+  const script = await fs.readFile(path.join(dir, "start.sh"), "utf8").catch(() => "");
+  const pinned = script.match(/^\s*exec\s+"(\/[^"]+\/bin\/java)"/m)?.[1];
+  if (pinned) {
+    const v = await new Promise<string | undefined>((resolve) => {
+      execFile(pinned, ["-version"], { timeout: 10_000 }, (err, _o, stderr) => resolve(err ? undefined : String(stderr).match(/version "([^"]+)"/)?.[1]));
+    });
+    if (v) return v;
+  }
+  return getJavaVersion();
+}

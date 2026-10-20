@@ -7,6 +7,7 @@
 export type CreateErrorCode =
   | "unsupported_platform"
   | "invalid_path"
+  | "invalid_setting"
   | "folder_not_empty"
   | "eula_required"
   | "busy"

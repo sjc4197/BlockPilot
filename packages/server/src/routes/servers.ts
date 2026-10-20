@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { RegisterServerInput, type ServerSummary } from "@blockpilot/shared";
 import { addServer, listServers, removeServer } from "../config/store.js";
-import { detectServer, getJavaVersion, validateServerDir } from "../services/serverInfo.js";
+import { detectServer, getServerJavaVersion, validateServerDir } from "../services/serverInfo.js";
 import { readPropertiesFile, toRecord } from "../services/properties.js";
 import { modsDirName } from "../services/mods.js";
 import { loadContext } from "../lib/context.js";
@@ -36,7 +36,7 @@ export async function serversRoutes(app: FastifyInstance) {
     const [{ lines }, processStatus, javaVersion, modFiles] = await Promise.all([
       readPropertiesFile(dir),
       managed.status(),
-      getJavaVersion(),
+      getServerJavaVersion(dir),
       fs.readdir(path.join(dir, modsDirName(info.loader))).catch(() => [] as string[]),
     ]);
     const p = toRecord(lines);
