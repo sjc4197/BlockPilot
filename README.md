@@ -37,6 +37,7 @@
 
 | 화면 | 할 수 있는 것 |
 |---|---|
+| **새 서버 만들기** | 빈 폴더만 고르면 Fabric 서버를 처음부터 구축. 정식 버전·로더 선택, 필요한 Java 를 앱 폴더에 자동 준비, 모든 다운로드 해시 검증, 최초 실행까지 마치고 목록에 등록 (macOS) |
 | **대시보드** | 로더·버전·접속자·모드 수 요약, 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔 |
 | **서버 설정** | `server.properties`를 게임플레이 / 월드 / 플레이어 / 네트워크 / 성능 탭의 폼으로 편집. 그 외 키는 고급 탭에서 raw 편집. 주석과 키 순서 보존 |
 | **플레이어** | 화이트리스트 · OP · 밴(플레이어/IP). 닉네임만 입력하면 Mojang API로 UUID 자동 조회 |
@@ -47,6 +48,15 @@
 | **백업** | 월드 zip 백업 / 복원 / 다운로드, 간격·보관 개수 기반 자동 백업 (실행 중이면 `save-all flush` 후 백업) |
 
 지원 로더: **Fabric · Forge · NeoForge · Paper/Purpur · Vanilla** (폴더 구조로 자동 감지)
+
+### 지원 환경
+
+| | macOS | Linux | Windows |
+|---|---|---|---|
+| 기존 서버 연결·관리 | ✅ 지원 | 🚧 준비 중 | 🚧 준비 중 |
+| 새 서버 만들기 (Fabric) | ✅ 지원 (Apple Silicon · Intel) | 🚧 준비 중 | 🚧 준비 중 |
+
+지금은 macOS 에서만 테스트하고 지원해요. Linux·Windows 는 확장으로 추가할 예정이에요.
 
 ## 스크린샷
 
@@ -73,9 +83,10 @@
 
 ### 요구 사항
 
+- **macOS**
 - **Node.js 20 이상**
-- **Java** — 서버를 BlockPilot에서 시작하려면 (이미 서버가 돌아가는 환경이면 당연히 있음)
-- 마인크래프트 서버 폴더 (`server.properties`, `eula.txt` 가 있는 곳)
+- 기존 서버를 연결할 때: 그 서버 폴더와 서버를 돌릴 Java
+- 새 서버를 만들 때: 빈 폴더만 있으면 돼요. Java 가 없으면 BlockPilot 이 앱 폴더에 받아서 써요
 
 ### 설치 및 실행
 
@@ -99,6 +110,41 @@ npm start
 
 > **BlockPilot 밖에서 서버를 띄운 경우** — 대시보드에 "외부 실행 중"으로 표시됩니다. `server.properties` 에서 `enable-rcon=true`, `rcon.password=…` 를 설정하고 서버를 재시작하면 콘솔 명령·중지·접속자 조회가 RCON으로 동작합니다.
 
+### 새 서버 만들기 (macOS)
+
+첫 화면의 **새 서버 만들기** → 폴더를 고르고 버전·기본 설정을 정한 뒤 EULA 에 직접 동의하면, 나머지는 BlockPilot 이 해요.
+
+<table>
+  <tr>
+    <td align="center"><b>입력</b><br><img src="docs/screenshots/10-new-form.png" width="420"></td>
+    <td align="center"><b>폴더 찾기</b><br><img src="docs/screenshots/11-new-picker.png" width="420"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>진행</b><br><img src="docs/screenshots/12-new-progress.png" width="420"></td>
+    <td align="center"><b>완료</b><br><img src="docs/screenshots/13-new-done.png" width="420"></td>
+  </tr>
+</table>
+
+1. **사전 점검** — 폴더가 비었는지, 포트·메모리·디스크 여유, 닉네임이 실제로 있는지
+2. **버전 확인** — Minecraft 정식 버전과 Fabric 로더 호환, 이 버전이 요구하는 Java (1.21.x → 21, 26.x → 25)
+3. **Java 준비** — 이 Mac 에 정확히 그 버전 JDK 가 있으면 사용, 없으면 Temurin 을 `~/.blockpilot/runtimes/` 에 받아서 사용 (시스템에는 설치하지 않음)
+4. **server.jar · Fabric 설치** — 공식 설치기로 설치하고 라이브러리까지 전부 해시 대조
+5. **설정 파일** — `start.sh`(Java 경로·메모리 고정), `server.properties`, `eula.txt`, 닉네임을 OP·화이트리스트에 추가
+6. **최초 실행** — 월드를 만들고 `Done` 이 뜨면 정상 종료
+7. **등록** — 서버 목록에 추가하고 대시보드로
+
+| 받는 파일 | 출처 | 검증 |
+|---|---|---|
+| 버전 정보 | Mojang `piston-meta` | 매니페스트의 sha1 |
+| `server.jar` | Mojang | sha1 |
+| Fabric 설치기 | `maven.fabricmc.net` | 같은 저장소의 sha256 |
+| Fabric 라이브러리 | 설치기가 받음 | 설치 후 하나씩 sha256 대조 |
+| JDK (Temurin) | Adoptium | sha256 |
+
+- **EULA** 는 사용자가 체크박스를 직접 체크해야만 진행돼요. 체크하지 않으면 버튼이 눌리지 않고 API 도 거부해요.
+- **실패하거나 취소하면** 원인과 해결 방법을 한글로 보여 주고, 이번에 만든 파일만 지워요. 원래 폴더에 있던 것은 건드리지 않아요. 도중에 BlockPilot 이 꺼져도 다음에 켤 때 같은 방식으로 정리해요.
+- 해시 검증까지 끝난 JDK 는 다음에 다시 쓰도록 앱 폴더에 남겨요.
+
 ### 외부에서 접속하기 (선택)
 
 기본값은 `127.0.0.1` 바인딩, 인증 없음입니다. 다른 기기에서 접속하려면:
@@ -116,7 +162,7 @@ BLOCKPILOT_HOST=0.0.0.0 npm start
 | `BLOCKPILOT_PORT` | `4800` | 대시보드 포트 |
 | `BLOCKPILOT_HOST` | `127.0.0.1` | 바인딩 주소. 루프백이 아니면 토큰 인증이 자동으로 켜짐 |
 | `BLOCKPILOT_TOKEN` | (없음) | 접속 토큰 지정. 설정하면 루프백에서도 토큰 필요 |
-| `BLOCKPILOT_HOME` | `~/.blockpilot` | 등록된 서버 목록 · 자동 백업 설정 · 토큰 저장 위치 |
+| `BLOCKPILOT_HOME` | `~/.blockpilot` | 앱 폴더: 등록된 서버 목록 · 자동 백업 설정 · 토큰 · 받아 둔 JDK(`runtimes/`) · 만들기 작업 일지(`jobs/`) |
 | `LOG_LEVEL` | `info` | Fastify 로그 레벨 |
 
 ## 기술 스택
@@ -130,7 +176,7 @@ BLOCKPILOT_HOST=0.0.0.0 npm start
 | 파일 처리 | `yauzl` / `yazl` | jar 메타데이터 읽기, 백업·모드 zip 생성 |
 | 설정 파서 | `smol-toml`, `yaml` | 모드 설정 문법 검사. `server.properties`는 주석·순서 보존 자체 파서 |
 | 프로세스 | Node `child_process` + 자체 **RCON** 클라이언트 | stdin/stdout 파이프 제어, 외부 서버는 Source RCON 프로토콜 |
-| 테스트 | **vitest** | 파서(properties, 버전 범위, 설정 문법) 단위 테스트 |
+| 테스트 | **vitest** | 파서(properties, 버전 범위, 설정 문법), 다운로드·해시 검증(로컬 HTTP 서버), 작업 정리·취소·재시작 복구 |
 | 폰트 | [Galmuri11](https://github.com/quiple/galmuri) · Silkscreen (SIL OFL 1.1), IBM Plex Sans KR, JetBrains Mono | 제목·메뉴는 한글 픽셀 서체, 본문은 일반 서체, 콘솔은 고정폭 |
 | 패키지 구조 | npm workspaces 모노레포 | `shared` · `server` · `web` |
 
@@ -143,12 +189,16 @@ BlockPilot/
 │   ├── server/
 │   │   └── src/
 │   │       ├── routes/      servers · properties · players · mods · process(+WS 콘솔) · configs · logs · backups · auth
+│   │       │                create(새 서버 만들기) · fs(폴더 찾기)
 │   │       ├── services/    serverInfo(로더 감지) · properties(파서) · mods(jar 파싱·의존성)
 │   │       │                process(spawn/stdin) · rcon · backups · scheduler · logs · configs · mojang
+│   │       │                create/  sources(Mojang·Fabric·Adoptium) · download(해시 검증) · java · target(폴더 검증·정리)
+│   │       │                         job(진행·일지·취소·복구) · pipeline(설치 단계)
 │   │       └── lib/         safePath(경로 탈출 차단) · atomicWrite(백업+원자적 쓰기) · auth
 │   └── web/
 │       └── src/
-│           ├── pages/       Dashboard · Settings · Players · Mods · ConfigFiles · Console · Logs · Backups · Login
+│           ├── pages/       Dashboard · Settings · Players · Mods · ConfigFiles · Console · Logs · Backups · Login · NewServer
+│           ├── components/  ProcessControls · Lever · FolderPicker
 │           ├── api/         fetch 클라이언트, react-query 훅
 │           └── lib/         UI 프리미티브, WebSocket 콘솔 훅
 └── docs/screenshots/
@@ -162,6 +212,7 @@ BlockPilot/
 - 모드 변경 · 월드 복원은 서버가 중지된 상태에서만 허용
 - 복원 시 기존 월드는 삭제하지 않고 `.blockpilot-backup/restore-<시각>/` 으로 이동
 - 삭제 · 중지 · 복원 등 파괴적 동작은 두 번 클릭 확인
+- 새 서버 만들기: 빈 폴더만 허용(시스템·홈·앱 폴더, 등록된 서버와 겹치는 폴더 거부), 받는 파일 전부 해시 검증, 실패 시 시작 시점에 없던 항목만 삭제, EULA 자동 동의 없음
 
 ## 개발
 
@@ -173,9 +224,11 @@ npm run typecheck    # 세 패키지 tsc --noEmit
 
 ## 로드맵
 
+- [x] 새 서버 만들기 — Fabric · macOS
+- [ ] 새 서버 만들기 — Paper · Forge · NeoForge
+- [ ] Linux 지원 (기존 서버 관리 검증, 새 서버 만들기용 JDK)
+- [ ] Windows 지원 (`start.bat`, `pause`, 경로 처리, 종료 신호)
 - [ ] Modrinth API 연동 모드 검색·설치
-- [ ] 서버 생성 마법사 (Fabric / Paper 설치부터)
-- [ ] Windows 지원 (`start.bat`, 경로 처리)
 - [ ] 플레이어 통계 (`stats/`, `playerdata/` 파싱)
 
 ## 라이선스
