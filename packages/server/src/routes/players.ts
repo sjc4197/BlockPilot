@@ -22,12 +22,12 @@ export async function playersRoutes(app: FastifyInstance) {
     const kind = PlayerListKind.parse(rawKind);
     const input = AddPlayerInput.parse(req.body);
     const { dir, managed } = await loadContext(id);
-    const live = (await managed.status()).state === "running";
+    const live = await isLive(managed);
 
     if (kind === "banned-ips") {
       if (!input.ip) throw badRequest("IP를 입력하세요.");
       if (live) {
-        managed.sendCommand(`ban-ip ${input.ip}${input.reason ? " " + input.reason : ""}`);
+        await managed.sendCommand(`ban-ip ${input.ip}${input.reason ? " " + input.reason : ""}`);
         return { applied: "live" };
       }
       const list = await readList<any>(dir, kind);
@@ -47,7 +47,7 @@ export async function playersRoutes(app: FastifyInstance) {
         kind === "whitelist" ? `whitelist add ${profile.name}`
         : kind === "ops" ? `op ${profile.name}`
         : `ban ${profile.name}${input.reason ? " " + input.reason : ""}`;
-      managed.sendCommand(cmd);
+      await managed.sendCommand(cmd);
       return { applied: "live", profile };
     }
 
@@ -72,16 +72,22 @@ export async function playersRoutes(app: FastifyInstance) {
     const entry = kind === "banned-ips" ? list.find((e) => e.ip === key) : list.find((e) => e.uuid === key || e.name === key);
     if (!entry) return { applied: "none" };
 
-    if ((await managed.status()).state === "running") {
+    if (await isLive(managed)) {
       const cmd =
         kind === "whitelist" ? `whitelist remove ${entry.name}`
         : kind === "ops" ? `deop ${entry.name}`
         : kind === "banned-players" ? `pardon ${entry.name}`
         : `pardon-ip ${entry.ip}`;
-      managed.sendCommand(cmd);
+      await managed.sendCommand(cmd);
       return { applied: "live" };
     }
     await writeList(dir, kind, list.filter((e) => e !== entry));
     return { applied: "file" };
   });
+}
+
+/** 직접 띄운 서버가 준비됐거나, 외부 서버인데 RCON이 되면 명령으로 처리 */
+async function isLive(managed: { status(): Promise<{ state: string; rcon?: string }> }) {
+  const st = await managed.status();
+  return st.state === "running" || (st.state === "external" && st.rcon === "connected");
 }

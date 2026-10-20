@@ -5,6 +5,7 @@ import { RegisterServerInput, type ServerSummary } from "@blockpilot/shared";
 import { addServer, listServers, removeServer } from "../config/store.js";
 import { detectServer, getJavaVersion, validateServerDir } from "../services/serverInfo.js";
 import { readPropertiesFile, toRecord } from "../services/properties.js";
+import { modsDirName } from "../services/mods.js";
 import { loadContext } from "../lib/context.js";
 import { conflict } from "../lib/errors.js";
 
@@ -31,12 +32,12 @@ export async function serversRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { server, dir, managed } = await loadContext(id);
     const exists = await fs.stat(dir).then((s) => s.isDirectory()).catch(() => false);
-    const [info, { lines }, processStatus, javaVersion, modFiles] = await Promise.all([
-      detectServer(dir),
+    const info = await detectServer(dir);
+    const [{ lines }, processStatus, javaVersion, modFiles] = await Promise.all([
       readPropertiesFile(dir),
       managed.status(),
       getJavaVersion(),
-      fs.readdir(path.join(dir, "mods")).catch(() => [] as string[]),
+      fs.readdir(path.join(dir, modsDirName(info.loader))).catch(() => [] as string[]),
     ]);
     const p = toRecord(lines);
     return {

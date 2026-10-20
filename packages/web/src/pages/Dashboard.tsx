@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { useProcessAction, useServer } from "../api/hooks";
+import { useProcessAction, useSendCommand, useServer } from "../api/hooks";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
 import { btn, card, cx, StatusBadge, useToast, ConfirmButton } from "../lib/ui";
@@ -8,13 +8,17 @@ export default function Dashboard() {
   const { id = "" } = useParams();
   const { data: s } = useServer(id);
   const action = useProcessAction(id);
+  const sendCmd = useSendCommand(id);
   const toast = useToast();
   const { lines, status } = useConsole(id);
   if (!s) return null;
 
   const state = status?.state ?? s.process.state;
-  const players = status?.onlinePlayers ?? s.process.onlinePlayers;
+  const players = state === "external" ? s.process.onlinePlayers : (status?.onlinePlayers ?? s.process.onlinePlayers);
+  const rcon = s.process.rcon;
+  const canCommand = state === "running" || (state === "external" && rcon === "connected");
   const busy = action.isPending || state === "starting" || state === "stopping";
+  const cmd = (c: string, okMsg: string) => sendCmd.mutate(c, { onSuccess: () => toast("ok", okMsg), onError: (e) => toast("err", (e as Error).message) });
 
   const run = (a: "start" | "stop" | "restart") =>
     action.mutate(a, {
@@ -42,9 +46,20 @@ export default function Dashboard() {
               <ConfirmButton label="↻ 재시작" confirmLabel="정말 재시작?" disabled={busy} onConfirm={() => run("restart")} />
             </>
           )}
-          {state === "external" && <span className="text-xs text-slate-400">다른 곳에서 실행 중 — 여기서는 제어할 수 없습니다</span>}
+          {state === "external" && rcon === "connected" && <ConfirmButton label="■ 중지 (RCON)" confirmLabel="정말 중지?" disabled={busy} onConfirm={() => run("stop")} />}
         </div>
       </header>
+
+      {state === "external" && rcon !== "connected" && (
+        <div className="rounded-lg border border-sky-700/50 bg-sky-950/40 px-4 py-3 text-sm text-sky-200">
+          이 서버는 BlockPilot 밖에서 실행 중이라 콘솔을 직접 볼 수 없어요. 그래도 제어하려면{" "}
+          <Link to={`/s/${id}/settings`} className="underline">
+            서버 설정 → 네트워크
+          </Link>
+          에서 <code>RCON 사용</code>을 켜고 <code>RCON 비밀번호</code>를 정한 뒤 서버를 재시작하세요.
+          {rcon === "failed" && <span className="block mt-1 text-amber-300">RCON 설정은 있지만 연결에 실패했습니다. 비밀번호/포트를 확인하거나 서버를 재시작해 보세요.</span>}
+        </div>
+      )}
 
       {!s.eulaAccepted && (
         <div className="rounded-lg border border-amber-600/50 bg-amber-950/40 px-4 py-3 text-sm text-amber-200">
@@ -72,9 +87,15 @@ export default function Dashboard() {
         ) : (
           <ul className="flex flex-wrap gap-2">
             {players.map((p) => (
-              <li key={p} className="flex items-center gap-2 rounded-md bg-slate-800 px-2.5 py-1 text-sm">
+              <li key={p} className="flex items-center gap-2 rounded-md bg-slate-800 pl-2.5 pr-1 py-1 text-sm">
                 <img src={`https://mc-heads.net/avatar/${p}/20`} alt="" className="h-5 w-5 rounded-sm" />
                 {p}
+                {canCommand && (
+                  <span className="ml-1 flex gap-0.5">
+                    <ConfirmButton label="킥" confirmLabel="킥?" className={cx(btn.ghost, "!px-1.5 !py-0.5 text-xs")} onConfirm={() => cmd(`kick ${p}`, `${p} 추방`)} />
+                    <ConfirmButton label="밴" confirmLabel="밴?" className={cx(btn.ghost, "!px-1.5 !py-0.5 text-xs text-red-300")} onConfirm={() => cmd(`ban ${p}`, `${p} 밴`)} />
+                  </span>
+                )}
               </li>
             ))}
           </ul>

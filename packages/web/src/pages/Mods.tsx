@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useParams } from "react-router-dom";
 import type { ModInfo } from "@blockpilot/shared";
 import { useDeleteMod, useMods, useServer, useToggleMod, useUploadMods } from "../api/hooks";
+import { withToken } from "../api/client";
 import { btn, card, cx, ConfirmButton, EmptyState, Spinner, Toggle, useToast } from "../lib/ui";
 
 export default function Mods() {
@@ -18,18 +19,43 @@ export default function Mods() {
 
   const enabled = mods?.filter((m) => m.enabled) ?? [];
   const problems = enabled.filter((m) => m.missingDeps.length);
+  const isPaper = server?.loader === "paper";
+  const clientMods = enabled.filter((m) => m.environment !== "server");
+
+  const copyList = async () => {
+    const text = [
+      `${server?.name ?? "서버"} 모드 목록 (${server?.mcVersion ?? ""} ${server?.loader ?? ""})`,
+      ...clientMods.map((m) => `- ${m.name ?? m.file}${m.version ? ` ${m.version}` : ""}  (${m.file})`),
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("ok", "모드 목록을 클립보드에 복사했습니다.");
+    } catch {
+      toast("err", "클립보드에 복사하지 못했습니다.");
+    }
+  };
 
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">모드</h1>
+          <h1 className="text-2xl font-bold">{isPaper ? "플러그인" : "모드"}</h1>
           <p className="mt-1 text-sm text-slate-400">
-            mods/ 폴더 · 활성 {enabled.length}개 / 전체 {mods?.length ?? 0}개
-            {locked && <span className="ml-2 text-amber-300">· 서버를 중지해야 모드를 변경할 수 있습니다</span>}
+            {isPaper ? "plugins/" : "mods/"} 폴더 · 활성 {enabled.length}개 / 전체 {mods?.length ?? 0}개
+            {locked && <span className="ml-2 text-amber-300">· 서버를 중지해야 변경할 수 있습니다</span>}
           </p>
         </div>
-        <div>
+        <div className="flex flex-wrap gap-2">
+          {!isPaper && clientMods.length > 0 && (
+            <>
+              <button className={cx(btn.base, btn.secondary)} onClick={copyList}>
+                목록 복사
+              </button>
+              <a className={cx(btn.base, btn.secondary)} href={withToken(`/api/servers/${id}/mods/export`)} title="친구들에게 나눠줄 클라이언트용 모드 zip">
+                친구용 zip 다운로드
+              </a>
+            </>
+          )}
           <input
             ref={fileRef}
             type="file"

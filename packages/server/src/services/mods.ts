@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import yazl from "yazl";
+import { parse as parseYaml } from "yaml";
 import type { ModInfo, ModDependency } from "@blockpilot/shared";
 import { readZipEntries, readZipEntriesFromBuffer } from "../lib/zip.js";
 import { assertPlainFilename } from "../lib/safePath.js";
@@ -24,8 +26,13 @@ interface ParsedJar {
   iconDataUrl?: string;
 }
 
-export async function listMods(serverDir: string, mcVersion?: string): Promise<ModInfo[]> {
-  const modsDir = path.join(serverDir, "mods");
+/** Paper/Spigot 은 mods/ 대신 plugins/ 를 쓴다 */
+export function modsDirName(loader?: string) {
+  return loader === "paper" ? "plugins" : "mods";
+}
+
+export async function listMods(serverDir: string, mcVersion?: string, loader?: string): Promise<ModInfo[]> {
+  const modsDir = path.join(serverDir, modsDirName(loader));
   let files: string[];
   try {
     files = await fs.readdir(modsDir);
@@ -81,9 +88,9 @@ export async function listMods(serverDir: string, mcVersion?: string): Promise<M
   });
 }
 
-export async function setModEnabled(serverDir: string, file: string, enabled: boolean) {
+export async function setModEnabled(serverDir: string, file: string, enabled: boolean, loader?: string) {
   assertPlainFilename(file);
-  const modsDir = path.join(serverDir, "mods");
+  const modsDir = path.join(serverDir, modsDirName(loader));
   const from = path.join(modsDir, file);
   const base = file.endsWith(DISABLED_SUFFIX) ? file.slice(0, -DISABLED_SUFFIX.length) : file;
   const to = path.join(modsDir, enabled ? base : base + DISABLED_SUFFIX);
@@ -97,9 +104,9 @@ export async function setModEnabled(serverDir: string, file: string, enabled: bo
   return path.basename(to);
 }
 
-export async function deleteMod(serverDir: string, file: string) {
+export async function deleteMod(serverDir: string, file: string, loader?: string) {
   assertPlainFilename(file);
-  const full = path.join(serverDir, "mods", file);
+  const full = path.join(serverDir, modsDirName(loader), file);
   try {
     await fs.rm(full);
   } catch (e: any) {
@@ -108,17 +115,40 @@ export async function deleteMod(serverDir: string, file: string) {
   }
 }
 
-export async function saveUploadedMod(serverDir: string, filename: string, data: Buffer) {
+export async function saveUploadedMod(serverDir: string, filename: string, data: Buffer, loader?: string) {
   assertPlainFilename(filename);
   if (!filename.endsWith(".jar")) throw badRequest(".jar 파일만 업로드할 수 있습니다.");
-  const modsDir = path.join(serverDir, "mods");
+  const modsDir = path.join(serverDir, modsDirName(loader));
   await fs.mkdir(modsDir, { recursive: true });
   await fs.writeFile(path.join(modsDir, filename), data);
 }
 
+/**
+ * 친구들에게 나눠줄 클라이언트용 모드 zip.
+ * 활성화된 모드 중 서버 전용(environment=server)을 제외하고 묶는다. Paper 플러그인은 클라이언트에 필요 없으므로 비움.
+ */
+export async function buildClientModsZip(serverDir: string, mcVersion?: string, loader?: string): Promise<{ stream: NodeJS.ReadableStream; files: string[] }> {
+  const mods = loader === "paper" ? [] : await listMods(serverDir, mcVersion, loader);
+  const files = mods.filter((m) => m.enabled && m.environment !== "server").map((m) => m.file);
+  const zip = new yazl.ZipFile();
+  for (const f of files) zip.addFile(path.join(serverDir, modsDirName(loader), f), `mods/${f}`);
+  const readme = [
+    `BlockPilot 클라이언트 모드팩`,
+    `마인크래프트 ${mcVersion ?? ""} / ${loader ?? ""}`,
+    ``,
+    `1. 런처에 ${loader === "fabric" ? "Fabric Loader" : loader === "neoforge" ? "NeoForge" : loader === "forge" ? "Forge" : "서버와 같은 로더"}를 설치하세요.`,
+    `2. mods/ 폴더의 jar 파일을 .minecraft/mods/ 에 넣으세요.`,
+    ``,
+    ...files.map((f) => `- ${f}`),
+  ].join("\n");
+  zip.addBuffer(Buffer.from(readme, "utf8"), "README.txt");
+  zip.end();
+  return { stream: zip.outputStream, files };
+}
+
 // ---------- jar 파싱 ----------
 
-const WANTED = ["fabric.mod.json", "META-INF/mods.toml", "META-INF/neoforge.mods.toml"];
+const WANTED = ["fabric.mod.json", "META-INF/mods.toml", "META-INF/neoforge.mods.toml", "plugin.yml", "paper-plugin.yml"];
 
 async function parseJar(file: string): Promise<ParsedJar> {
   const entries = await readZipEntries(file, WANTED);
@@ -128,7 +158,31 @@ async function parseJar(file: string): Promise<ParsedJar> {
   if (neo) return parseForgeToml(neo, "neoforge");
   const forge = entries.get("META-INF/mods.toml");
   if (forge) return parseForgeToml(forge, "forge");
+  const plugin = entries.get("paper-plugin.yml") ?? entries.get("plugin.yml");
+  if (plugin) return parsePluginYml(plugin);
   return { loader: "unknown", authors: [], depends: [], provides: new Map() };
+}
+
+/** Bukkit/Paper plugin.yml */
+function parsePluginYml(buf: Buffer): ParsedJar {
+  const y = (parseYaml(buf.toString("utf8")) ?? {}) as Record<string, any>;
+  const id = typeof y.name === "string" ? y.name : undefined;
+  const version = y.version !== undefined ? String(y.version) : undefined;
+  const provides = new Map<string, string>();
+  if (id) provides.set(id, version ?? "");
+  const authors: string[] = Array.isArray(y.authors) ? y.authors.map(String) : y.author ? [String(y.author)] : [];
+  const dependsRaw: string[] = Array.isArray(y.depend) ? y.depend.map(String) : Array.isArray(y.dependencies?.server) ? Object.keys(y.dependencies.server) : [];
+  return {
+    loader: "paper",
+    id,
+    name: id,
+    version,
+    description: typeof y.description === "string" ? y.description : undefined,
+    authors,
+    environment: "server",
+    depends: dependsRaw.map((d) => ({ id: d, version: "*" })),
+    provides,
+  };
 }
 
 async function parseFabric(buf: Buffer, jarPath: string): Promise<ParsedJar> {

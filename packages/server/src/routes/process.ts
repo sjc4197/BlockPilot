@@ -34,7 +34,7 @@ export async function processRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { command } = (req.body ?? {}) as { command?: string };
     const { managed } = await loadContext(id);
-    managed.sendCommand(String(command ?? ""));
+    await managed.sendCommand(String(command ?? ""));
     return { ok: true };
   });
 
@@ -59,10 +59,10 @@ export async function processRoutes(app: FastifyInstance) {
     managed.on("line", onLine);
     managed.on("status", onStatus);
 
-    socket.on("message", (raw: Buffer | string) => {
+    socket.on("message", async (raw: Buffer | string) => {
       try {
         const msg = JSON.parse(String(raw)) as ConsoleClientMessage;
-        if (msg.type === "command") managed.sendCommand(msg.command);
+        if (msg.type === "command") await managed.sendCommand(msg.command);
       } catch (e: any) {
         send({ type: "line", line: { ts: Date.now(), source: "system", text: `오류: ${e?.message ?? e}` } });
       }

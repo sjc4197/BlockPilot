@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConsoleLine, ConsoleServerMessage, ProcessStatus } from "@blockpilot/shared";
+import { withToken } from "../api/client";
 
 const MAX_LINES = 2000;
 
@@ -16,7 +17,7 @@ export function useConsole(serverId: string) {
 
     const connect = () => {
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(`${proto}://${location.host}/api/servers/${serverId}/console`);
+      const ws = new WebSocket(withToken(`${proto}://${location.host}/api/servers/${serverId}/console`));
       wsRef.current = ws;
       ws.onopen = () => setConnected(true);
       ws.onmessage = (ev) => {

@@ -31,14 +31,12 @@ export async function propertiesRoutes(app: FastifyInstance) {
     await writePropertiesChanges(dir, changes);
     const status = await managed.status();
     const result: UpdatePropertiesResult = { saved: Object.keys(changes), appliedLive: [], needsRestart: [] };
-    if (status.state === "running") {
+    if (status.state === "running" || status.state === "external") {
       for (const [key, value] of Object.entries(changes)) {
         const meta = PROPERTY_META_BY_KEY[key];
-        if (meta?.liveCommand && managed.tryCommand(meta.liveCommand(value))) result.appliedLive.push(key);
+        if (meta?.liveCommand && (await managed.tryCommand(meta.liveCommand(value)).catch(() => false))) result.appliedLive.push(key);
         else result.needsRestart.push(key);
       }
-    } else if (status.state === "external") {
-      result.needsRestart.push(...Object.keys(changes));
     }
     return result;
   });

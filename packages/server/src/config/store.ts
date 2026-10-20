@@ -2,11 +2,17 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { RegisteredServer } from "@blockpilot/shared";
+import { DEFAULT_BACKUP_SETTINGS, type BackupSettings, type RegisteredServer } from "@blockpilot/shared";
 import { notFound } from "../lib/errors.js";
+
+interface ServerSettings {
+  backup: BackupSettings;
+}
 
 interface ConfigFile {
   servers: RegisteredServer[];
+  settings?: Record<string, ServerSettings>;
+  auth?: { token?: string };
 }
 
 const CONFIG_DIR = process.env.BLOCKPILOT_HOME ?? path.join(os.homedir(), ".blockpilot");
@@ -27,7 +33,7 @@ async function load(): Promise<ConfigFile> {
 
 async function save(cfg: ConfigFile) {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(CONFIG_PATH, JSON.stringify(cfg, null, 2), "utf8");
+  await fs.writeFile(CONFIG_PATH, JSON.stringify(cfg, null, 2), { encoding: "utf8", mode: 0o600 });
   cache = cfg;
 }
 
@@ -55,7 +61,37 @@ export async function addServer(input: { path: string; name: string }): Promise<
   return server;
 }
 
+export async function renameServer(id: string, name: string) {
+  const cfg = await load();
+  await save({ ...cfg, servers: cfg.servers.map((s) => (s.id === id ? { ...s, name } : s)) });
+}
+
 export async function removeServer(id: string) {
   const cfg = await load();
-  await save({ ...cfg, servers: cfg.servers.filter((s) => s.id !== id) });
+  const settings = { ...cfg.settings };
+  delete settings[id];
+  await save({ ...cfg, servers: cfg.servers.filter((s) => s.id !== id), settings });
+}
+
+// ---------- 서버별 설정 ----------
+
+export async function getBackupSettings(id: string): Promise<BackupSettings> {
+  const cfg = await load();
+  return { ...DEFAULT_BACKUP_SETTINGS, ...cfg.settings?.[id]?.backup };
+}
+
+export async function setBackupSettings(id: string, backup: BackupSettings) {
+  const cfg = await load();
+  await save({ ...cfg, settings: { ...cfg.settings, [id]: { ...cfg.settings?.[id], backup } } });
+}
+
+// ---------- 인증 ----------
+
+export async function getAuthToken(): Promise<string | null> {
+  return (await load()).auth?.token ?? null;
+}
+
+export async function setAuthToken(token: string | null) {
+  const cfg = await load();
+  await save({ ...cfg, auth: token ? { token } : undefined });
 }

@@ -108,7 +108,7 @@ function ListPanel({ serverId, kind }: { serverId: string; kind: PlayerListKind 
           </div>
         )}
         {kind === "ops" && (
-          <div className="w-32">
+          <div className="w-32 shrink-0">
             <label className="mb-1 block text-xs text-slate-400">권한 레벨</label>
             <select className={input} value={level} onChange={(e) => setLevel(Number(e.target.value))}>
               {[1, 2, 3, 4].map((l) => (

@@ -9,17 +9,36 @@ import type {
   ModInfo,
   ProcessStatus,
   MojangProfile,
+  ConfigFileEntry,
+  ConfigFileContent,
+  ConfigValidationResult,
+  LogFileEntry,
+  LogFileContent,
+  BackupEntry,
+  BackupStatus,
+  BackupSettings,
+  AuthInfo,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
 export const keys = {
+  auth: ["auth"] as const,
   servers: ["servers"] as const,
   server: (id: string) => ["server", id] as const,
   properties: (id: string) => ["server", id, "properties"] as const,
   players: (id: string, kind: PlayerListKind) => ["server", id, "players", kind] as const,
   mods: (id: string) => ["server", id, "mods"] as const,
   process: (id: string) => ["server", id, "process"] as const,
+  configs: (id: string) => ["server", id, "configs"] as const,
+  configFile: (id: string, path: string) => ["server", id, "configs", path] as const,
+  logs: (id: string) => ["server", id, "logs"] as const,
+  logFile: (id: string, kind: string, name: string) => ["server", id, "logs", kind, name] as const,
+  backups: (id: string) => ["server", id, "backups"] as const,
 };
+
+// ---------- 인증 ----------
+
+export const useAuthInfo = () => useQuery({ queryKey: keys.auth, queryFn: () => api<AuthInfo>("/api/auth"), staleTime: Infinity });
 
 // ---------- 서버 ----------
 
@@ -139,5 +158,93 @@ export function useProcessAction(id: string) {
       qc.invalidateQueries({ queryKey: keys.server(id) });
       qc.invalidateQueries({ queryKey: keys.process(id) });
     },
+  });
+}
+
+export function useSendCommand(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (command: string) => api(`/api/servers/${id}/process/command`, { method: "POST", json: { command } }),
+    onSettled: () => setTimeout(() => qc.invalidateQueries({ queryKey: keys.server(id) }), 800),
+  });
+}
+
+// ---------- 설정 파일 ----------
+
+export const useConfigFiles = (id: string) => useQuery({ queryKey: keys.configs(id), queryFn: () => api<ConfigFileEntry[]>(`/api/servers/${id}/configs`) });
+
+export const useConfigFile = (id: string, path: string | null) =>
+  useQuery({
+    queryKey: keys.configFile(id, path ?? ""),
+    queryFn: () => api<ConfigFileContent>(`/api/servers/${id}/configs/file?path=${encodeURIComponent(path!)}`),
+    enabled: !!path,
+  });
+
+export function useSaveConfigFile(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { path: string; content: string }) => api<ConfigFileContent>(`/api/servers/${id}/configs/file`, { method: "PUT", json: input }),
+    onSuccess: (data) => {
+      qc.setQueryData(keys.configFile(id, data.path), data);
+      qc.invalidateQueries({ queryKey: keys.configs(id) });
+    },
+  });
+}
+
+export const validateConfig = (id: string, input: { path: string; content: string }) =>
+  api<ConfigValidationResult>(`/api/servers/${id}/configs/validate`, { method: "POST", json: input });
+
+// ---------- 로그 ----------
+
+export const useLogs = (id: string) => useQuery({ queryKey: keys.logs(id), queryFn: () => api<LogFileEntry[]>(`/api/servers/${id}/logs`) });
+
+export const useLogFile = (id: string, kind: string | null, name: string | null, tail = 2000) =>
+  useQuery({
+    queryKey: [...keys.logFile(id, kind ?? "", name ?? ""), tail],
+    queryFn: () => api<LogFileContent>(`/api/servers/${id}/logs/${kind}/${encodeURIComponent(name!)}?tail=${tail}`),
+    enabled: !!kind && !!name,
+    refetchInterval: name === "latest.log" ? 5000 : false,
+  });
+
+// ---------- 백업 ----------
+
+export interface BackupsResponse {
+  backups: BackupEntry[];
+  status: BackupStatus;
+  worlds: string[];
+}
+
+export const useBackups = (id: string) =>
+  useQuery({ queryKey: keys.backups(id), queryFn: () => api<BackupsResponse>(`/api/servers/${id}/backups`), refetchInterval: 15000 });
+
+export function useCreateBackup(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (label?: string) => api<BackupEntry>(`/api/servers/${id}/backups`, { method: "POST", json: { label } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.backups(id) }),
+  });
+}
+
+export function useDeleteBackup(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: string) => api(`/api/servers/${id}/backups/${encodeURIComponent(file)}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.backups(id) }),
+  });
+}
+
+export function useRestoreBackup(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: string) => api<{ restored: string[]; previousMovedTo: string }>(`/api/servers/${id}/backups/${encodeURIComponent(file)}/restore`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.server(id) }),
+  });
+}
+
+export function useSaveBackupSettings(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: BackupSettings) => api<BackupStatus>(`/api/servers/${id}/backups/settings`, { method: "PUT", json: settings }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.backups(id) }),
   });
 }
