@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="docs/screenshots/02-dashboard.png" alt="BlockPilot 대시보드" width="820">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png">
+    <img src="docs/logo-light.png" alt="BlockPilot" width="480">
+  </picture>
 </p>
-
-<h1 align="center">BlockPilot</h1>
 
 <p align="center">
   마인크래프트 서버 폴더 경로 하나만 등록하면<br>
@@ -16,6 +17,10 @@
   <img alt="React" src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black">
   <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-green">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/02-dashboard.png" alt="BlockPilot 대시보드" width="820">
 </p>
 
 ---

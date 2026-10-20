@@ -6,6 +6,7 @@ export default {
       fontFamily: {
         sans: ["Inter", "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "SFMono-Regular", "Menlo", "Consolas", "ui-monospace", "monospace"],
+        pixel: ["Silkscreen", "ui-monospace", "monospace"],
       },
       colors: {
         // 배경 레이어: 0(가장 깊음) → 3(떠 있는 요소)
@@ -19,6 +20,10 @@ export default {
         line: {
           DEFAULT: "rgba(148, 163, 184, 0.12)",
           strong: "rgba(148, 163, 184, 0.24)",
+        },
+        redstone: {
+          DEFAULT: "#ff3b2f",
+          dim: "#6b1a14",
         },
         brand: {
           50: "#ecfdf5",

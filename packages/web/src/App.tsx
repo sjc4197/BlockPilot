@@ -6,6 +6,7 @@ import { useAuthInfo, useServer } from "./api/hooks";
 import { getToken, setToken, setUnauthorizedHandler } from "./api/client";
 import { StatusBadge, cx } from "./lib/ui";
 import { ProcessControls } from "./components/ProcessControls";
+import { DustRow, PixelLeverMark } from "./components/Lever";
 import ServerSelect from "./pages/ServerSelect";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
@@ -71,17 +72,17 @@ const NAV = [
   { to: "backups", label: "백업", icon: Archive },
 ];
 
-export function Logo({ className }: { className?: string }) {
+/** J 시안: 레버 마크 + BLOCK/PILOT 픽셀 워드마크 + 레드스톤 가루 밑줄 */
+export function Logo({ className, size = "md" }: { className?: string; size?: "md" | "lg" }) {
+  const lg = size === "lg";
   return (
-    <span className={cx("inline-flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 shadow-[0_4px_12px_-4px_rgba(16,185,129,.8)]">
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
-          <path d="M5 5h14v14H5z" fill="#070a12" />
-          <path d="M8 8h4v4H8zM12 12h4v4h-4z" fill="#6ee7b7" />
-        </svg>
-      </span>
-      <span>
-        Block<span className="text-brand-400">Pilot</span>
+    <span className={cx("inline-flex items-center", lg ? "gap-4" : "gap-2.5", className)}>
+      <PixelLeverMark className={lg ? "h-16 w-16" : "h-8 w-8"} />
+      <span className="inline-flex flex-col">
+        <span className={cx("font-pixel font-bold leading-none text-white", lg ? "text-[38px]" : "text-[15px]")}>
+          BLOCK<span className="text-redstone">PILOT</span>
+        </span>
+        <DustRow count={lg ? 24 : 13} lit={lg ? 14 : 8} size={lg ? 5 : 3} className={lg ? "mt-3" : "mt-1.5"} />
       </span>
     </span>
   );
@@ -156,12 +157,7 @@ function ServerLayout() {
             <ChevronRight className="h-3.5 w-3.5 text-slate-600" />
             <span className="truncate font-medium text-slate-200">{current?.label ?? ""}</span>
           </div>
-          {server && (
-            <div className="flex items-center gap-3">
-              <StatusBadge state={server.process.state} />
-              <ProcessControls serverId={id} status={server.process} size="sm" />
-            </div>
-          )}
+          {server && <ProcessControls serverId={id} status={server.process} size="sm" />}
         </header>
         <main className="flex-1 px-6 py-6">
           <div key={location.pathname} className="mx-auto max-w-6xl animate-fade-in">

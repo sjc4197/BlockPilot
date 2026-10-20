@@ -31,7 +31,7 @@ export default function ServerSelect() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16 animate-slide-up">
       <header className="mb-10 text-center">
-        <Logo className="text-3xl" />
+        <Logo size="lg" />
         <p className="mx-auto mt-4 max-w-lg text-balance text-slate-400">마인크래프트 서버 폴더를 등록하면 설정 · 모드 · 플레이어 · 콘솔 · 백업을 한 곳에서 관리할 수 있어요.</p>
       </header>
 

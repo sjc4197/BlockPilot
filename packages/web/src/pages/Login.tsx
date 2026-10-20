@@ -26,7 +26,7 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
 
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-16 animate-slide-up">
-      <Logo className="text-2xl" />
+      <Logo size="lg" />
       <p className="mt-3 text-sm text-slate-400">이 대시보드는 접속 토큰으로 보호되어 있어요. BlockPilot을 실행한 터미널 로그나 <code className="font-mono text-slate-300">BLOCKPILOT_TOKEN</code> 환경 변수에서 확인하세요.</p>
       <Card className="mt-6">
         <form onSubmit={submit} className="space-y-3">
