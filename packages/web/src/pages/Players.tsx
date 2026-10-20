@@ -1,64 +1,54 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { Ban, Crown, Globe, ShieldCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import type { PlayerListKind, WhitelistEntry, OpEntry, BannedPlayerEntry, BannedIpEntry } from "@blockpilot/shared";
 import { useAddPlayer, usePlayerList, useRemovePlayer, useServer, useUpdateProperties } from "../api/hooks";
-import { btn, card, cx, input, ConfirmButton, EmptyState, Toggle, useToast, Spinner } from "../lib/ui";
+import { Avatar, Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageHeader, Select, Spinner, Tabs, Toggle, useToast } from "../lib/ui";
 
-const TABS: { id: PlayerListKind; label: string }[] = [
-  { id: "whitelist", label: "화이트리스트" },
-  { id: "ops", label: "OP" },
-  { id: "banned-players", label: "밴 (플레이어)" },
-  { id: "banned-ips", label: "밴 (IP)" },
-];
+const TABS = [
+  { id: "whitelist", label: "화이트리스트", icon: ShieldCheck },
+  { id: "ops", label: "OP", icon: Crown },
+  { id: "banned-players", label: "밴 (플레이어)", icon: Ban },
+  { id: "banned-ips", label: "밴 (IP)", icon: Globe },
+] as const;
 
 export default function Players() {
   const { id = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const tabParam = params.get("tab");
   const tab: PlayerListKind = TABS.some((t) => t.id === tabParam) ? (tabParam as PlayerListKind) : "whitelist";
-  const setTab = (t: PlayerListKind) => setParams({ tab: t });
   const { data: server } = useServer(id);
   const updateProps = useUpdateProperties(id);
   const toast = useToast();
-  const running = server?.process.state === "running";
+  const live = server?.process.state === "running" || (server?.process.state === "external" && server.process.rcon === "connected");
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">플레이어</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            {running ? "서버 실행 중: 변경 사항은 콘솔 명령으로 즉시 반영됩니다." : "서버 중지 상태: 파일을 직접 수정합니다. 다음 시작 때 반영돼요."}
-          </p>
-        </div>
-        {server && (
-          <label className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-2 text-sm">
-            화이트리스트 사용
-            <Toggle
-              checked={server.properties.whitelist}
-              disabled={updateProps.isPending}
-              onChange={(v) =>
-                updateProps.mutate(
-                  { "white-list": v ? "true" : "false" },
-                  { onSuccess: () => toast("ok", v ? "화이트리스트를 켰습니다." : "화이트리스트를 껐습니다."), onError: (e) => toast("err", (e as Error).message) },
-                )
-              }
-            />
-          </label>
-        )}
-      </header>
+      <PageHeader
+        icon={Users}
+        title="플레이어"
+        description={live ? "서버 실행 중 · 변경 사항은 콘솔 명령으로 즉시 반영돼요." : "서버 중지 상태 · 파일을 직접 수정하고 다음 시작 때 반영돼요."}
+        actions={
+          server && (
+            <label className="flex h-9 items-center gap-3 rounded-lg border border-line bg-ink-1/70 px-3 text-sm">
+              <span className="text-slate-300">화이트리스트 사용</span>
+              <Toggle
+                size="sm"
+                checked={server.properties.whitelist}
+                disabled={updateProps.isPending}
+                onChange={(v) =>
+                  updateProps.mutate(
+                    { "white-list": v ? "true" : "false" },
+                    { onSuccess: () => toast("ok", v ? "화이트리스트를 켰습니다." : "화이트리스트를 껐습니다."), onError: (e) => toast("err", (e as Error).message) },
+                  )
+                }
+              />
+            </label>
+          )
+        }
+      />
 
-      <nav className="flex gap-1 border-b border-slate-800">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={cx("px-3 py-2 text-sm border-b-2 -mb-px", tab === t.id ? "border-emerald-400 text-white" : "border-transparent text-slate-400 hover:text-slate-200")}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <Tabs tabs={[...TABS]} value={tab} onChange={(t) => setParams({ tab: t })} />
 
       <ListPanel key={tab} serverId={id} kind={tab} />
     </div>
@@ -91,74 +81,74 @@ function ListPanel({ serverId, kind }: { serverId: string; kind: PlayerListKind 
   };
 
   const removeEntry = (key: string, label: string) =>
-    remove.mutate(key, {
-      onSuccess: () => toast("info", `${label} 제거`),
-      onError: (err) => toast("err", (err as Error).message),
-    });
+    remove.mutate(key, { onSuccess: () => toast("info", `${label} 제거`), onError: (err) => toast("err", (err as Error).message) });
 
   return (
     <div className="space-y-4">
-      <form onSubmit={submit} className={cx(card, "flex flex-wrap items-end gap-3")}>
-        {isIp ? (
-          <div className="flex-1 min-w-48">
-            <label className="mb-1 block text-xs text-slate-400">IP 주소</label>
-            <input className={input} value={ip} onChange={(e) => setIp(e.target.value)} placeholder="1.2.3.4" required />
-          </div>
-        ) : (
-          <div className="flex-1 min-w-48">
-            <label className="mb-1 block text-xs text-slate-400">닉네임 (UUID는 Mojang에서 자동 조회)</label>
-            <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Steve" pattern="[A-Za-z0-9_]{1,16}" required />
-          </div>
-        )}
-        {kind === "ops" && (
-          <div className="w-32 shrink-0">
-            <label className="mb-1 block text-xs text-slate-400">권한 레벨</label>
-            <select className={input} value={level} onChange={(e) => setLevel(Number(e.target.value))}>
-              {[1, 2, 3, 4].map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        {kind.startsWith("banned") && (
-          <div className="flex-1 min-w-48">
-            <label className="mb-1 block text-xs text-slate-400">사유 (선택)</label>
-            <input className={input} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </div>
-        )}
-        <button className={cx(btn.base, btn.primary)} disabled={add.isPending}>
-          {add.isPending ? "조회 중..." : "추가"}
-        </button>
-      </form>
+      <Card>
+        <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+          {isIp ? (
+            <Field label="IP 주소" className="min-w-56 flex-1">
+              <Input mono value={ip} onChange={(e) => setIp(e.target.value)} placeholder="1.2.3.4" required />
+            </Field>
+          ) : (
+            <Field label="닉네임 · UUID는 Mojang에서 자동 조회" className="min-w-56 flex-1">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Steve" pattern="[A-Za-z0-9_]{1,16}" required />
+            </Field>
+          )}
+          {kind === "ops" && (
+            <Field label="권한 레벨" className="w-28 shrink-0">
+              <Select value={level} onChange={(e) => setLevel(Number(e.target.value))}>
+                {[1, 2, 3, 4].map((l) => (
+                  <option key={l} value={l}>
+                    레벨 {l}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          {kind.startsWith("banned") && (
+            <Field label="사유 (선택)" className="min-w-56 flex-1">
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Banned by an operator." />
+            </Field>
+          )}
+          <Button variant="primary" type="submit" icon={UserPlus} loading={add.isPending} className={!isIp ? "mb-[18px]" : ""}>
+            추가
+          </Button>
+        </form>
+      </Card>
 
       {isLoading ? (
         <Spinner />
       ) : !data?.length ? (
-        <EmptyState>목록이 비어 있습니다.</EmptyState>
+        <EmptyState icon={Users} title="목록이 비어 있어요">
+          위 폼에서 추가하면 여기에 표시됩니다.
+        </EmptyState>
       ) : (
-        <ul className={cx(card, "divide-y divide-slate-800 p-0")}>
+        <Card padded={false} className="divide-y divide-line">
           {data.map((e: WhitelistEntry | OpEntry | BannedPlayerEntry | BannedIpEntry) => {
             const key = "ip" in e ? e.ip : e.uuid;
             const label = "ip" in e ? e.ip : e.name;
             return (
-              <li key={key} className="flex items-center gap-4 px-5 py-3">
-                {"name" in e && <img src={`https://mc-heads.net/avatar/${e.uuid}/32`} alt="" className="h-8 w-8 rounded" />}
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">{label}</div>
-                  <div className="truncate text-xs text-slate-500">
+              <div key={key} className="flex items-center gap-4 px-5 py-3">
+                {"name" in e ? <Avatar id={e.uuid} size={36} /> : <div className="grid h-9 w-9 place-items-center rounded-md bg-ink-3 text-slate-400"><Globe className="h-4 w-4" /></div>}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-white">{label}</span>
+                    {"level" in e && <Badge tone="brand">레벨 {e.level}</Badge>}
+                    {"bypassesPlayerLimit" in e && e.bypassesPlayerLimit && <Badge>인원 제한 무시</Badge>}
+                    {"expires" in e && <Badge tone={e.expires === "forever" ? "danger" : "warning"}>{e.expires === "forever" ? "영구" : `만료 ${e.expires}`}</Badge>}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-[11px] text-slate-500">
                     {"uuid" in e && e.uuid}
-                    {"level" in e && ` · 레벨 ${e.level}`}
-                    {"reason" in e && ` · ${e.reason}`}
-                    {"expires" in e && e.expires !== "forever" && ` · 만료 ${e.expires}`}
+                    {"reason" in e && <span className="ml-2 font-sans text-slate-500">· {e.reason}</span>}
                   </div>
                 </div>
-                <ConfirmButton label="제거" confirmLabel="제거할까요?" className={btn.ghost} onConfirm={() => removeEntry(key, label)} />
-              </li>
+                <ConfirmButton size="sm" variant="ghost" icon={UserMinus} label="제거" confirmLabel="제거할까요?" onConfirm={() => removeEntry(key, label)} />
+              </div>
             );
           })}
-        </ul>
+        </Card>
       )}
     </div>
   );

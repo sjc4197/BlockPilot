@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
-import { btn, card, cx, input } from "../lib/ui";
+import { KeyRound } from "lucide-react";
+import { Logo } from "../App";
+import { Button, Card, Input } from "../lib/ui";
 
 export default function Login({ onLogin }: { onLogin: (token: string) => void }) {
   const [token, setTokenInput] = useState("");
@@ -23,18 +25,21 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
   };
 
   return (
-    <div className="mx-auto max-w-sm px-6 py-24">
-      <h1 className="text-2xl font-bold tracking-tight">
-        Block<span className="text-emerald-400">Pilot</span>
-      </h1>
-      <p className="mt-2 text-sm text-slate-400">이 대시보드는 접속 토큰으로 보호되어 있습니다. BlockPilot을 실행한 터미널 로그나 BLOCKPILOT_TOKEN 환경 변수에서 토큰을 확인하세요.</p>
-      <form onSubmit={submit} className={cx(card, "mt-6 space-y-3")}>
-        <input className={cx(input, "console-font")} type="password" placeholder="접속 토큰" value={token} onChange={(e) => setTokenInput(e.target.value)} autoFocus required />
-        {error && <p className="text-sm text-red-300">{error}</p>}
-        <button className={cx(btn.base, btn.primary, "w-full justify-center")} disabled={busy}>
-          {busy ? "확인 중..." : "입장"}
-        </button>
-      </form>
+    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-16 animate-slide-up">
+      <Logo className="text-2xl" />
+      <p className="mt-3 text-sm text-slate-400">이 대시보드는 접속 토큰으로 보호되어 있어요. BlockPilot을 실행한 터미널 로그나 <code className="font-mono text-slate-300">BLOCKPILOT_TOKEN</code> 환경 변수에서 확인하세요.</p>
+      <Card className="mt-6">
+        <form onSubmit={submit} className="space-y-3">
+          <div className="relative">
+            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input className="pl-9" mono type="password" placeholder="접속 토큰" value={token} onChange={(e) => setTokenInput(e.target.value)} autoFocus required />
+          </div>
+          {error && <p className="text-sm text-rose-300">{error}</p>}
+          <Button variant="primary" type="submit" loading={busy} className="w-full">
+            입장
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { FileArchive, Flame, ScrollText, Search } from "lucide-react";
 import { useLogFile, useLogs } from "../api/hooks";
-import { card, cx, input, EmptyState, Spinner } from "../lib/ui";
+import { Badge, Card, EmptyState, Input, PageHeader, Select, Spinner, cx, fmtBytes, fmtDate } from "../lib/ui";
 
 type Level = "all" | "warn" | "error";
 
@@ -34,65 +35,77 @@ export default function Logs() {
     if (boxRef.current && sel?.name === "latest.log") boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [lines, sel]);
 
+  const counts = useMemo(() => {
+    const all = log?.lines ?? [];
+    return { warn: all.filter((x) => /\/WARN\]/.test(x)).length, error: all.filter((x) => /\/(ERROR|FATAL)\]/.test(x)).length };
+  }, [log]);
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col gap-4">
-      <header>
-        <h1 className="text-2xl font-bold">로그</h1>
-        <p className="mt-1 text-sm text-slate-400">logs/ 와 crash-reports/ 의 파일을 봅니다. 압축(.gz)된 로그도 바로 열려요. latest.log 는 5초마다 갱신됩니다.</p>
-      </header>
+    <div className="flex h-[calc(100vh-7.5rem)] flex-col gap-5">
+      <PageHeader icon={ScrollText} title="로그" description="logs/ 와 crash-reports/ 의 파일을 봐요. 압축(.gz)된 로그도 바로 열리고 latest.log 는 5초마다 갱신돼요." />
       <div className="flex min-h-0 flex-1 gap-4">
-        <aside className={cx(card, "w-64 shrink-0 overflow-y-auto p-2 text-sm")}>
+        <Card padded={false} className="w-64 shrink-0 overflow-y-auto p-2">
           {isLoading ? (
-            <Spinner />
+            <Spinner className="m-3" />
           ) : !files?.length ? (
-            <EmptyState>로그 파일이 없습니다.</EmptyState>
+            <div className="p-4 text-center text-xs text-slate-500">로그 파일이 없어요.</div>
           ) : (
-            files.map((f) => (
-              <button
-                key={f.kind + f.name}
-                onClick={() => setSel({ kind: f.kind, name: f.name })}
-                className={cx("block w-full rounded px-2 py-1.5 text-left", sel?.name === f.name && sel.kind === f.kind ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-900")}
-              >
-                <div className="flex items-center gap-1.5 truncate console-font text-xs">
-                  {f.kind === "crash" && <span className="rounded bg-red-900/60 px-1 text-[10px] text-red-300">crash</span>}
-                  {f.name}
-                </div>
-                <div className="text-[10px] text-slate-500">
-                  {(f.sizeBytes / 1024).toFixed(0)} KB · {new Date(f.mtime).toLocaleString()}
-                </div>
-              </button>
-            ))
+            files.map((f) => {
+              const active = sel?.name === f.name && sel.kind === f.kind;
+              return (
+                <button
+                  key={f.kind + f.name}
+                  onClick={() => setSel({ kind: f.kind, name: f.name })}
+                  className={cx("flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition focus-ring", active ? "bg-ink-3 text-white" : "text-slate-300 hover:bg-ink-2")}
+                >
+                  {f.kind === "crash" ? <Flame className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" /> : f.compressed ? <FileArchive className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" /> : <ScrollText className={cx("mt-0.5 h-4 w-4 shrink-0", f.name === "latest.log" ? "text-brand-400" : "text-slate-500")} />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-mono text-[12px]">{f.name}</span>
+                    <span className="block text-[10px] text-slate-500 tnum">
+                      {fmtBytes(f.sizeBytes)} · {fmtDate(f.mtime)}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
           )}
-        </aside>
-        <section className={cx(card, "flex min-w-0 flex-1 flex-col p-0 overflow-hidden")}>
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 px-3 py-2">
-            <input className={cx(input, "!w-64")} placeholder="검색" value={filter} onChange={(e) => setFilter(e.target.value)} />
-            <select className={cx(input, "!w-36")} value={level} onChange={(e) => setLevel(e.target.value as Level)}>
+        </Card>
+        <Card padded={false} className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+              <Input className="h-8 !w-60 pl-8 text-xs" placeholder="검색" value={filter} onChange={(e) => setFilter(e.target.value)} />
+            </div>
+            <Select className="h-8 !w-36 text-xs" value={level} onChange={(e) => setLevel(e.target.value as Level)}>
               <option value="all">전체</option>
               <option value="warn">WARN 이상</option>
               <option value="error">ERROR / 예외</option>
-            </select>
-            <select className={cx(input, "!w-32")} value={tail} onChange={(e) => setTail(Number(e.target.value))}>
+            </Select>
+            <Select className="h-8 !w-32 text-xs" value={tail} onChange={(e) => setTail(Number(e.target.value))}>
               {[500, 2000, 5000].map((n) => (
                 <option key={n} value={n}>
                   마지막 {n}줄
                 </option>
               ))}
-            </select>
-            <span className="ml-auto text-xs text-slate-500">
-              {log ? `${lines.length} / ${log.totalLines}줄${log.truncated ? " (앞부분 생략)" : ""}` : ""} {isFetching && "· 갱신 중"}
-            </span>
+            </Select>
+            <div className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500 tnum">
+              {counts.warn > 0 && <Badge tone="warning">WARN {counts.warn}</Badge>}
+              {counts.error > 0 && <Badge tone="danger">ERROR {counts.error}</Badge>}
+              <span>
+                {log ? `${lines.length} / ${log.totalLines}줄${log.truncated ? " (앞부분 생략)" : ""}` : ""} {isFetching && "· 갱신 중"}
+              </span>
+            </div>
           </div>
-          <div ref={boxRef} className="console-font min-h-0 flex-1 overflow-auto bg-slate-950 p-3 text-xs leading-5">
-            {!sel ? null : !log ? <Spinner /> : lines.length === 0 ? <div className="text-slate-600">표시할 줄이 없습니다.</div> : lines.map((l, i) => <LogLine key={i} text={l} />)}
+          <div ref={boxRef} className="terminal min-h-0 flex-1 overflow-auto bg-ink-0/80 px-4 py-3">
+            {!sel ? null : !log ? <Spinner /> : lines.length === 0 ? <EmptyState title="표시할 줄이 없어요" /> : lines.map((l, i) => <LogLine key={i} text={l} />)}
           </div>
-        </section>
+        </Card>
       </div>
     </div>
   );
 }
 
 function LogLine({ text }: { text: string }) {
-  const cls = /\/(ERROR|FATAL)\]/.test(text) || /^\s*at |Exception/.test(text) ? "text-red-300" : /\/WARN\]/.test(text) ? "text-amber-300" : "text-slate-300";
-  return <div className={cx("whitespace-pre-wrap break-all", cls)}>{text}</div>;
+  const cls = /\/(ERROR|FATAL)\]/.test(text) || /^\s*at |Exception/.test(text) ? "text-rose-300" : /\/WARN\]/.test(text) ? "text-amber-300" : "text-slate-300";
+  return <div className={cx("whitespace-pre-wrap break-all hover:bg-white/[.025]", cls)}>{text}</div>;
 }

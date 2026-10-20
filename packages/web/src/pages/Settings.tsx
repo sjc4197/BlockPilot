@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Gauge, Globe, Layers, ListTree, Settings2, Swords, Users, Zap, type LucideIcon } from "lucide-react";
 import { PROPERTY_GROUPS, PROPERTY_META, PROPERTY_META_BY_KEY, type PropertyMeta, type PropertyGroup } from "@blockpilot/shared";
 import { useProperties, useServer, useUpdateProperties } from "../api/hooks";
-import { btn, card, cx, input, Toggle, useToast, Spinner } from "../lib/ui";
+import { Badge, Button, Card, Input, PageHeader, Select, Spinner, Toggle, cx, useToast } from "../lib/ui";
 
 type Tab = PropertyGroup | "advanced";
+const GROUP_ICON: Record<Tab, LucideIcon> = { gameplay: Swords, world: Layers, players: Users, network: Globe, performance: Gauge, advanced: ListTree };
 
 export default function Settings() {
   const { id = "" } = useParams();
@@ -27,15 +29,13 @@ export default function Settings() {
       return next;
     });
   const dirtyCount = Object.keys(draft).length;
-  const running = server?.process.state === "running";
+  const live = server?.process.state === "running" || (server?.process.state === "external" && server.process.rcon === "connected");
 
   const save = () =>
     update.mutate(draft, {
       onSuccess: (r) => {
-        if (r.appliedLive.length) toast("ok", `${r.appliedLive.length}개 즉시 적용, 파일에 저장했습니다.`);
-        else toast("ok", "저장했습니다.");
-        if (r.needsRestart.length)
-          toast("info", `재시작 후 반영: ${r.needsRestart.map((k) => PROPERTY_META_BY_KEY[k]?.label ?? k).join(", ")}`);
+        toast("ok", r.appliedLive.length ? `${r.appliedLive.length}개 즉시 적용, 파일에 저장했습니다.` : "저장했습니다.");
+        if (r.needsRestart.length) toast("info", `재시작 후 반영: ${r.needsRestart.map((k) => PROPERTY_META_BY_KEY[k]?.label ?? k).join(", ")}`);
         setDraft({});
       },
       onError: (err) => toast("err", (err as Error).message),
@@ -45,75 +45,83 @@ export default function Settings() {
 
   const knownKeys = new Set(PROPERTY_META.map((m) => m.key));
   const advancedEntries = (data?.entries ?? []).filter((e) => !knownKeys.has(e.key));
+  const groups: { id: Tab; label: string; count: number }[] = [
+    ...PROPERTY_GROUPS.map((g) => ({ id: g.id as Tab, label: g.label, count: PROPERTY_META.filter((m) => m.group === g.id).length })),
+    { id: "advanced", label: "고급", count: advancedEntries.length },
+  ];
+  const dirtyInGroup = (g: Tab) => Object.keys(draft).filter((k) => (g === "advanced" ? !knownKeys.has(k) : PROPERTY_META_BY_KEY[k]?.group === g)).length;
 
   return (
-    <div className="space-y-5">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">서버 설정</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            server.properties
-            {running && <span className="ml-2 text-amber-300">· 실행 중: 즉시 반영 가능한 항목은 바로 적용되고, 나머지는 재시작 후 반영됩니다.</span>}
-          </p>
-        </div>
-      </header>
+    <div className="space-y-5 pb-24">
+      <PageHeader
+        icon={Settings2}
+        title="서버 설정"
+        description={
+          <span>
+            <code className="font-mono text-slate-300">server.properties</code>
+            {live ? " · 실행 중: 즉시 적용 가능한 항목은 바로 반영되고, 나머지는 재시작 후 반영돼요." : " · 중지 상태: 파일에 저장되고 다음 시작 때 반영돼요."}
+          </span>
+        }
+      />
 
-      <nav className="flex gap-1 border-b border-slate-800">
-        {[...PROPERTY_GROUPS, { id: "advanced" as const, label: `고급 (${advancedEntries.length})` }].map((g) => (
-          <button
-            key={g.id}
-            onClick={() => setTab(g.id)}
-            className={cx(
-              "px-3 py-2 text-sm border-b-2 -mb-px",
-              tab === g.id ? "border-emerald-400 text-white" : "border-transparent text-slate-400 hover:text-slate-200",
-            )}
-          >
-            {g.label}
-          </button>
-        ))}
-      </nav>
+      <div className="grid gap-5 lg:grid-cols-[200px_1fr]">
+        <nav className="flex gap-1 overflow-x-auto lg:flex-col">
+          {groups.map((g) => {
+            const Icon = GROUP_ICON[g.id];
+            const active = tab === g.id;
+            const dirty = dirtyInGroup(g.id);
+            return (
+              <button
+                key={g.id}
+                onClick={() => setTab(g.id)}
+                className={cx("flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition focus-ring", active ? "bg-ink-3 text-white" : "text-slate-400 hover:bg-ink-2 hover:text-slate-200")}
+              >
+                <Icon className={cx("h-4 w-4", active ? "text-brand-400" : "text-slate-500")} />
+                <span className="flex-1">{g.label}</span>
+                {dirty > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> : <span className="text-[11px] text-slate-600 tnum">{g.count}</span>}
+              </button>
+            );
+          })}
+        </nav>
 
-      {tab !== "advanced" ? (
-        <div className={cx(card, "divide-y divide-slate-800 p-0")}>
-          {PROPERTY_META.filter((m) => m.group === tab).map((m) => (
-            <Field key={m.key} meta={m} value={value(m.key)} dirty={m.key in draft} running={running} onChange={(v) => set(m.key, v)} />
-          ))}
-        </div>
-      ) : (
-        <div className={cx(card, "p-0 overflow-hidden")}>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900 text-xs text-slate-400">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">키</th>
-                <th className="px-4 py-2 text-left font-medium">값</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {advancedEntries.map((e) => (
-                <tr key={e.key} className={cx(e.key in draft && "bg-emerald-950/30")}>
-                  <td className="px-4 py-2 console-font text-xs text-slate-300">{e.key}</td>
-                  <td className="px-4 py-1.5">
-                    <input className={cx(input, "console-font text-xs")} value={value(e.key)} onChange={(ev) => set(e.key, ev.target.value)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        {tab !== "advanced" ? (
+          <Card padded={false} className="divide-y divide-line">
+            {PROPERTY_META.filter((m) => m.group === tab).map((m) => (
+              <FieldRow key={m.key} meta={m} value={value(m.key)} dirty={m.key in draft} live={live} onChange={(v) => set(m.key, v)} />
+            ))}
+          </Card>
+        ) : (
+          <Card padded={false} className="overflow-hidden">
+            <div className="border-b border-line px-5 py-3 text-xs text-slate-500">위 그룹에 정리되지 않은 나머지 키. 값은 그대로 문자열로 저장돼요.</div>
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-line">
+                {advancedEntries.map((e) => (
+                  <tr key={e.key} className={cx(e.key in draft && "bg-brand-500/5")}>
+                    <td className="w-[40%] px-5 py-2 font-mono text-[12px] text-slate-300">{e.key}</td>
+                    <td className="px-4 py-1.5">
+                      <Input mono value={value(e.key)} onChange={(ev) => set(e.key, ev.target.value)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </div>
 
       {dirtyCount > 0 && (
-        <div className="sticky bottom-4 flex items-center justify-between rounded-xl border border-emerald-700/60 bg-slate-900/95 px-5 py-3 shadow-xl backdrop-blur">
+        <div className="fixed inset-x-0 bottom-5 z-30 mx-auto flex w-[min(720px,calc(100%-3rem))] items-center justify-between rounded-2xl glass px-5 py-3 shadow-pop animate-slide-up">
           <span className="text-sm">
-            <b>{dirtyCount}</b>개 항목 변경됨
+            <b className="text-white">{dirtyCount}</b>개 항목 변경됨
+            {live && <span className="ml-2 text-xs text-slate-400">· 즉시 적용 가능한 항목은 바로 반영돼요</span>}
           </span>
           <div className="flex gap-2">
-            <button className={cx(btn.base, btn.secondary)} onClick={() => setDraft({})}>
+            <Button variant="ghost" onClick={() => setDraft({})}>
               취소
-            </button>
-            <button className={cx(btn.base, btn.primary)} disabled={update.isPending} onClick={save}>
-              {update.isPending ? "저장 중..." : "저장"}
-            </button>
+            </Button>
+            <Button variant="primary" icon={Zap} loading={update.isPending} onClick={save}>
+              저장
+            </Button>
           </div>
         </div>
       )}
@@ -121,52 +129,37 @@ export default function Settings() {
   );
 }
 
-function Field({
-  meta,
-  value,
-  dirty,
-  running,
-  onChange,
-}: {
-  meta: PropertyMeta;
-  value: string;
-  dirty: boolean;
-  running: boolean;
-  onChange: (v: string) => void;
-}) {
-  const live = !!meta.liveCommand;
+function FieldRow({ meta, value, dirty, live, onChange }: { meta: PropertyMeta; value: string; dirty: boolean; live: boolean; onChange: (v: string) => void }) {
+  const canLive = !!meta.liveCommand;
   return (
-    <div className={cx("flex items-center gap-6 px-5 py-3.5", dirty && "bg-emerald-950/20")}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">{meta.label}</span>
-          <code className="text-[11px] text-slate-500">{meta.key}</code>
-          {running && (
-            <span className={cx("rounded px-1.5 py-px text-[10px]", live ? "bg-emerald-900/60 text-emerald-300" : "bg-slate-800 text-slate-400")}>
-              {live ? "즉시 적용" : "재시작 필요"}
-            </span>
-          )}
+    <div className={cx("flex items-center gap-6 px-5 py-3.5 transition", dirty && "bg-brand-500/5")}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-slate-100">{meta.label}</span>
+          <code className="font-mono text-[11px] text-slate-500">{meta.key}</code>
+          {live && <Badge tone={canLive ? "success" : "neutral"}>{canLive ? "즉시 적용" : "재시작 필요"}</Badge>}
+          {dirty && <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />}
         </div>
         {meta.description && <p className="mt-0.5 text-xs text-slate-500">{meta.description}</p>}
       </div>
-      <div className="w-64 shrink-0">
+      <div className="w-60 shrink-0">
         {meta.type === "boolean" ? (
           <div className="flex justify-end">
             <Toggle checked={value === "true"} onChange={(v) => onChange(v ? "true" : "false")} />
           </div>
         ) : meta.type === "enum" ? (
-          <select className={input} value={value} onChange={(e) => onChange(e.target.value)}>
+          <Select value={value} onChange={(e) => onChange(e.target.value)}>
             {!meta.options.some((o) => o.value === value) && <option value={value}>{value || "(비어 있음)"}</option>}
             {meta.options.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
-          </select>
+          </Select>
         ) : meta.type === "int" ? (
-          <input type="number" className={input} value={value} min={meta.min} max={meta.max} onChange={(e) => onChange(e.target.value)} />
+          <Input type="number" value={value} min={meta.min} max={meta.max} onChange={(e) => onChange(e.target.value)} />
         ) : (
-          <input className={input} value={value} placeholder={meta.placeholder} onChange={(e) => onChange(e.target.value)} />
+          <Input value={value} placeholder={meta.placeholder} onChange={(e) => onChange(e.target.value)} />
         )}
       </div>
     </div>
