@@ -1,5 +1,4 @@
 import Fastify from "fastify";
-import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
@@ -9,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { ZodError } from "zod";
 import { HttpError } from "./lib/errors.js";
 import { initAuth } from "./lib/auth.js";
+import { installOriginGuard } from "./lib/originGuard.js";
 import { authRoutes } from "./routes/auth.js";
 import { serversRoutes } from "./routes/servers.js";
 import { propertiesRoutes } from "./routes/properties.js";
@@ -27,7 +27,8 @@ const HOST = process.env.BLOCKPILOT_HOST ?? "127.0.0.1";
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" } });
 
-await app.register(cors, { origin: true });
+// CORS 는 일부러 켜지 않는다. 대시보드는 같은 출처에서 서빙되고, 다른 출처(악성 페이지 등)의 요청은 아래 가드가 막는다.
+installOriginGuard(app, HOST);
 await app.register(websocket);
 await app.register(multipart);
 

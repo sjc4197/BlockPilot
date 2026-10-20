@@ -1,12 +1,32 @@
 import { describe, it, expect } from "vitest";
-import { satisfies, parseVersion } from "../src/services/mods.js";
+import { satisfies, parseVersion, compareVersions } from "../src/services/mods.js";
 
 describe("parseVersion", () => {
-  it("strips build metadata and prerelease", () => {
-    expect(parseVersion("0.116.15+1.21.1")).toEqual([0, 116, 15]);
-    expect(parseVersion("5.1.3-beta")).toEqual([5, 1, 3]);
-    expect(parseVersion("1.21.1-Fabric-5.1.8")).toEqual([1, 21, 1]);
+  it("strips build metadata but keeps prerelease identifiers", () => {
+    expect(parseVersion("0.116.15+1.21.1")).toEqual({ core: [0, 116, 15], pre: null });
+    expect(parseVersion("5.1.3-beta")).toEqual({ core: [5, 1, 3], pre: ["beta"] });
+    expect(parseVersion("1.21.1-Fabric-5.1.8")).toEqual({ core: [1, 21, 1], pre: ["Fabric-5", "1", "8"] });
     expect(parseVersion("abc")).toBeNull();
+  });
+});
+
+describe("compareVersions", () => {
+  const v = (s: string) => parseVersion(s)!;
+  it("orders prerelease identifiers like semver", () => {
+    expect(compareVersions(v("1.21.1-Fabric-5.1.8"), v("1.21.1-Fabric-5.1.3"))).toBeGreaterThan(0);
+    expect(compareVersions(v("1.21.1-Fabric-5.1.0"), v("1.21.1-Fabric-5.1.3"))).toBeLessThan(0);
+    expect(compareVersions(v("1.21.1"), v("1.21.1-Fabric-5.1.3"))).toBeGreaterThan(0); // 프리릴리즈 없는 쪽이 큼
+    expect(compareVersions(v("1.0.0-alpha"), v("1.0.0-beta"))).toBeLessThan(0);
+    expect(compareVersions(v("1.0.0-alpha.1"), v("1.0.0-alpha"))).toBeGreaterThan(0);
+  });
+});
+
+describe("YUNG-style versions (core identical, real version after the dash)", () => {
+  // 실제 겪은 케이스: Better Dungeons 5.1.3 이 yungsapi >=1.21.1-Fabric-5.1.3 을 요구
+  it("does not report an outdated YUNG's API as satisfied", () => {
+    expect(satisfies("1.21.1-Fabric-5.1.0", ">=1.21.1-Fabric-5.1.3")).toBe(false);
+    expect(satisfies("1.21.1-Fabric-5.1.3", ">=1.21.1-Fabric-5.1.3")).toBe(true);
+    expect(satisfies("1.21.1-Fabric-5.1.8", ">=1.21.1-Fabric-5.1.3")).toBe(true);
   });
 });
 
