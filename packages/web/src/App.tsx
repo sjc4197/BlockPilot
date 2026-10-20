@@ -18,6 +18,7 @@ import ConfigFiles from "./pages/ConfigFiles";
 import Logs from "./pages/Logs";
 import Backups from "./pages/Backups";
 import Login from "./pages/Login";
+import NewServer from "./pages/NewServer";
 
 export default function App() {
   const qc = useQueryClient();
@@ -47,6 +48,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<ServerSelect />} />
+      <Route path="/new" element={<NewServer />} />
       <Route path="/s/:id" element={<ServerLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="settings" element={<Settings />} />

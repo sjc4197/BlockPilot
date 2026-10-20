@@ -1,15 +1,17 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, FolderOpen, Plus, Server, Trash2 } from "lucide-react";
-import { useRegisterServer, useRemoveServer, useServers } from "../api/hooks";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, FolderOpen, Hammer, Plus, Server, Trash2 } from "lucide-react";
+import { useCreateOptions, useRegisterServer, useRemoveServer, useServers } from "../api/hooks";
 import { Logo } from "../App";
-import { Button, Card, ConfirmButton, EmptyState, Field, Input, Spinner, useToast } from "../lib/ui";
+import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, Spinner, useToast } from "../lib/ui";
 
 export default function ServerSelect() {
   const { data: servers, isLoading } = useServers();
   const register = useRegisterServer();
   const remove = useRemoveServer();
   const toast = useToast();
+  const navigate = useNavigate();
+  const { data: createOpts } = useCreateOptions();
   const [path, setPath] = useState("");
   const [name, setName] = useState("");
 
@@ -35,9 +37,22 @@ export default function ServerSelect() {
         <p className="mx-auto mt-4 max-w-lg text-balance text-slate-400">마인크래프트 서버 폴더를 등록하면 설정 · 모드 · 플레이어 · 콘솔 · 백업을 한 곳에서 관리할 수 있어요.</p>
       </header>
 
+      <Card className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 font-block text-[12px] text-slate-200">
+            <Hammer className="h-4 w-4 text-redstone" /> 새 서버 만들기
+            {createOpts && !createOpts.supported && <Badge tone="warning">macOS 전용 · Linux·Windows 준비 중</Badge>}
+          </h2>
+          <p className="mt-1.5 text-sm text-slate-400">빈 폴더만 고르면 Fabric 서버를 처음부터 만들어요. Java 가 없으면 앱 폴더에 받아서 써요.</p>
+        </div>
+        <Button variant="primary" icon={Hammer} disabled={!createOpts?.supported} onClick={() => navigate("/new")} title={createOpts?.unsupportedMessage}>
+          새 서버 만들기
+        </Button>
+      </Card>
+
       <Card className="mb-8">
         <h2 className="mb-4 flex items-center gap-2 font-block text-[12px] text-slate-200">
-          <Plus className="h-4 w-4 text-redstone" /> 서버 폴더 추가
+          <Plus className="h-4 w-4 text-redstone" /> 이미 있는 서버 폴더 추가
         </h2>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid gap-3 md:grid-cols-[1fr_200px_auto] md:items-end">
@@ -67,7 +82,7 @@ export default function ServerSelect() {
             위에서 서버 폴더 경로를 추가하면 여기에 나타납니다.
           </EmptyState>
         ) : (
-          <ul className="grid gap-3">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
             {servers.map((s, i) => (
               <li key={s.id} className="slab group flex animate-slide-up items-center gap-4 p-4" style={{ animationDelay: `${i * 40}ms` }}>
                 <div className="well grid h-11 w-11 shrink-0 place-items-center text-redstone">

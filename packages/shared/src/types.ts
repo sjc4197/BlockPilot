@@ -313,6 +313,40 @@ export interface CreateJobStatus {
   finishedAt?: string;
 }
 
+export interface CreateOptions {
+  supported: boolean;
+  platform: "macos" | "linux" | "windows" | "other";
+  unsupportedMessage?: string;
+  totalMemMb: number;
+  /** Mojang 정식 릴리스 ∩ Fabric 안정 지원 (최신순) */
+  releases: { id: string; releaseTime: string }[];
+  defaults: { parentDir: string; memory: { minMb: number; maxMb: number } };
+  /** BlockPilot 이 도중에 꺼져서 다음 시작 때 정리한 작업 */
+  recovered: { target: string; cleaned: string[]; at: string }[];
+  activeJobId?: string;
+}
+
+export interface CreateVersionInfo {
+  mcVersion: string;
+  javaMajor: number;
+  java: { source: "system" | "cached" | "download"; version?: string; downloadMb?: number };
+  serverJarMb: number;
+  loaders: { version: string; stable: boolean }[];
+  recommendedLoader?: string;
+}
+
+export interface FsListing {
+  path: string;
+  parent: string | null;
+  home: string;
+  /** 이 폴더가 비었는지 (.DS_Store 등 제외) */
+  empty: boolean;
+  isServer: boolean;
+  entries: { name: string; path: string; empty: boolean | null; isServer: boolean }[];
+  truncated: boolean;
+  shortcuts: { label: string; path: string }[];
+}
+
 // ---------- 공통 ----------
 
 export interface ApiError {

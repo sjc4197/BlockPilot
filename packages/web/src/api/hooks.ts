@@ -18,6 +18,11 @@ import type {
   BackupStatus,
   BackupSettings,
   AuthInfo,
+  CreateOptions,
+  CreateVersionInfo,
+  CreateServerInput,
+  CreateJobStatus,
+  FsListing,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -247,4 +252,30 @@ export function useSaveBackupSettings(id: string) {
     mutationFn: (settings: BackupSettings) => api<BackupStatus>(`/api/servers/${id}/backups/settings`, { method: "PUT", json: settings }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.backups(id) }),
   });
+}
+
+// ---------- 새 서버 만들기 ----------
+
+export const useCreateOptions = () => useQuery({ queryKey: ["create", "options"], queryFn: () => api<CreateOptions>("/api/create/options"), staleTime: 60_000 });
+
+export const useVersionInfo = (mc: string | undefined) =>
+  useQuery({ queryKey: ["create", "version", mc], queryFn: () => api<CreateVersionInfo>(`/api/create/version-info?mc=${encodeURIComponent(mc!)}`), enabled: !!mc, staleTime: 60_000 });
+
+export const useFsList = (path: string | null) =>
+  useQuery({ queryKey: ["fs", path], queryFn: () => api<FsListing>(`/api/fs/list${path ? `?path=${encodeURIComponent(path)}` : ""}`), enabled: path !== undefined, retry: false });
+
+export function useStartCreate() {
+  return useMutation({ mutationFn: (input: CreateServerInput) => api<{ jobId: string }>("/api/create", { method: "POST", json: input }) });
+}
+
+export const useCreateJob = (id: string | null) =>
+  useQuery({
+    queryKey: ["create", "job", id],
+    queryFn: () => api<CreateJobStatus>(`/api/create/jobs/${id}`),
+    enabled: !!id,
+    refetchInterval: (q) => (q.state.data && q.state.data.state !== "running" ? false : 1000),
+  });
+
+export function useCancelCreate() {
+  return useMutation({ mutationFn: (id: string) => api<{ cancelled: boolean }>(`/api/create/jobs/${id}/cancel`, { method: "POST" }) });
 }

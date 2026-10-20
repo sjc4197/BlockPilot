@@ -19,6 +19,9 @@ import { mojangRoutes } from "./routes/mojang.js";
 import { configsRoutes } from "./routes/configs.js";
 import { logsRoutes } from "./routes/logs.js";
 import { backupsRoutes } from "./routes/backups.js";
+import { createRoutes } from "./routes/create.js";
+import { fsRoutes } from "./routes/fs.js";
+import { CreateError } from "./services/create/errors.js";
 import { shutdownAll } from "./services/process.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
 import { cancelAllJobs, recoverInterruptedJobs } from "./services/create/job.js";
@@ -36,6 +39,10 @@ await app.register(multipart);
 app.setErrorHandler((err, _req, reply) => {
   if (err instanceof HttpError) {
     return reply.code(err.statusCode).send({ error: err.code, message: err.message });
+  }
+  if (err instanceof CreateError) {
+    const status = err.code === "busy" ? 409 : ["network", "http_error", "not_found"].includes(err.code) ? 502 : 400;
+    return reply.code(status).send({ error: err.code, message: err.message, hint: err.hint, detail: err.detail });
   }
   if (err instanceof ZodError) {
     return reply.code(400).send({ error: "validation", message: err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ") });
@@ -57,6 +64,8 @@ await app.register(mojangRoutes);
 await app.register(configsRoutes);
 await app.register(logsRoutes);
 await app.register(backupsRoutes);
+await app.register(createRoutes);
+await app.register(fsRoutes);
 
 // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist)
 const here = path.dirname(fileURLToPath(import.meta.url));

@@ -3,6 +3,9 @@ export class ApiRequestError extends Error {
     public status: number,
     public code: string,
     message: string,
+    /** 사용자가 할 수 있는 일 (새 서버 만들기 오류 등) */
+    public hint?: string,
+    public detail?: string,
   ) {
     super(message);
   }
@@ -52,7 +55,7 @@ export async function api<T>(path: string, init?: RequestInit & { json?: unknown
   const data = text ? JSON.parse(text) : undefined;
   if (!res.ok) {
     if (res.status === 401) onUnauthorized?.();
-    throw new ApiRequestError(res.status, data?.error ?? "error", data?.message ?? `요청 실패 (${res.status})`);
+    throw new ApiRequestError(res.status, data?.error ?? "error", data?.message ?? `요청 실패 (${res.status})`, data?.hint, data?.detail);
   }
   return data as T;
 }
