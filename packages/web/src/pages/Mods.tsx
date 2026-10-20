@@ -126,15 +126,15 @@ const ENV_DEPS = new Set(["minecraft", "java", "fabricloader", "fabric-loader"])
 
 function ModCard({ mod: m, locked, delay, onToggle, onDelete }: { mod: ModInfo; locked: boolean; delay: number; onToggle: (v: boolean) => void; onDelete: () => void }) {
   return (
-    <li className={cx("surface flex gap-4 p-4 transition hover:border-line-strong animate-slide-up", !m.enabled && "opacity-60 saturate-50")} style={{ animationDelay: `${delay}ms` }}>
-      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line bg-ink-3">
+    <li className={cx("slab flex animate-slide-up gap-4 p-4", !m.enabled && "opacity-60 saturate-50")} style={{ animationDelay: `${delay}ms` }}>
+      <div className="h-14 w-14 shrink-0 overflow-hidden well">
         {m.iconDataUrl ? <img src={m.iconDataUrl} alt="" className="h-full w-full object-cover" style={{ imageRendering: "pixelated" }} /> : <div className="grid h-full place-items-center text-slate-500"><Package className="h-6 w-6" /></div>}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate font-medium text-white">{m.name ?? m.file}</span>
+              <span className="truncate font-block text-[12px] text-white">{m.name ?? m.file}</span>
               {m.version && <Badge mono>{m.version}</Badge>}
               {!m.enabled && <Badge tone="warning">비활성</Badge>}
             </div>
@@ -155,7 +155,7 @@ function ModCard({ mod: m, locked, delay, onToggle, onDelete }: { mod: ModInfo; 
               </Badge>
             ))}
         </div>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2.5">
+        <div className="mt-3 flex items-center justify-between gap-3 shadow-[inset_0_2px_0_#08080a] pt-2.5">
           <span className="truncate font-mono text-[11px] text-slate-500" title={m.file}>
             {m.file} · {fmtBytes(m.sizeBytes)}
           </span>

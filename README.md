@@ -131,6 +131,7 @@ BLOCKPILOT_HOST=0.0.0.0 npm start
 | 설정 파서 | `smol-toml`, `yaml` | 모드 설정 문법 검사. `server.properties`는 주석·순서 보존 자체 파서 |
 | 프로세스 | Node `child_process` + 자체 **RCON** 클라이언트 | stdin/stdout 파이프 제어, 외부 서버는 Source RCON 프로토콜 |
 | 테스트 | **vitest** | 파서(properties, 버전 범위, 설정 문법) 단위 테스트 |
+| 폰트 | [Galmuri11](https://github.com/quiple/galmuri) · Silkscreen (SIL OFL 1.1), IBM Plex Sans KR, JetBrains Mono | 제목·메뉴는 한글 픽셀 서체, 본문은 일반 서체, 콘솔은 고정폭 |
 | 패키지 구조 | npm workspaces 모노레포 | `shared` · `server` · `web` |
 
 ## 구조

@@ -30,7 +30,7 @@ export default function Players() {
         description={live ? "서버 실행 중 · 변경 사항은 콘솔 명령으로 즉시 반영돼요." : "서버 중지 상태 · 파일을 직접 수정하고 다음 시작 때 반영돼요."}
         actions={
           server && (
-            <label className="flex h-9 items-center gap-3 rounded-lg border border-line bg-ink-1/70 px-3 text-sm">
+            <label className="flex h-9 items-center gap-3 well px-3 text-sm">
               <span className="text-slate-300">화이트리스트 사용</span>
               <Toggle
                 size="sm"
@@ -125,16 +125,16 @@ function ListPanel({ serverId, kind }: { serverId: string; kind: PlayerListKind 
           위 폼에서 추가하면 여기에 표시됩니다.
         </EmptyState>
       ) : (
-        <Card padded={false} className="divide-y divide-line">
+        <Card padded={false} className="divide-y-2 divide-bevel-lo">
           {data.map((e: WhitelistEntry | OpEntry | BannedPlayerEntry | BannedIpEntry) => {
             const key = "ip" in e ? e.ip : e.uuid;
             const label = "ip" in e ? e.ip : e.name;
             return (
               <div key={key} className="flex items-center gap-4 px-5 py-3">
-                {"name" in e ? <Avatar id={e.uuid} size={36} /> : <div className="grid h-9 w-9 place-items-center rounded-md bg-ink-3 text-slate-400"><Globe className="h-4 w-4" /></div>}
+                {"name" in e ? <Avatar id={e.uuid} size={36} /> : <div className="well grid h-9 w-9 place-items-center text-slate-400"><Globe className="h-4 w-4" /></div>}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-white">{label}</span>
+                    <span className="font-block text-[12px] text-white">{label}</span>
                     {"level" in e && <Badge tone="brand">레벨 {e.level}</Badge>}
                     {"bypassesPlayerLimit" in e && e.bypassesPlayerLimit && <Badge>인원 제한 무시</Badge>}
                     {"expires" in e && <Badge tone={e.expires === "forever" ? "danger" : "warning"}>{e.expires === "forever" ? "영구" : `만료 ${e.expires}`}</Badge>}

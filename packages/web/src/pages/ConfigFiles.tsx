@@ -29,7 +29,7 @@ export default function ConfigFiles() {
       <PageHeader icon={FileCode2} title="설정 파일" description="모드·플러그인 설정 파일을 직접 편집해요. 저장 전에 문법을 검사하고 원본은 .blockpilot-backup/ 에 보관돼요." />
       <div className="flex min-h-0 flex-1 gap-4">
         <Card padded={false} className="flex w-72 shrink-0 flex-col">
-          <div className="border-b border-line p-2.5">
+          <div className="shadow-[inset_0_-2px_0_#08080a] p-2.5">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
               <Input className="h-8 pl-8 text-xs" placeholder="파일 검색" value={filter} onChange={(e) => setFilter(e.target.value)} />
@@ -53,7 +53,7 @@ export default function ConfigFiles() {
                       <button
                         key={f.path}
                         onClick={() => setParams({ path: f.path })}
-                        className={cx("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left font-mono text-[12px] transition focus-ring", selected === f.path ? "bg-ink-3 text-white" : "text-slate-300 hover:bg-ink-2")}
+                        className={cx("flex w-full items-center gap-2 px-2 py-1.5 text-left font-mono text-[12px] transition-colors focus-ring", selected === f.path ? "slab text-white" : "text-slate-300 hover:bg-ink-2")}
                         title={f.path}
                       >
                         <Icon className={cx("h-3.5 w-3.5 shrink-0", FORMAT_TONE[f.format])} />
@@ -110,7 +110,7 @@ function Editor({ serverId, path }: { serverId: string; path: string }) {
 
   return (
     <Card padded={false} className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 shadow-[inset_0_-2px_0_#08080a] px-4 py-2.5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="truncate font-mono text-[13px] text-white">{path}</span>
@@ -126,7 +126,7 @@ function Editor({ serverId, path }: { serverId: string; path: string }) {
               문법 오류{validation.line ? ` ${validation.line}행` : ""}
             </Badge>
           )}
-          {validation?.ok && dirty && <Badge tone="success">문법 OK</Badge>}
+          {validation?.ok && dirty && <Badge tone="lamp">문법 OK</Badge>}
           <Button size="sm" variant="ghost" icon={RotateCcw} disabled={!dirty} onClick={() => setText(data.content)}>
             되돌리기
           </Button>
@@ -135,9 +135,9 @@ function Editor({ serverId, path }: { serverId: string; path: string }) {
           </Button>
         </div>
       </div>
-      {validation && !validation.ok && <div className="border-b border-rose-500/30 bg-rose-500/10 px-4 py-1.5 font-mono text-[12px] text-rose-200">{validation.message}</div>}
+      {validation && !validation.ok && <div className="border-b bg-[#2a0b09] px-4 py-1.5 font-mono text-[12px] text-red-200">{validation.message}</div>}
       <textarea
-        className="terminal min-h-0 flex-1 resize-none bg-ink-0/70 p-4 text-slate-200 focus:outline-none"
+        className="well terminal mx-3 min-h-0 flex-1 resize-none p-4 text-slate-200 focus:outline focus:outline-2 focus:outline-redstone/50"
         value={text}
         spellCheck={false}
         onChange={(e) => setText(e.target.value)}
@@ -155,11 +155,11 @@ function Editor({ serverId, path }: { serverId: string; path: string }) {
           }
         }}
       />
-      <div className="flex items-center justify-between border-t border-line px-4 py-1.5 text-[11px] text-slate-500">
+      <div className="flex items-center justify-between shadow-[inset_0_2px_0_#08080a] px-4 py-1.5 text-[11px] text-slate-500">
         <span>
           <Kbd>⌘</Kbd> + <Kbd>S</Kbd> 저장 · <Kbd>Tab</Kbd> 들여쓰기
         </span>
-        {dirty && <span className="text-brand-300">저장되지 않은 변경</span>}
+        {dirty && <span className="text-red-300">저장되지 않은 변경</span>}
       </div>
     </Card>
   );

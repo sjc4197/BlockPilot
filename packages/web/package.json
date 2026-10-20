@@ -12,6 +12,7 @@
   "dependencies": {
     "@blockpilot/shared": "*",
     "@tanstack/react-query": "^5.59.16",
+    "galmuri": "^2.40.3",
     "lucide-react": "^0.453.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

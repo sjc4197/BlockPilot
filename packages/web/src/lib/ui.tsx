@@ -1,62 +1,66 @@
-import { createContext, forwardRef, useCallback, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
-import { AlertTriangle, CheckCircle2, Info, Loader2, XCircle, type LucideIcon } from "lucide-react";
+import { createContext, forwardRef, useCallback, useContext, useState, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import type { ProcessState } from "@blockpilot/shared";
+import { DustLoader, Lamp, LeverGlyph, TntIcon, type LampState } from "./pixel";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
-// ---------- Button ----------
+/** lucide 아이콘과 픽셀 아이콘(TntIcon 등) 둘 다 받는다 */
+export type IconType = ComponentType<{ className?: string }>;
+
+// ---------- Button: 돌 버튼 ----------
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg";
 
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_1px_0_rgba(255,255,255,.15)_inset,0_6px_16px_-6px_rgba(16,185,129,.6)] hover:from-brand-400 hover:to-brand-600 active:translate-y-px",
-  secondary: "bg-ink-3 text-slate-100 border border-line-strong hover:bg-ink-4 hover:border-slate-500/40 active:translate-y-px",
-  outline: "bg-transparent text-slate-200 border border-line-strong hover:bg-ink-3 active:translate-y-px",
+  // 레드스톤 블록
+  primary:
+    "bg-[#c42a20] text-white shadow-[inset_2px_2px_0_#ff6b5f,inset_-2px_-2px_0_#5a1712] hover:bg-[#d93a2b] active:shadow-[inset_2px_2px_0_#5a1712,inset_-2px_-2px_0_#ff6b5f] [text-shadow:1px_1px_0_#5a1712]",
+  // 돌 버튼
+  secondary: "bg-ink-4 text-slate-100 shadow-[inset_2px_2px_0_#5e5e6a,inset_-2px_-2px_0_#1a1a1f] hover:bg-[#44444e] active:shadow-pressed [text-shadow:1px_1px_0_#1a1a1f]",
+  outline: "bg-ink-2 text-slate-200 shadow-slab hover:bg-ink-3 active:shadow-pressed",
   ghost: "bg-transparent text-slate-300 hover:bg-ink-3 hover:text-white",
-  danger: "bg-gradient-to-b from-rose-500 to-rose-600 text-white hover:from-rose-400 hover:to-rose-600 active:translate-y-px",
+  // TNT
+  danger: "bg-[#3a0d0a] text-red-100 shadow-[inset_2px_2px_0_#7a2018,inset_-2px_-2px_0_#160504] hover:bg-[#4a110d]",
 };
 const SIZE: Record<Size, string> = {
-  sm: "h-7 px-2.5 text-xs gap-1.5 rounded-md",
-  md: "h-9 px-3.5 text-sm gap-2 rounded-lg",
-  lg: "h-11 px-5 text-sm gap-2 rounded-xl",
+  sm: "h-7 px-2.5 gap-1.5",
+  md: "h-9 px-3.5 gap-2",
+  lg: "h-11 px-5 gap-2",
 };
+const BTN_BASE = "inline-flex items-center justify-center whitespace-nowrap font-block text-[12px] transition-colors focus-ring disabled:opacity-40 disabled:cursor-not-allowed";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
-  icon?: LucideIcon;
+  icon?: IconType;
   loading?: boolean;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({ variant = "secondary", size = "md", icon: Icon, loading, className, children, disabled, ...rest }, ref) {
   return (
-    <button
-      ref={ref}
-      disabled={disabled || loading}
-      className={cx("inline-flex items-center justify-center font-medium whitespace-nowrap transition-all duration-150 focus-ring disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-y-0", VARIANT[variant], SIZE[size], className)}
-      {...rest}
-    >
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : Icon ? <Icon className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} /> : null}
+    <button ref={ref} disabled={disabled || loading} className={cx(BTN_BASE, VARIANT[variant], SIZE[size], className)} {...rest}>
+      {loading ? <DustLoader count={3} size={4} /> : Icon ? <Icon className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} /> : null}
       {children}
     </button>
   );
 });
 
 /** <a> 를 버튼처럼 (다운로드 링크 등) */
-export function LinkButton({ variant = "secondary", size = "md", icon: Icon, className, children, ...rest }: { variant?: Variant; size?: Size; icon?: LucideIcon; className?: string; children: ReactNode } & React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+export function LinkButton({ variant = "secondary", size = "md", icon: Icon, className, children, ...rest }: { variant?: Variant; size?: Size; icon?: IconType; className?: string; children: ReactNode } & React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   return (
-    <a className={cx("inline-flex items-center justify-center font-medium whitespace-nowrap transition-all duration-150 focus-ring", VARIANT[variant], SIZE[size], className)} {...rest}>
+    <a className={cx(BTN_BASE, VARIANT[variant], SIZE[size], className)} {...rest}>
       {Icon && <Icon className="h-4 w-4" />}
       {children}
     </a>
   );
 }
 
-// ---------- Inputs ----------
+// ---------- Inputs: 움푹 파인 홈 ----------
 
 export const inputCls =
-  "w-full h-9 rounded-lg bg-ink-0/70 border border-line-strong px-3 text-sm text-slate-100 placeholder-slate-500 transition focus:outline-none focus:border-brand-500/70 focus:ring-2 focus:ring-brand-500/25 disabled:opacity-50";
+  "w-full h-9 bg-[#0d0d0f] shadow-well px-3 text-sm text-slate-100 placeholder-slate-600 transition focus:outline focus:outline-2 focus:outline-redstone/70 focus:outline-offset-0 disabled:opacity-50";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { mono?: boolean }>(function Input({ className, mono, ...rest }, ref) {
   return <input ref={ref} className={cx(inputCls, mono && "font-mono text-[13px]", className)} {...rest} />;
@@ -64,7 +68,12 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 
 export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cx(inputCls, "appearance-none pr-8 bg-no-repeat bg-[right_0.6rem_center] bg-[length:14px]", className)} style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")" }} {...rest}>
+    <select
+      className={cx(inputCls, "appearance-none pr-8 bg-no-repeat bg-[right_0.6rem_center] bg-[length:10px]", className)}
+      // 픽셀 화살표
+      style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 3' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h5v1H0zM1 1h3v1H1zM2 2h1v1H2z' fill='%23a19d94'/%3E%3C/svg%3E\")" }}
+      {...rest}
+    >
       {children}
     </select>
   );
@@ -73,25 +82,26 @@ export function Select({ className, children, ...rest }: SelectHTMLAttributes<HT
 export function Field({ label, hint, children, className }: { label?: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx("block", className)}>
-      {label && <span className="mb-1.5 block text-xs font-medium text-slate-400">{label}</span>}
+      {label && <span className="mb-1.5 block font-block text-[12px] text-slate-400">{label}</span>}
       {children}
       {hint && <span className="mt-1 block text-[11px] text-slate-500">{hint}</span>}
     </label>
   );
 }
 
+/** 켜기/끄기 = 작은 레버. 오른쪽으로 넘어가고 손잡이가 빨갛게 켜지면 켜진 상태 */
 export function Toggle({ checked, onChange, disabled, size = "md" }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean; size?: "sm" | "md" }) {
-  const dims = size === "sm" ? { track: "h-5 w-9", knob: "h-4 w-4", on: "translate-x-[18px]", off: "translate-x-0.5" } : { track: "h-6 w-11", knob: "h-5 w-5", on: "translate-x-[22px]", off: "translate-x-0.5" };
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       disabled={disabled}
+      data-on={checked}
       onClick={() => onChange(!checked)}
-      className={cx("relative inline-flex shrink-0 items-center rounded-full transition-colors duration-200 focus-ring disabled:opacity-50", dims.track, checked ? "bg-brand-500 shadow-[0_0_12px_-2px_rgba(16,185,129,.7)]" : "bg-ink-4 border border-line-strong")}
+      className={cx("inline-grid shrink-0 place-items-center focus-ring disabled:cursor-not-allowed disabled:opacity-40", size === "sm" ? "h-7 w-8" : "h-9 w-10")}
     >
-      <span className={cx("inline-block rounded-full bg-white shadow transition-transform duration-200", dims.knob, checked ? dims.on : dims.off)} />
+      <LeverGlyph className="h-full w-full" />
     </button>
   );
 }
@@ -99,20 +109,20 @@ export function Toggle({ checked, onChange, disabled, size = "md" }: { checked: 
 // ---------- Layout primitives ----------
 
 export function Card({ children, className, padded = true }: { children: ReactNode; className?: string; padded?: boolean }) {
-  return <div className={cx("surface", padded && "p-5", className)}>{children}</div>;
+  return <div className={cx("slab", padded && "p-5", className)}>{children}</div>;
 }
 
-export function PageHeader({ title, description, actions, icon: Icon }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; icon?: LucideIcon }) {
+export function PageHeader({ title, description, actions, icon: Icon }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; icon?: IconType }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-4">
-      <div className="flex items-start gap-3 min-w-0">
+      <div className="flex min-w-0 items-start gap-3">
         {Icon && (
-          <div className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-ink-2 text-brand-400">
+          <div className="slab mt-0.5 grid h-11 w-11 shrink-0 place-items-center text-redstone">
             <Icon className="h-5 w-5" />
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-white">{title}</h1>
+          <h1 className="font-block text-[24px] leading-tight text-white [text-shadow:2px_2px_0_#08080a]">{title}</h1>
           {description && <div className="mt-1 text-sm text-slate-400">{description}</div>}
         </div>
       </div>
@@ -121,20 +131,29 @@ export function PageHeader({ title, description, actions, icon: Icon }: { title:
   );
 }
 
-export function Tabs<T extends string>({ tabs, value, onChange, className }: { tabs: { id: T; label: ReactNode; count?: number; icon?: LucideIcon }[]; value: T; onChange: (v: T) => void; className?: string }) {
+export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className={cx("inline-flex flex-wrap gap-1 rounded-xl border border-line bg-ink-1/70 p-1", className)}>
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="font-block text-[12px] text-slate-300">{children}</h2>
+      {right}
+    </div>
+  );
+}
+
+export function Tabs<T extends string>({ tabs, value, onChange, className }: { tabs: { id: T; label: ReactNode; count?: number; icon?: IconType }[]; value: T; onChange: (v: T) => void; className?: string }) {
+  return (
+    <div className={cx("well inline-flex flex-wrap gap-1 p-1", className)}>
       {tabs.map((t) => {
         const active = t.id === value;
         return (
           <button
             key={t.id}
             onClick={() => onChange(t.id)}
-            className={cx("inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-sm transition focus-ring", active ? "bg-ink-3 text-white shadow-[0_1px_0_rgba(255,255,255,.06)_inset]" : "text-slate-400 hover:text-slate-200 hover:bg-ink-2")}
+            className={cx("inline-flex h-8 items-center gap-1.5 px-3 font-block text-[12px] transition-colors focus-ring", active ? "slab text-white" : "text-slate-400 hover:bg-ink-2 hover:text-slate-200")}
           >
-            {t.icon && <t.icon className="h-3.5 w-3.5" />}
+            {t.icon && <t.icon className={cx("h-3.5 w-3.5", active && "text-redstone")} />}
             {t.label}
-            {t.count !== undefined && <span className={cx("rounded-md px-1.5 text-[11px] tnum", active ? "bg-brand-500/20 text-brand-300" : "bg-ink-3 text-slate-400")}>{t.count}</span>}
+            {t.count !== undefined && <span className={cx("px-1 text-[11px] tnum", active ? "bg-redstone/20 text-red-300" : "bg-ink-3 text-slate-400")}>{t.count}</span>}
           </button>
         );
       })}
@@ -142,92 +161,96 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
   );
 }
 
-type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "brand";
+export type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "brand" | "lamp";
 const TONE: Record<Tone, string> = {
-  neutral: "bg-ink-3 text-slate-300 border-line-strong",
-  success: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
-  warning: "bg-amber-500/10 text-amber-300 border-amber-500/30",
-  danger: "bg-rose-500/10 text-rose-300 border-rose-500/30",
-  info: "bg-sky-500/10 text-sky-300 border-sky-500/30",
-  brand: "bg-brand-500/10 text-brand-300 border-brand-500/30",
+  neutral: "bg-[#0d0d0f] text-slate-300 shadow-[inset_1px_1px_0_#08080a,inset_-1px_-1px_0_#2c2c33]",
+  success: "bg-emerald-950/70 text-emerald-300 shadow-[inset_0_0_0_1px_rgba(52,211,153,.3)]",
+  warning: "bg-amber-950/70 text-amber-300 shadow-[inset_0_0_0_1px_rgba(251,191,36,.3)]",
+  danger: "bg-[#2a0b09] text-red-300 shadow-[inset_0_0_0_1px_rgba(255,59,47,.35)]",
+  info: "bg-sky-950/70 text-sky-300 shadow-[inset_0_0_0_1px_rgba(56,189,248,.3)]",
+  brand: "bg-[#2a0b09] text-red-300 shadow-[inset_0_0_0_1px_rgba(255,59,47,.4)]",
+  lamp: "bg-[#2a1d10] text-[#ffe2a8] shadow-[inset_0_0_0_1px_rgba(255,179,71,.35)]",
 };
 
 export function Badge({ children, tone = "neutral", className, mono }: { children: ReactNode; tone?: Tone; className?: string; mono?: boolean }) {
-  return <span className={cx("inline-flex items-center gap-1 rounded-md border px-1.5 py-px text-[11px] font-medium leading-5", TONE[tone], mono && "font-mono", className)}>{children}</span>;
+  return <span className={cx("inline-flex items-center gap-1 px-1.5 py-px leading-5", mono ? "font-mono text-[11px]" : "font-block text-[12px]", TONE[tone], className)}>{children}</span>;
 }
 
-const STATE: Record<ProcessState, { label: string; tone: Tone; pulse?: boolean }> = {
-  stopped: { label: "중지됨", tone: "neutral" },
-  starting: { label: "시작 중", tone: "warning", pulse: true },
-  running: { label: "실행 중", tone: "success", pulse: true },
-  stopping: { label: "중지 중", tone: "warning", pulse: true },
-  external: { label: "외부 실행 중", tone: "info", pulse: true },
+const STATE: Record<ProcessState, { label: string; tone: Tone; lamp: LampState }> = {
+  stopped: { label: "중지됨", tone: "neutral", lamp: "off" },
+  starting: { label: "시작 중", tone: "warning", lamp: "blink" },
+  running: { label: "실행 중", tone: "lamp", lamp: "on" },
+  stopping: { label: "중지 중", tone: "warning", lamp: "blink" },
+  external: { label: "외부 실행 중", tone: "info", lamp: "on" },
 };
 
+/** 서버 상태 = 레드스톤 램프 */
 export function StatusBadge({ state, size = "md" }: { state: ProcessState; size?: "sm" | "md" }) {
   const s = STATE[state];
-  const dot = { neutral: "bg-slate-400", success: "bg-emerald-400", warning: "bg-amber-400", danger: "bg-rose-400", info: "bg-sky-400", brand: "bg-brand-400" }[s.tone];
   return (
-    <span className={cx("inline-flex items-center gap-1.5 rounded-full border font-medium", TONE[s.tone], size === "sm" ? "px-2 py-px text-[11px]" : "px-2.5 py-0.5 text-xs")}>
-      <span className={cx("h-1.5 w-1.5 rounded-full", dot, s.pulse && "animate-pulse-dot")} />
+    <span className={cx("inline-flex items-center gap-1.5 font-block text-[12px]", TONE[s.tone], size === "sm" ? "px-1.5 py-px" : "px-2 py-0.5")}>
+      <Lamp state={s.lamp} size={size === "sm" ? 8 : 10} />
       {s.label}
     </span>
   );
 }
 
-export function Callout({ tone = "info", title, children, icon: Icon }: { tone?: Tone; title?: ReactNode; children: ReactNode; icon?: LucideIcon }) {
+export function Callout({ tone = "info", title, children, icon: Icon }: { tone?: Tone; title?: ReactNode; children: ReactNode; icon?: IconType }) {
   const I = Icon ?? (tone === "danger" ? XCircle : tone === "warning" ? AlertTriangle : tone === "success" ? CheckCircle2 : Info);
   return (
-    <div className={cx("flex gap-3 rounded-xl border px-4 py-3 text-sm", TONE[tone])}>
+    <div className={cx("flex gap-3 px-4 py-3 text-sm", TONE[tone])}>
       <I className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1 text-slate-200">
-        {title && <div className="font-medium">{title}</div>}
-        <div className={title ? "mt-0.5 text-slate-300/90" : undefined}>{children}</div>
+        {title && <div className="font-block text-[12px]">{title}</div>}
+        <div className={title ? "mt-1 text-slate-300/90" : undefined}>{children}</div>
       </div>
     </div>
   );
 }
 
-export function EmptyState({ icon: Icon, title, children, action }: { icon?: LucideIcon; title?: ReactNode; children?: ReactNode; action?: ReactNode }) {
+export function EmptyState({ icon: Icon, title, children, action }: { icon?: IconType; title?: ReactNode; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line-strong px-6 py-12 text-center">
+    <div className="well flex flex-col items-center justify-center px-6 py-12 text-center">
       {Icon && (
-        <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-ink-2 text-slate-500">
+        <div className="slab mb-3 grid h-12 w-12 place-items-center text-slate-500">
           <Icon className="h-6 w-6" />
         </div>
       )}
-      {title && <div className="text-sm font-medium text-slate-200">{title}</div>}
-      {children && <div className="mt-1 max-w-sm text-sm text-slate-500">{children}</div>}
+      {title && <div className="font-block text-[12px] text-slate-200">{title}</div>}
+      {children && <div className="mt-1.5 max-w-sm text-sm text-slate-500">{children}</div>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
 
+/** 로딩 = 레드스톤 신호 */
 export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cx("h-5 w-5 animate-spin text-slate-500", className)} />;
+  return <DustLoader className={className} />;
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="rounded border border-line-strong bg-ink-3 px-1.5 py-px font-mono text-[10px] text-slate-300">{children}</kbd>;
+  return <kbd className="bg-ink-3 px-1.5 py-px font-mono text-[10px] text-slate-300 shadow-[inset_1px_1px_0_#4a4a55,inset_-1px_-1px_0_#08080a]">{children}</kbd>;
 }
 
 export function Avatar({ id, size = 28, className }: { id: string; size?: number; className?: string }) {
-  return <img src={`https://mc-heads.net/avatar/${encodeURIComponent(id)}/${size}`} alt="" width={size} height={size} className={cx("rounded-md bg-ink-3", className)} style={{ imageRendering: "pixelated" }} loading="lazy" />;
+  return <img src={`https://mc-heads.net/avatar/${encodeURIComponent(id)}/${size}`} alt="" width={size} height={size} className={cx("bg-ink-3 shadow-[0_0_0_2px_#08080a]", className)} style={{ imageRendering: "pixelated" }} loading="lazy" />;
 }
 
 export function Divider({ className }: { className?: string }) {
-  return <div className={cx("h-px w-full bg-line", className)} />;
+  return <div className={cx("h-[2px] w-full bg-bevel-lo shadow-[0_1px_0_#2c2c33]", className)} />;
 }
 
-// ---------- Confirm (alert/confirm 대신 2단계 클릭) ----------
+// ---------- Confirm: TNT 점화 → 한 번 더 누르면 실행 ----------
 
-export function ConfirmButton({ label, confirmLabel = "정말요?", onConfirm, variant = "secondary", size = "md", icon, disabled, className }: { label: ReactNode; confirmLabel?: ReactNode; onConfirm: () => void; variant?: Variant; size?: Size; icon?: LucideIcon; disabled?: boolean; className?: string }) {
+const PrimedTnt: IconType = ({ className }) => <TntIcon className={className} primed />;
+
+export function ConfirmButton({ label, confirmLabel = "정말요?", onConfirm, variant = "secondary", size = "md", icon, disabled, className }: { label: ReactNode; confirmLabel?: ReactNode; onConfirm: () => void; variant?: Variant; size?: Size; icon?: IconType; disabled?: boolean; className?: string }) {
   const [arm, setArm] = useState(false);
   return (
     <Button
       variant={arm ? "danger" : variant}
       size={size}
-      icon={arm ? undefined : icon}
+      icon={arm ? PrimedTnt : icon}
       disabled={disabled}
       className={className}
       onClick={() => {
@@ -262,16 +285,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastCtx.Provider value={push}>
       {children}
       <div className="pointer-events-none fixed bottom-5 right-5 z-50 flex w-[22rem] flex-col gap-2">
-        {toasts.map((t) => {
-          const I = t.kind === "ok" ? CheckCircle2 : t.kind === "err" ? XCircle : Info;
-          const tone = t.kind === "ok" ? "text-emerald-400" : t.kind === "err" ? "text-rose-400" : "text-sky-400";
-          return (
-            <div key={t.id} className="pointer-events-auto flex items-start gap-3 rounded-xl glass px-4 py-3 text-sm text-slate-100 shadow-pop animate-slide-in-right">
-              <I className={cx("mt-0.5 h-4 w-4 shrink-0", tone)} />
-              <span className="min-w-0 flex-1 break-words">{t.text}</span>
-            </div>
-          );
-        })}
+        {toasts.map((t) => (
+          <div key={t.id} className="glass pointer-events-auto flex animate-slide-in-right items-start gap-3 px-4 py-3 text-sm text-slate-100">
+            {t.kind === "ok" ? <Lamp state="on" size={14} className="mt-0.5" /> : t.kind === "err" ? <TntIcon className="mt-0.5 h-4 w-4 shrink-0" /> : <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />}
+            <span className="min-w-0 flex-1 break-words">{t.text}</span>
+          </div>
+        ))}
       </div>
     </ToastCtx.Provider>
   );

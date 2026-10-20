@@ -56,9 +56,9 @@ export default function Logs() {
                 <button
                   key={f.kind + f.name}
                   onClick={() => setSel({ kind: f.kind, name: f.name })}
-                  className={cx("flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition focus-ring", active ? "bg-ink-3 text-white" : "text-slate-300 hover:bg-ink-2")}
+                  className={cx("flex w-full items-start gap-2.5 px-2.5 py-2 text-left transition-colors focus-ring", active ? "slab text-white" : "text-slate-300 hover:bg-ink-2")}
                 >
-                  {f.kind === "crash" ? <Flame className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" /> : f.compressed ? <FileArchive className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" /> : <ScrollText className={cx("mt-0.5 h-4 w-4 shrink-0", f.name === "latest.log" ? "text-brand-400" : "text-slate-500")} />}
+                  {f.kind === "crash" ? <Flame className="mt-0.5 h-4 w-4 shrink-0 text-red-400" /> : f.compressed ? <FileArchive className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" /> : <ScrollText className={cx("mt-0.5 h-4 w-4 shrink-0", f.name === "latest.log" ? "text-redstone" : "text-slate-500")} />}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-mono text-[12px]">{f.name}</span>
                     <span className="block text-[10px] text-slate-500 tnum">
@@ -71,7 +71,7 @@ export default function Logs() {
           )}
         </Card>
         <Card padded={false} className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 shadow-[inset_0_-2px_0_#08080a] px-3 py-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
               <Input className="h-8 !w-60 pl-8 text-xs" placeholder="검색" value={filter} onChange={(e) => setFilter(e.target.value)} />
@@ -96,7 +96,7 @@ export default function Logs() {
               </span>
             </div>
           </div>
-          <div ref={boxRef} className="terminal min-h-0 flex-1 overflow-auto bg-ink-0/80 px-4 py-3">
+          <div ref={boxRef} className="well terminal m-3 mt-0 min-h-0 flex-1 overflow-auto px-4 py-3">
             {!sel ? null : !log ? <Spinner /> : lines.length === 0 ? <EmptyState title="표시할 줄이 없어요" /> : lines.map((l, i) => <LogLine key={i} text={l} />)}
           </div>
         </Card>

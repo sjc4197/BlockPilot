@@ -1,18 +1,11 @@
 import type { CSSProperties } from "react";
 import { cx } from "../lib/ui";
-
-const STONE_A = "#8f8f8f";
-const STONE_B = "#5e5e5e";
-const STONE_C = "#737373";
-const STICK = "#7a5230";
-const STICK_HI = "#9c6b3c";
-const KNOB_OFF = "#3a3a3a";
-const KNOB_ON = "#ff3b2f";
+import { LeverGlyph, STONE_A, STONE_B } from "../lib/pixel";
 
 /** 로고용 정적 레버 마크 (8x8 픽셀) */
 export function PixelLeverMark({ className }: { className?: string }) {
   const map = [".....kk.", "....hs..", "...ss...", "..ss....", ".ss.....", "cCcCcCcC", "CcCcCcCc"];
-  const pal: Record<string, string> = { k: KNOB_OFF, h: STICK_HI, s: STICK, c: STONE_A, C: STONE_B };
+  const pal: Record<string, string> = { k: "#3a3a3a", h: "#9c6b3c", s: "#7a5230", c: STONE_A, C: STONE_B };
   return (
     <svg viewBox="0 -0.5 8 8" className={className} shapeRendering="crispEdges" aria-hidden>
       {map.flatMap((row, y) =>
@@ -32,9 +25,6 @@ export function DustRow({ count, lit, size, className }: { count: number; lit: n
     </span>
   );
 }
-
-// 조약돌 받침 무늬 (12 x 3)
-const COBBLE = ["abaabbabaaba", "babbaabbabab", "aabbabaabbaa"];
 
 export type LeverVisual = "off" | "starting" | "on" | "stopping";
 
@@ -84,24 +74,15 @@ export function Lever({
       data-state={state}
       data-armed={!!armed}
       className={cx(
-        "lever inline-flex items-center rounded-xl border text-left transition-colors focus-ring disabled:cursor-not-allowed disabled:opacity-50",
+        "lever inline-flex items-center text-left transition-colors focus-ring disabled:cursor-not-allowed disabled:opacity-40",
         busy && "cursor-progress",
-        lg ? "gap-3 py-2 pl-2 pr-4" : "h-9 gap-2 pl-1 pr-3",
-        armed ? "border-rose-500/60 bg-rose-500/10" : "border-line-strong bg-ink-2/70 hover:border-slate-500/50 hover:bg-ink-3",
+        lg ? "gap-3 py-2 pl-2 pr-4" : "h-10 gap-2 pl-1 pr-3",
+        armed ? "bg-[#2a1d10] shadow-[inset_2px_2px_0_#7a5a22,inset_-2px_-2px_0_#08080a]" : "bg-ink-2 shadow-slab hover:bg-ink-3 active:shadow-pressed",
       )}
     >
-      <svg viewBox="0 0 16 14" className={lg ? "h-12 w-12" : "h-8 w-8"} shapeRendering="crispEdges" aria-hidden>
-        <g className="lever-handle">
-          <rect x={7} y={2} width={2} height={9} fill={STICK} />
-          <rect x={7} y={2} width={1} height={9} fill={STICK_HI} />
-          <rect className="lever-knob" x={6.5} y={0.5} width={3} height={2.5} fill={on ? KNOB_ON : KNOB_OFF} />
-        </g>
-        <rect x={5} y={9} width={6} height={2} fill={STONE_C} />
-        <rect x={5} y={9} width={6} height={0.6} fill={STONE_A} />
-        {COBBLE.flatMap((row, y) => [...row].map((ch, x) => <rect key={`${x}-${y}`} x={2 + x} y={11 + y} width={1} height={1} fill={ch === "a" ? STONE_A : STONE_B} />))}
-      </svg>
+      <LeverGlyph className={lg ? "h-12 w-12" : "h-8 w-8"} />
       <span className="flex flex-col gap-1.5">
-        <span className={cx("font-medium leading-none", lg ? "text-sm" : "text-xs", armed ? "text-rose-300" : on ? "text-red-300" : "text-slate-300")}>{label}</span>
+        <span className={cx("font-block leading-none", "text-[12px]", armed ? "text-lamp" : on ? "text-red-300" : "text-slate-300")}>{label}</span>
         <span className="flex items-end" style={{ gap: lg ? 4 : 3 }}>
           {Array.from({ length: dustCount }, (_, i) => (
             <span key={i} className="dust" style={{ width: dustSize, height: dustSize, "--i": i, transform: i % 3 === 1 ? "translateY(-1px)" : undefined } as CSSProperties} />

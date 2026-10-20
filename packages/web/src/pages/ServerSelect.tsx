@@ -36,8 +36,8 @@ export default function ServerSelect() {
       </header>
 
       <Card className="mb-8">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
-          <Plus className="h-4 w-4 text-brand-400" /> 서버 폴더 추가
+        <h2 className="mb-4 flex items-center gap-2 font-block text-[12px] text-slate-200">
+          <Plus className="h-4 w-4 text-redstone" /> 서버 폴더 추가
         </h2>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid gap-3 md:grid-cols-[1fr_200px_auto] md:items-end">
@@ -59,7 +59,7 @@ export default function ServerSelect() {
       </Card>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-300">등록된 서버</h2>
+        <h2 className="mb-3 font-block text-[12px] text-slate-200">등록된 서버</h2>
         {isLoading ? (
           <Spinner />
         ) : !servers?.length ? (
@@ -69,12 +69,12 @@ export default function ServerSelect() {
         ) : (
           <ul className="grid gap-3">
             {servers.map((s, i) => (
-              <li key={s.id} className="surface group flex items-center gap-4 p-4 transition hover:border-line-strong animate-slide-up" style={{ animationDelay: `${i * 40}ms` }}>
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-ink-3 text-brand-400">
+              <li key={s.id} className="slab group flex animate-slide-up items-center gap-4 p-4" style={{ animationDelay: `${i * 40}ms` }}>
+                <div className="well grid h-11 w-11 shrink-0 place-items-center text-redstone">
                   <Server className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Link to={`/s/${s.id}`} className="font-medium text-white hover:text-brand-300">
+                  <Link to={`/s/${s.id}`} className="font-medium text-white hover:text-red-300">
                     {s.name}
                   </Link>
                   <div className="truncate font-mono text-[12px] text-slate-500" title={s.path}>
@@ -94,7 +94,7 @@ export default function ServerSelect() {
                     })
                   }
                 />
-                <Link to={`/s/${s.id}`} className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-lg bg-ink-3 px-3.5 text-sm font-medium text-white transition group-hover:bg-brand-600">
+                <Link to={`/s/${s.id}`} className="focus-ring inline-flex h-9 items-center gap-1.5 bg-[#c42a20] px-3.5 font-block text-[12px] text-white shadow-[inset_2px_2px_0_#ff6b5f,inset_-2px_-2px_0_#5a1712] [text-shadow:1px_1px_0_#5a1712] hover:bg-[#d93a2b]">
                   열기 <ArrowRight className="h-4 w-4" />
                 </Link>
               </li>

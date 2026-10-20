@@ -74,29 +74,29 @@ export default function Settings() {
               <button
                 key={g.id}
                 onClick={() => setTab(g.id)}
-                className={cx("flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition focus-ring", active ? "bg-ink-3 text-white" : "text-slate-400 hover:bg-ink-2 hover:text-slate-200")}
+                className={cx("flex shrink-0 items-center gap-2.5 px-3 py-2 text-left font-block text-[12px] transition-colors focus-ring", active ? "slab text-white" : "text-slate-400 hover:bg-ink-2 hover:text-slate-200")}
               >
-                <Icon className={cx("h-4 w-4", active ? "text-brand-400" : "text-slate-500")} />
+                <Icon className={cx("h-4 w-4", active ? "text-redstone" : "text-slate-500")} />
                 <span className="flex-1">{g.label}</span>
-                {dirty > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> : <span className="text-[11px] text-slate-600 tnum">{g.count}</span>}
+                {dirty > 0 ? <span className="h-1.5 w-1.5 bg-redstone shadow-[0_0_6px_rgba(255,59,47,.7)]" /> : <span className="text-[11px] text-slate-600 tnum">{g.count}</span>}
               </button>
             );
           })}
         </nav>
 
         {tab !== "advanced" ? (
-          <Card padded={false} className="divide-y divide-line">
+          <Card padded={false} className="divide-y-2 divide-bevel-lo">
             {PROPERTY_META.filter((m) => m.group === tab).map((m) => (
               <FieldRow key={m.key} meta={m} value={value(m.key)} dirty={m.key in draft} live={live} onChange={(v) => set(m.key, v)} />
             ))}
           </Card>
         ) : (
           <Card padded={false} className="overflow-hidden">
-            <div className="border-b border-line px-5 py-3 text-xs text-slate-500">위 그룹에 정리되지 않은 나머지 키. 값은 그대로 문자열로 저장돼요.</div>
+            <div className="shadow-[inset_0_-2px_0_#08080a] px-5 py-3 text-xs text-slate-500">위 그룹에 정리되지 않은 나머지 키. 값은 그대로 문자열로 저장돼요.</div>
             <table className="w-full text-sm">
-              <tbody className="divide-y divide-line">
+              <tbody className="divide-y-2 divide-bevel-lo">
                 {advancedEntries.map((e) => (
-                  <tr key={e.key} className={cx(e.key in draft && "bg-brand-500/5")}>
+                  <tr key={e.key} className={cx(e.key in draft && "bg-redstone/[.06]")}>
                     <td className="w-[40%] px-5 py-2 font-mono text-[12px] text-slate-300">{e.key}</td>
                     <td className="px-4 py-1.5">
                       <Input mono value={value(e.key)} onChange={(ev) => set(e.key, ev.target.value)} />
@@ -110,9 +110,9 @@ export default function Settings() {
       </div>
 
       {dirtyCount > 0 && (
-        <div className="fixed inset-x-0 bottom-5 z-30 mx-auto flex w-[min(720px,calc(100%-3rem))] items-center justify-between rounded-2xl glass px-5 py-3 shadow-pop animate-slide-up">
+        <div className="glass fixed inset-x-0 bottom-5 z-30 mx-auto flex w-[min(720px,calc(100%-3rem))] animate-slide-up items-center justify-between px-5 py-3">
           <span className="text-sm">
-            <b className="text-white">{dirtyCount}</b>개 항목 변경됨
+            <b className="font-block text-[12px] text-white">{dirtyCount}개</b> <span className="font-block text-[12px]">항목 변경됨</span>
             {live && <span className="ml-2 text-xs text-slate-400">· 즉시 적용 가능한 항목은 바로 반영돼요</span>}
           </span>
           <div className="flex gap-2">
@@ -132,13 +132,13 @@ export default function Settings() {
 function FieldRow({ meta, value, dirty, live, onChange }: { meta: PropertyMeta; value: string; dirty: boolean; live: boolean; onChange: (v: string) => void }) {
   const canLive = !!meta.liveCommand;
   return (
-    <div className={cx("flex items-center gap-6 px-5 py-3.5 transition", dirty && "bg-brand-500/5")}>
+    <div className={cx("flex items-center gap-6 px-5 py-3.5 transition", dirty && "bg-redstone/[.06]")}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-100">{meta.label}</span>
           <code className="font-mono text-[11px] text-slate-500">{meta.key}</code>
-          {live && <Badge tone={canLive ? "success" : "neutral"}>{canLive ? "즉시 적용" : "재시작 필요"}</Badge>}
-          {dirty && <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />}
+          {live && <Badge tone={canLive ? "lamp" : "neutral"}>{canLive ? "즉시 적용" : "재시작 필요"}</Badge>}
+          {dirty && <span className="h-1.5 w-1.5 bg-redstone shadow-[0_0_6px_rgba(255,59,47,.7)]" />}
         </div>
         {meta.description && <p className="mt-0.5 text-xs text-slate-500">{meta.description}</p>}
       </div>

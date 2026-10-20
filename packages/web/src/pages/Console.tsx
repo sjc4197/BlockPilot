@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { ArrowDownToLine, Eraser, SendHorizonal, SquareTerminal } from "lucide-react";
 import type { ConsoleLine } from "@blockpilot/shared";
 import { useConsole } from "../lib/useConsole";
+import { Lamp } from "../lib/pixel";
 import { Button, Card, Kbd, StatusBadge, Toggle, cx, useToast } from "../lib/ui";
 
 export default function Console() {
@@ -57,21 +58,21 @@ export default function Console() {
     <div className="flex h-[calc(100vh-7.5rem)] flex-col gap-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-ink-2 text-brand-400">
+          <div className="slab grid h-11 w-11 place-items-center text-redstone">
             <SquareTerminal className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-white">콘솔</h1>
-            <div className="mt-0.5 flex items-center gap-2 text-xs">
+            <h1 className="font-block text-[24px] leading-tight text-white [text-shadow:2px_2px_0_#08080a]">콘솔</h1>
+            <div className="mt-1 flex items-center gap-2 font-block text-[12px]">
               {status && <StatusBadge state={status.state} size="sm" />}
-              <span className={cx("inline-flex items-center gap-1", connected ? "text-emerald-400" : "text-rose-400")}>
-                <span className={cx("h-1.5 w-1.5 rounded-full", connected ? "bg-emerald-400" : "bg-rose-400")} />
-                {connected ? "연결됨" : "연결 끊김 — 재접속 중"}
+              <span className={cx("inline-flex items-center gap-1.5", connected ? "text-slate-300" : "text-red-300")}>
+                <Lamp state={connected ? "on" : "blink"} size={8} />
+                {connected ? "연결됨" : "연결 끊김 · 재접속 중"}
               </span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-xs text-slate-400">
+        <div className="flex items-center gap-4 font-block text-[12px] text-slate-400">
           <label className="flex items-center gap-2">
             시간 표시 <Toggle size="sm" checked={showTime} onChange={setShowTime} />
           </label>
@@ -85,11 +86,10 @@ export default function Console() {
       </header>
 
       <Card padded={false} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex items-center gap-2 border-b border-line bg-ink-1 px-4 py-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-rose-500/70" />
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-500/70" />
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70" />
-          <span className="ml-3 font-mono text-[11px] text-slate-500">server console · {visible.length}줄</span>
+        <div className="flex items-center gap-2 px-4 py-2.5">
+          <Lamp state={status?.state === "running" ? "on" : status?.state === "starting" || status?.state === "stopping" ? "blink" : "off"} size={10} />
+          <span className="font-block text-[12px] text-slate-400">서버 콘솔</span>
+          <span className="font-block text-[12px] text-slate-600 tnum">· {visible.length}줄</span>
         </div>
         <div
           ref={boxRef}
@@ -99,7 +99,7 @@ export default function Console() {
             if (!atBottom && autoScroll) setAutoScroll(false);
             if (atBottom && !autoScroll) setAutoScroll(true);
           }}
-          className="terminal min-h-0 flex-1 overflow-auto bg-ink-0/80 px-4 py-3"
+          className="well terminal mx-3 min-h-0 flex-1 overflow-auto px-4 py-3"
           onClick={() => inputRef.current?.focus()}
         >
           {visible.length === 0 ? (
@@ -109,12 +109,12 @@ export default function Console() {
           )}
         </div>
         {!autoScroll && (
-          <button onClick={() => setAutoScroll(true)} className="absolute bottom-16 right-5 inline-flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs text-slate-200 shadow-pop hover:bg-ink-3">
+          <button onClick={() => setAutoScroll(true)} className="glass absolute bottom-20 right-7 inline-flex items-center gap-1.5 px-3 py-1.5 font-block text-[12px] text-slate-200 hover:bg-ink-3">
             <ArrowDownToLine className="h-3.5 w-3.5" /> 최신으로
           </button>
         )}
-        <form onSubmit={submit} className="flex items-center gap-2 border-t border-line bg-ink-1 px-3 py-2">
-          <span className="font-mono text-sm text-brand-400">›</span>
+        <form onSubmit={submit} className="well m-3 flex items-center gap-2 px-3 py-1.5">
+          <span className="font-mono text-sm text-redstone">›</span>
           <input
             ref={inputRef}
             className="terminal min-w-0 flex-1 bg-transparent text-slate-100 placeholder-slate-600 focus:outline-none"
@@ -141,9 +141,9 @@ export default function Console() {
 function Line({ line, showTime }: { line: ConsoleLine; showTime: boolean }) {
   const t = line.text;
   const cls =
-    line.source === "input" ? "text-brand-300"
+    line.source === "input" ? "text-white font-medium"
     : line.source === "system" ? "text-sky-300"
-    : line.source === "stderr" || /\/(ERROR|FATAL)\]/.test(t) ? "text-rose-300"
+    : line.source === "stderr" || /\/(ERROR|FATAL)\]/.test(t) ? "text-red-300"
     : /\/WARN\]/.test(t) ? "text-amber-300"
     : "text-slate-300";
   return (

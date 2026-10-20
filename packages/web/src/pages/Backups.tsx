@@ -52,8 +52,8 @@ export default function Backups() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-            <HardDriveDownload className="h-4 w-4 text-brand-400" /> 지금 백업
+          <h2 className="mb-3 flex items-center gap-2 font-block text-[12px] text-slate-200">
+            <HardDriveDownload className="h-4 w-4 text-redstone" /> 지금 백업
           </h2>
           <div className="flex items-end gap-3">
             <Field label="이름표 (선택)" className="flex-1">
@@ -80,10 +80,10 @@ export default function Backups() {
         {settings && (
           <Card>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Clock className="h-4 w-4 text-brand-400" /> 자동 백업
+              <h2 className="flex items-center gap-2 font-block text-[12px] text-slate-200">
+                <Clock className="h-4 w-4 text-redstone" /> 자동 백업
               </h2>
-              <Badge tone={settings.intervalMinutes > 0 ? "success" : "neutral"}>{settings.intervalMinutes > 0 ? "켜짐" : "꺼짐"}</Badge>
+              <Badge tone={settings.intervalMinutes > 0 ? "lamp" : "neutral"}>{settings.intervalMinutes > 0 ? "켜짐" : "꺼짐"}</Badge>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="간격">
@@ -99,7 +99,7 @@ export default function Backups() {
                 <Input type="number" min={1} max={500} value={settings.keep} onChange={(e) => setSettings({ ...settings, keep: Number(e.target.value) || 1 })} />
               </Field>
             </div>
-            <label className="mt-3 flex items-center justify-between rounded-lg border border-line bg-ink-2/60 px-3 py-2 text-sm">
+            <label className="mt-3 flex items-center justify-between well px-3 py-2 text-sm">
               <span className="text-slate-300">서버가 꺼져 있어도 백업</span>
               <Toggle size="sm" checked={settings.whenStopped} onChange={(v) => setSettings({ ...settings, whenStopped: v })} />
             </label>
@@ -124,7 +124,7 @@ export default function Backups() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-200">백업 목록</h2>
+          <h2 className="font-block text-[12px] text-slate-200">백업 목록</h2>
           {!stopped && <span className="text-xs text-amber-300">복원은 서버를 중지한 뒤에만 가능해요</span>}
         </div>
         {isLoading ? (
@@ -134,10 +134,10 @@ export default function Backups() {
             위에서 "백업 만들기"를 누르거나 자동 백업을 켜 두세요.
           </EmptyState>
         ) : (
-          <Card padded={false} className="divide-y divide-line">
+          <Card padded={false} className="divide-y-2 divide-bevel-lo">
             {data.backups.map((b) => (
               <div key={b.file} className="flex flex-wrap items-center gap-3 px-5 py-3">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink-3 text-slate-400">
+                <div className="well grid h-9 w-9 shrink-0 place-items-center text-slate-400">
                   <Archive className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
