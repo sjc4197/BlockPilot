@@ -30,16 +30,16 @@
 
 ## 기능
 
-| | 화면 | 할 수 있는 것 |
-|---|---|---|
-| ▦ | **대시보드** | 로더·버전·접속자·모드 수 요약, 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔 |
-| ⚙ | **서버 설정** | `server.properties`를 게임플레이 / 월드 / 플레이어 / 네트워크 / 성능 탭의 폼으로 편집. 그 외 키는 고급 탭에서 raw 편집. 주석과 키 순서 보존 |
-| 👤 | **플레이어** | 화이트리스트 · OP · 밴(플레이어/IP). 닉네임만 입력하면 Mojang API로 UUID 자동 조회 |
-| 🧩 | **모드** | jar 안의 `fabric.mod.json` / `mods.toml` / `plugin.yml`을 읽어 이름·버전·설명·의존성 표시, **의존성 누락 경고**, 활성/비활성 토글, 삭제, 업로드, 친구용 클라이언트 모드 zip 내보내기 |
-| 📝 | **설정 파일** | `config/`, `plugins/` 안의 toml · json · yaml · properties 편집기. 저장 전 문법 검사(오류 행 표시), `Cmd/Ctrl+S` 저장 |
-| >_ | **콘솔** | WebSocket 실시간 스트리밍, 명령어 전송, ↑↓ 히스토리, WARN/ERROR 색상 |
-| 📄 | **로그** | `logs/`(gz 포함) · `crash-reports/` 보기, 검색, WARN/ERROR 필터, `latest.log` 자동 갱신 |
-| 💾 | **백업** | 월드 zip 백업 / 복원 / 다운로드, 간격·보관 개수 기반 자동 백업 (실행 중이면 `save-all flush` 후 백업) |
+| 화면 | 할 수 있는 것 |
+|---|---|
+| **대시보드** | 로더·버전·접속자·모드 수 요약, 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔 |
+| **서버 설정** | `server.properties`를 게임플레이 / 월드 / 플레이어 / 네트워크 / 성능 탭의 폼으로 편집. 그 외 키는 고급 탭에서 raw 편집. 주석과 키 순서 보존 |
+| **플레이어** | 화이트리스트 · OP · 밴(플레이어/IP). 닉네임만 입력하면 Mojang API로 UUID 자동 조회 |
+| **모드** | jar 안의 `fabric.mod.json` / `mods.toml` / `plugin.yml`을 읽어 이름·버전·설명·의존성 표시, **의존성 누락 경고**, 활성/비활성 토글, 삭제, 업로드, 친구용 클라이언트 모드 zip 내보내기 |
+| **설정 파일** | `config/`, `plugins/` 안의 toml · json · yaml · properties 편집기. 저장 전 문법 검사(오류 행 표시), `Cmd/Ctrl+S` 저장 |
+| **콘솔** | WebSocket 실시간 스트리밍, 명령어 전송, ↑↓ 히스토리, WARN/ERROR 색상 |
+| **로그** | `logs/`(gz 포함) · `crash-reports/` 보기, 검색, WARN/ERROR 필터, `latest.log` 자동 갱신 |
+| **백업** | 월드 zip 백업 / 복원 / 다운로드, 간격·보관 개수 기반 자동 백업 (실행 중이면 `save-all flush` 후 백업) |
 
 지원 로더: **Fabric · Forge · NeoForge · Paper/Purpur · Vanilla** (폴더 구조로 자동 감지)
 
