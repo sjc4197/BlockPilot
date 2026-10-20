@@ -1,0 +1,126 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { writeFileAtomic } from "../lib/atomicWrite.js";
+
+/**
+ * server.properties 파서.
+ * 주석·빈 줄·키 순서를 그대로 보존하기 위해 라인 단위로 다룬다.
+ */
+
+export type PropertyLine =
+  | { kind: "entry"; key: string; value: string; raw: string }
+  | { kind: "other"; raw: string };
+
+export function parseProperties(text: string): PropertyLine[] {
+  return text.split(/\r?\n/).map((raw) => {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("!")) {
+      return { kind: "other", raw };
+    }
+    const idx = indexOfSeparator(trimmed);
+    if (idx < 0) return { kind: "entry", key: unescapeKey(trimmed), value: "", raw };
+    return {
+      kind: "entry",
+      key: unescapeKey(trimmed.slice(0, idx).trim()),
+      value: unescapeValue(trimmed.slice(idx + 1).trim()),
+      raw,
+    };
+  });
+}
+
+export function serializeProperties(lines: PropertyLine[]): string {
+  return lines
+    .map((l) => (l.kind === "entry" ? `${escapeKey(l.key)}=${escapeValue(l.value)}` : l.raw))
+    .join("\n");
+}
+
+/** 변경 사항을 적용. 기존 키는 제자리에서 값만 바꾸고, 새 키는 끝에 추가. */
+export function applyChanges(lines: PropertyLine[], changes: Record<string, string>): PropertyLine[] {
+  const remaining = { ...changes };
+  const out: PropertyLine[] = lines.map((l) => {
+    if (l.kind === "entry" && l.key in remaining) {
+      const value = remaining[l.key];
+      delete remaining[l.key];
+      return { kind: "entry", key: l.key, value, raw: "" };
+    }
+    return l;
+  });
+  // 파일 끝에 빈 줄이 있으면 그 앞에 새 키를 넣는다
+  const tail = out.length && out[out.length - 1].kind === "other" && out[out.length - 1].raw === "" ? out.pop() : null;
+  for (const [key, value] of Object.entries(remaining)) {
+    out.push({ kind: "entry", key, value, raw: "" });
+  }
+  if (tail) out.push(tail);
+  return out;
+}
+
+export function toRecord(lines: PropertyLine[]): Record<string, string> {
+  const r: Record<string, string> = {};
+  for (const l of lines) if (l.kind === "entry") r[l.key] = l.value;
+  return r;
+}
+
+// --- 파일 IO ---
+
+export async function readPropertiesFile(serverDir: string) {
+  const file = path.join(serverDir, "server.properties");
+  try {
+    const [text, stat] = await Promise.all([fs.readFile(file, "utf8"), fs.stat(file)]);
+    return { lines: parseProperties(text), mtime: stat.mtime.toISOString(), exists: true };
+  } catch (e: any) {
+    if (e.code === "ENOENT") return { lines: [] as PropertyLine[], mtime: new Date(0).toISOString(), exists: false };
+    throw e;
+  }
+}
+
+export async function writePropertiesChanges(serverDir: string, changes: Record<string, string>) {
+  const file = path.join(serverDir, "server.properties");
+  const { lines } = await readPropertiesFile(serverDir);
+  const next = applyChanges(lines, changes);
+  await writeFileAtomic(file, serializeProperties(next));
+  return toRecord(next);
+}
+
+// --- 이스케이프 (java.util.Properties 규칙의 실용적 부분집합) ---
+
+function indexOfSeparator(s: string): number {
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "\\") {
+      i++;
+      continue;
+    }
+    if (c === "=" || c === ":") return i;
+  }
+  return -1;
+}
+
+function unescapeKey(s: string) {
+  return s.replace(/\\(.)/g, "$1");
+}
+
+function escapeKey(s: string) {
+  return s.replace(/([=:\\ ])/g, "\\$1");
+}
+
+function unescapeValue(s: string) {
+  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\(.)/g, (_, c) => (c === "n" ? "\n" : c === "t" ? "\t" : c));
+}
+
+function escapeValue(s: string) {
+  // 마인크래프트 자체도 비ASCII를 \uXXXX로 쓰므로 호환되게 맞춘다 (MOTD 한글 등)
+  let out = "";
+  for (const ch of s) {
+    const code = ch.codePointAt(0)!;
+    if (ch === "\\") out += "\\\\";
+    else if (ch === "\n") out += "\\n";
+    else if (ch === "\t") out += "\\t";
+    else if (ch === "=" || ch === ":" || ch === "#" || ch === "!") out += "\\" + ch;
+    else if (code < 0x20 || code > 0x7e) {
+      // BMP 밖(이모지 등)은 서로게이트 쌍으로 나눠서 각각 \u로
+      for (const unit of ch.split("")) out += "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0");
+    } else out += ch;
+  }
+  return out;
+}

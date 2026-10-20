@@ -1,0 +1,53 @@
+# --- Claude Code / AI 작업 파일 (개인 작업 메모, 커밋 금지) ---
+PLAN.md
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+docs/ai/
+*.claude.md
+
+# --- 개인정보 / 로컬 설정 ---
+.env
+.env.*
+!.env.example
+*.local
+.blockpilot/
+blockpilot.config.json
+*.pem
+*.key
+*.token
+
+# --- 의존성 / 빌드 ---
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+coverage/
+
+# --- 로그 / 임시 ---
+logs/
+*.log
+npm-debug.log*
+.tmp/
+tmp/
+
+# --- OS / 에디터 ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- 마인크래프트 서버 데이터 (실수로 복사해도 올라가지 않게) ---
+world/
+world_*/
+*.jar
+*.mca
+*.dat
+usercache.json
+banned-*.json
+whitelist.json
+ops.json
+server.properties
+eula.txt
