@@ -363,6 +363,8 @@ export interface ApiError {
 // ---------- 이 컴퓨터 (자동 인식) ----------
 
 export interface SystemInfo {
+  /** BlockPilot 버전 */
+  version: string;
   os: "macos" | "linux" | "windows";
   /** 예: "macOS 26.6.2", "Ubuntu 24.04.1 LTS", "Windows 11 (빌드 22631)" */
   osLabel: string;

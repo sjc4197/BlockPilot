@@ -1,0 +1,103 @@
+name: Release
+
+# - v1.2.3 태그를 올리면: 6개 OS 실행 파일을 만들고, 각 OS 에서 직접 켜서 확인한 뒤 GitHub 릴리스로 공개
+# - 빌드 스크립트·이 파일이 바뀐 push: 같은 빌드와 실행 확인만 (공개하지 않음, 시험용)
+on:
+  push:
+    tags: ["v*.*.*"]
+    branches: [main]
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/build-sea.mjs"
+      - "scripts/smoke-sea.mjs"
+      - "scripts/release-notes.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: macos-arm64, runner: macos-latest }
+          - { target: macos-x64, runner: macos-15-intel }
+          - { target: linux-x64, runner: ubuntu-latest }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm }
+          - { target: windows-x64, runner: windows-latest }
+          - { target: windows-arm64, runner: windows-11-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      NO_COLOR: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 태그와 package.json 버전이 같은지
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          [ "$v" = "$GITHUB_REF_NAME" ] || { echo "::error::태그 $GITHUB_REF_NAME 와 package.json 버전 $v 이 달라요"; exit 1; }
+      - name: 실행 파일 만들기
+        run: |
+          set -o pipefail
+          node scripts/build-sea.mjs --target ${{ matrix.target }} 2>&1 | tee build.log
+      - name: 실행 파일을 켜서 확인
+        run: |
+          set -o pipefail
+          exe="out/sea/${{ matrix.target }}/blockpilot"
+          [[ "${{ matrix.target }}" == windows-* ]] && exe="$exe.exe"
+          node scripts/smoke-sea.mjs "$exe" 2>&1 | tee smoke.log
+          size=$(ls release/*.* | xargs -I{} sh -c 'echo "$(basename {}) $(( $(wc -c < {}) / 1048576 ))MB"')
+          echo "::notice title=${{ matrix.target }}::실행 확인 통과 · $(grep -o 'BlockPilot [0-9.]* · .*' smoke.log | head -1) · $size"
+      - name: 실패 내용 요약
+        if: failure()
+        run: |
+          for f in build.log smoke.log; do
+            [ -f "$f" ] || continue
+            body=$(tail -n 60 "$f" | sed -e 's/%/%25/g' -e 's/\r//g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=${{ matrix.target }} ${f}::${body}"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: 릴리스 공개
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: 해시 목록
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: GitHub 릴리스 만들기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed "s/{VERSION}/$version/g" scripts/release-notes.md > notes.md
+          gh release create "$GITHUB_REF_NAME" release/* --title "BlockPilot $GITHUB_REF_NAME" --notes-file notes.md

@@ -387,3 +387,14 @@ export function useApplyModUpdates(id: string) {
     },
   });
 }
+
+// ---------- 업데이트 확인 (누를 때만 GitHub 에 묻는다) ----------
+
+export interface UpdateCheck {
+  current: string;
+  latest?: string;
+  newer: boolean;
+  url: string;
+  note?: string;
+}
+export const useUpdateCheck = () => useMutation({ mutationFn: () => api<UpdateCheck>("/api/update-check", { method: "POST" }) });

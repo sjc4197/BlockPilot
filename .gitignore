@@ -25,6 +25,10 @@ build/
 *.tsbuildinfo
 coverage/
 
+# --- 단일 실행 파일 빌드 결과 ---
+out/
+release/
+
 # --- 로그 / 임시 ---
 logs/
 *.log

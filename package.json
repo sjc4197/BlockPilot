@@ -1,7 +1,7 @@
 {
   "name": "blockpilot",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Minecraft server management dashboard",
   "workspaces": [
     "packages/shared",
@@ -9,6 +9,7 @@
     "packages/web"
   ],
   "scripts": {
+    "build:sea": "node scripts/build-sea.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:web": "npm run dev --workspace=packages/web",
@@ -19,5 +20,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6"
   }
 }

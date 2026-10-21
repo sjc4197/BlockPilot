@@ -6,6 +6,7 @@ import type { OsId, Platform } from "./types.js";
 import { macos } from "./macos.js";
 import { linux, isMusl } from "./linux.js";
 import { windows } from "./windows.js";
+import { APP_VERSION } from "../../lib/appInfo.js";
 
 export type { Platform, OsId } from "./types.js";
 export const platforms: Record<OsId, Platform> = { macos, linux, windows };
@@ -71,6 +72,7 @@ export function systemInfo(): SystemInfo {
   else if (!archOk) reason = `이 CPU(${process.arch})는 아직 지원하지 않아요. x64 또는 ARM64 컴퓨터에서 실행해 주세요.`;
   else if (!support.create) reason = `${current === "linux" ? "Linux" : "Windows"} 에서 새 서버 만들기는 아직 준비 중이에요.`;
   info = {
+    version: APP_VERSION,
     os: current ?? "linux",
     osLabel: osLabel(current),
     arch: process.arch,

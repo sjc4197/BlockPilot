@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, FolderOpen, Hammer, Plus, Server, Trash2 } from "lucide-react";
-import { useCreateOptions, useRegisterServer, useRemoveServer, useServers, useSystem } from "../api/hooks";
+import { useCreateOptions, useRegisterServer, useRemoveServer, useServers, useSystem, useUpdateCheck } from "../api/hooks";
 import { Logo } from "../App";
 import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, Spinner, cx, useToast } from "../lib/ui";
 import { usePlayOnce } from "../lib/fx";
@@ -14,6 +14,7 @@ export default function ServerSelect() {
   const navigate = useNavigate();
   const { data: createOpts } = useCreateOptions();
   const { data: sys } = useSystem();
+  const update = useUpdateCheck();
   const [path, setPath] = useState("");
   const [name, setName] = useState("");
   const place = usePlayOnce("server-list");
@@ -130,6 +131,22 @@ export default function ServerSelect() {
             {sys.osLabel} · {sys.archLabel}
           </span>
           {sys.support.manage === "wip" && <Badge tone="warning">이 OS 지원은 준비 중이라 일부 기능이 다르게 동작할 수 있어요</Badge>}
+          <span className="text-slate-600">·</span>
+          <span className="font-block">BlockPilot</span>
+          <span className="text-slate-300 tnum">v{sys.version}</span>
+          {update.data ? (
+            update.data.newer ? (
+              <a href={update.data.url} target="_blank" rel="noreferrer" className="focus-ring">
+                <Badge tone="lamp">v{update.data.latest} 이 나왔어요 · 받으러 가기</Badge>
+              </a>
+            ) : (
+              <span className="text-slate-400">{update.data.note ?? "최신 버전이에요"}</span>
+            )
+          ) : (
+            <Button size="sm" variant="ghost" loading={update.isPending} onClick={() => update.mutate(undefined, { onError: (e) => toast("err", (e as Error).message) })} title="누를 때만 GitHub 에 최신 버전을 물어봐요">
+              업데이트 확인
+            </Button>
+          )}
         </footer>
       )}
     </div>

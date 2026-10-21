@@ -21,6 +21,7 @@
   <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-green">
   <a href="https://github.com/sjc4197/BlockPilot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sjc4197/BlockPilot/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/sjc4197/BlockPilot/releases/latest"><img alt="최신 릴리스" src="https://img.shields.io/github/v/release/sjc4197/BlockPilot?label=%EB%8B%A4%EC%9A%B4%EB%A1%9C%EB%93%9C&color=ff3b2f"></a>
 </p>
 
 <p align="center">
@@ -115,14 +116,32 @@ push 할 때마다 GitHub Actions 가 macOS·Ubuntu·Windows 에서 단위 테�
 
 ## 시작하기
 
+### 다운로드 (Node 설치 없이)
+
+[**릴리스 페이지**](https://github.com/sjc4197/BlockPilot/releases/latest)에서 내 컴퓨터에 맞는 파일 하나를 받아 압축을 풀고 `blockpilot`(Windows 는 `blockpilot.exe`)을 실행하면 브라우저에 대시보드가 열려요.
+
+| 컴퓨터 | 받을 파일 |
+|---|---|
+| Mac (Apple 실리콘 / 인텔) | `…-macos-arm64.zip` / `…-macos-x64.zip` |
+| Windows (대부분 / ARM) | `…-windows-x64.zip` / `…-windows-arm64.zip` |
+| Linux (대부분 / ARM·라즈베리 파이) | `…-linux-x64.tar.gz` / `…-linux-arm64.tar.gz` |
+
+개발자 인증서로 서명하지 않은 앱이라 처음 한 번 경고가 떠요.
+
+- **macOS**: 경고 창을 닫고 시스템 설정 → 개인정보 보호 및 보안 → 맨 아래 **그래도 열기**
+- **Windows**: "Windows의 PC 보호" 창에서 **추가 정보 → 실행**
+- **Linux**: `chmod +x ./blockpilot && ./blockpilot` (Alpine 처럼 musl 을 쓰는 배포판은 아래 소스 설치로)
+
+함께 뜨는 창을 닫으면 BlockPilot 과 켜 둔 마인크래프트 서버가 함께 꺼져요. 받은 파일은 릴리스의 `SHA256SUMS.txt` 와 해시를 비교해 확인할 수 있어요.
+
 ### 요구 사항
 
 - **macOS · Linux · Windows** 중 하나
-- **Node.js 20 이상** ([nodejs.org](https://nodejs.org) 에서 LTS 설치)
+- 소스로 설치할 때만: **Node.js 20 이상** ([nodejs.org](https://nodejs.org) 에서 LTS 설치)
 - 기존 서버를 연결할 때: 그 서버 폴더와 서버를 돌릴 Java
 - 새 서버를 만들 때: 빈 폴더만 있으면 돼요. Java 가 없으면 BlockPilot 이 앱 폴더에 받아서 써요
 
-### 설치 및 실행
+### 소스로 설치 및 실행
 
 ```bash
 git clone https://github.com/sjc4197/BlockPilot.git
@@ -208,6 +227,7 @@ $env:BLOCKPILOT_HOST="0.0.0.0"; npm start   # Windows PowerShell
 | `BLOCKPILOT_TOKEN` | (없음) | 접속 토큰 지정. 설정하면 루프백에서도 토큰 필요 |
 | `BLOCKPILOT_HOME` | `~/.blockpilot` | 앱 폴더: 등록된 서버 목록 · 자동 백업·알림·자동화 설정(디스코드 웹훅 포함, 나만 읽기) · 토큰 · 받아 둔 JDK(`runtimes/`) · 만들기 작업 일지(`jobs/`) · 접속 시간 기록(`playtime/`) |
 | `LOG_LEVEL` | `info` | Fastify 로그 레벨 |
+| `BLOCKPILOT_NO_BROWSER` | (없음) | `1` 이면 실행 파일로 켤 때 브라우저를 자동으로 열지 않음 |
 
 ## 기술 스택
 
@@ -271,7 +291,10 @@ BlockPilot/
 npm run dev          # 백엔드 4800 (tsx watch) + 프론트 4801 (Vite HMR, /api 프록시)
 npm test             # vitest
 npm run typecheck    # 세 패키지 tsc --noEmit
+npm run build:sea    # 이 컴퓨터용 단일 실행 파일 → release/ (node scripts/build-sea.mjs --target linux-arm64 처럼 대상 지정 가능)
 ```
+
+릴리스: `package.json` 버전을 올리고 `v1.2.3` 태그를 push 하면 GitHub Actions 가 6개 OS 실행 파일을 만들고, 각 OS 에서 직접 켜서 확인한 뒤 릴리스로 올려요.
 
 테스트 전용 환경 변수: `BLOCKPILOT_DISCORD_ALLOW_LOCAL=1`(디스코드 대신 `http://127.0.0.1` 가짜 수신기 허용), `BLOCKPILOT_PUBLIC_IP_URL` · `BLOCKPILOT_SERVER_CHECK_URL` · `BLOCKPILOT_MODRINTH_URL`(외부 서비스 대신 가짜 서버). 평소에는 쓰지 않아요.
 
@@ -281,7 +304,8 @@ npm run typecheck    # 세 패키지 tsc --noEmit
 - [ ] 새 서버 만들기 — Paper · Forge · NeoForge
 - [x] Linux 지원
 - [x] Windows 지원 ([실제 PC 점검 체크리스트](docs/windows-checklist.md))
-- [ ] Node 설치 없이 실행되는 설치 파일, Linux 부팅 시 자동 실행(systemd)
+- [x] Node 설치 없이 실행되는 단일 실행 파일 (macOS · Windows · Linux, x64 · ARM64)
+- [ ] 로그인·부팅 시 자동 실행 (launchd · 작업 스케줄러 · systemd)
 - [x] Modrinth 모드 검색·설치·업데이트
 - [x] 플레이어 통계, 디스코드 알림, 크래시 자동 재시작, 예약 재시작, 친구 접속 도우미, 성능 모니터, 휴대폰 화면
 
