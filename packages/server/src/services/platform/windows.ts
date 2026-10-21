@@ -52,11 +52,14 @@ export const windows: Platform = {
 
   startScripts: ["start.bat", "run.bat", "start.cmd"],
   foreignScripts: ["start.sh", "run.sh"],
-  // `cmd /c start.bat` 은 cmd 가 내장 명령 START 로 읽어 버린다 (echo.bat → "bat" 출력과 같은 함정).
-  // 그래서 .\ 를 붙인 경로를 따옴표로 감싸 넘긴다. /s 가 바깥 따옴표 한 쌍을 벗기므로 Node 의 shell 실행과 같은 모양.
+  // 스크립트 이름이 cmd 내장 명령(START 등)으로 읽히지 않도록 .\ 를 붙인 경로를 따옴표로 감싸 넘긴다.
+  // /s 가 바깥 따옴표 한 쌍을 벗기므로 Node 의 shell 실행과 같은 모양.
   scriptCommand: (script) => ({ cmd: process.env.ComSpec ?? "cmd.exe", args: ["/d", "/s", "/c", `"".\\${script}""`], verbatim: true }),
-  // 자기 콘솔을 갖게 해서 BlockPilot 창의 Ctrl+C 가 서버로 바로 가지 않게. 창은 숨김
-  spawnOptions: () => ({ detached: true, windowsHide: true }),
+  // detached 는 쓰지 않는다: Windows 에서 detached 는 콘솔 없이(DETACHED_PROCESS) 띄워서, cmd 가 실행한 java 가
+  // 새 콘솔을 따로 받아 출력이 BlockPilot 으로 오지 않는다 (CI 에서 출력 0줄로 10분 시간 초과).
+  // windowsHide 만 쓰면 창 없는 자기 콘솔(CREATE_NO_WINDOW)을 받아 java 도 그 콘솔과 파이프를 물려받고,
+  // BlockPilot 창의 Ctrl+C 도 서버로 바로 가지 않는다.
+  spawnOptions: () => ({ windowsHide: true }),
   childEnv: () => {
     // Java 출력을 UTF-8 로 (JDK 19+: stdout.encoding, 그 이전: sun.stdout.encoding)
     const utf8Out = "-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8";

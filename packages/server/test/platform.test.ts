@@ -135,3 +135,39 @@ describe("scriptCommand runs this OS's start scripts for real", () => {
     }
   }, 20_000);
 });
+
+describe("BlockPilot's own start script reaches the java line and its output comes back", () => {
+  // java 대신 node 를 넣으면 -Xms 를 모르는 옵션이라며 바로 오류를 내고 끝난다 → 스크립트가 java 줄까지 가고,
+  // 스크립트가 실행한 프로그램의 출력이 파이프로 돌아오는지 확인 (Windows 에서 detached 로 띄우면 출력이 사라졌다)
+  it("runs the pinned program via scriptCommand with childEnv and spawnOptions", async () => {
+    const fsp = await import("node:fs/promises");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { spawn } = await import("node:child_process");
+    const { platform } = await import("../src/services/platform/index.js");
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "bp-java-line 서버-"));
+    try {
+      const script = platform.startScriptFor(process.execPath, 512, 1024);
+      await fsp.writeFile(path.join(dir, script.name), script.body, script.mode ? { mode: script.mode } : undefined);
+      const { cmd, args, verbatim } = platform.scriptCommand(script.name);
+      const child = spawn(cmd, args, { cwd: dir, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...platform.childEnv() }, ...platform.spawnOptions(), windowsVerbatimArguments: verbatim });
+      let out = "";
+      child.stdout!.on("data", (d) => (out += d));
+      child.stderr!.on("data", (d) => (out += d));
+      const code = await new Promise<number | null>((resolve, reject) => {
+        const t = setTimeout(() => {
+          platform.killTree(child, true);
+          reject(new Error(`스크립트가 끝나지 않음. 출력: ${JSON.stringify(out)}`));
+        }, 15_000);
+        child.once("close", (c) => {
+          clearTimeout(t);
+          resolve(c);
+        });
+      });
+      expect(out).toMatch(/bad option: -Xms512M/);
+      expect(code).not.toBe(0);
+    } finally {
+      await fsp.rm(dir, { recursive: true, force: true });
+    }
+  }, 20_000);
+});
