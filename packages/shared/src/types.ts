@@ -538,3 +538,36 @@ export interface PerfInfo {
   lag: { lastHour: number; worstMs?: number; lastAt?: string };
   advice?: string;
 }
+
+// ---------- 플레이어 통계 ----------
+
+export interface StatCount {
+  /** 예: "minecraft:stone" */
+  id: string;
+  n: number;
+}
+
+export interface PlayerStats {
+  uuid: string;
+  name?: string;
+  playMinutes: number;
+  deaths: number;
+  mined: number;
+  walkedKm: number;
+  mobKills: number;
+  playerKills: number;
+  jumps: number;
+  topMined: StatCount[];
+  topKilled: StatCount[];
+  killedBy: StatCount[];
+  savedAt: string;
+}
+
+export interface StatsResponse {
+  world: string;
+  /** 통계 파일 중 가장 최근에 저장된 시각 */
+  savedAt?: string;
+  players: PlayerStats[];
+  /** BlockPilot 이 지켜본 최근 7일 접속 시간 (분) */
+  week: { name: string; minutes: number }[];
+}

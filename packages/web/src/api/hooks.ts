@@ -31,6 +31,7 @@ import type {
   PublicIpResult,
   ReachabilityResult,
   PerfInfo,
+  StatsResponse,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -351,3 +352,5 @@ export const useReachCheck = (id: string) => useMutation({ mutationFn: (ip: stri
 
 /** 대시보드를 보는 동안만 5초마다 (서버도 조회가 있을 때만 측정한다) */
 export const usePerf = (id: string) => useQuery({ queryKey: ["server", id, "perf"], queryFn: () => api<PerfInfo>(`/api/servers/${id}/perf`), refetchInterval: 5000 });
+
+export const useStats = (id: string) => useQuery({ queryKey: ["server", id, "stats"], queryFn: () => api<StatsResponse>(`/api/servers/${id}/stats`), refetchInterval: 60_000 });

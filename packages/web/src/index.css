@@ -365,6 +365,34 @@ body {
   100% { opacity: 0; }
 }
 
+/* ---------- 통계 점수판 (게임 속 사이드바 점수판) ---------- */
+
+.scoreboard {
+  background: rgba(0, 0, 0, 0.45);
+  padding: 4px 0 6px;
+}
+.scoreboard-title {
+  text-align: center;
+  padding: 4px 12px 8px;
+  font-family: "Galmuri11", ui-monospace, monospace;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.25);
+  margin-bottom: 4px;
+}
+.scoreboard-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  font-size: 14px;
+  color: #e4e4ea;
+}
+.scoreboard-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* ---------- 경험치 바 ---------- */
 
 .xp-level {

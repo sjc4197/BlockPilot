@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { DeleteServerInput, RegisterServerInput, type DeleteServerResult, type ServerSummary } from "@blockpilot/shared";
 import { addServer, listServers, removeServer } from "../config/store.js";
+import { forgetPlaytime } from "../services/stats.js";
 import { detectServer, getServerJavaVersion, validateServerDir } from "../services/serverInfo.js";
 import { readPropertiesFile, toRecord } from "../services/properties.js";
 import { modsDirName } from "../services/mods.js";
@@ -26,6 +27,7 @@ export async function serversRoutes(app: FastifyInstance) {
     const { managed } = await loadContext(id);
     if (managed.isManaged()) throw conflict("실행 중인 서버는 먼저 중지해야 합니다.");
     await removeServer(id);
+    await forgetPlaytime(id);
     return { ok: true };
   });
 

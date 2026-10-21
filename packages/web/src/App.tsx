@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Archive, Boxes, ChevronRight, FileCode2, LayoutDashboard, ScrollText, Settings2, SquareTerminal, Users } from "lucide-react";
+import { ArrowLeft, Archive, Boxes, ChevronRight, FileCode2, LayoutDashboard, ScrollText, Settings2, SquareTerminal, Trophy, Users } from "lucide-react";
 import { useAuthInfo, useServer } from "./api/hooks";
 import { getToken, setToken, setUnauthorizedHandler } from "./api/client";
 import { StatusBadge, cx } from "./lib/ui";
@@ -16,6 +16,7 @@ import Console from "./pages/Console";
 import ConfigFiles from "./pages/ConfigFiles";
 import Logs from "./pages/Logs";
 import Backups from "./pages/Backups";
+import Stats from "./pages/Stats";
 import Login from "./pages/Login";
 import NewServer from "./pages/NewServer";
 
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="console" element={<Console />} />
         <Route path="logs" element={<Logs />} />
         <Route path="backups" element={<Backups />} />
+        <Route path="stats" element={<Stats />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -72,6 +74,7 @@ const NAV = [
   { to: "console", label: "콘솔", icon: SquareTerminal },
   { to: "logs", label: "로그", icon: ScrollText },
   { to: "backups", label: "백업", icon: Archive },
+  { to: "stats", label: "통계", icon: Trophy },
 ];
 
 // 로고 레버는 앱을 처음 열 때 한 번만 당겨진다 (화면을 옮길 때마다 다시 켜지지 않게)
@@ -224,7 +227,7 @@ function HotbarNav() {
   }, [id, navigate]);
 
   return (
-    <nav ref={navRef} className="relative flex-1 space-y-1 overflow-y-auto px-3" aria-label="서버 메뉴 (숫자 키 1~8)">
+    <nav ref={navRef} className="relative flex-1 space-y-1 overflow-y-auto px-3" aria-label="서버 메뉴 (숫자 키 1~9)">
       {frame && <span className="hotbar-frame" style={{ transform: `translateY(${frame.top}px)`, height: frame.height }} aria-hidden />}
       {NAV.map((n, i) => (
         <NavLink

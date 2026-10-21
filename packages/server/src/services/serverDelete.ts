@@ -6,6 +6,7 @@ import { badRequest, conflict } from "../lib/errors.js";
 import { activeJob } from "./create/job.js";
 import { assertDeletableTarget } from "./create/target.js";
 import { forgetManaged, type ManagedServer } from "./process.js";
+import { forgetPlaytime } from "./stats.js";
 import { isBackupRunning } from "./scheduler.js";
 import { validateServerDir } from "./serverInfo.js";
 import { platform } from "./platform/index.js";
@@ -77,6 +78,7 @@ export async function deleteServerFolder(server: RegisteredServer, managed: Mana
   }
 
   await removeServer(server.id);
+  await forgetPlaytime(server.id);
   forgetManaged(server.id);
   return { deletedPath: real, removedLink };
 }
