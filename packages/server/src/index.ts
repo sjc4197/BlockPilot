@@ -21,6 +21,8 @@ import { logsRoutes } from "./routes/logs.js";
 import { backupsRoutes } from "./routes/backups.js";
 import { createRoutes } from "./routes/create.js";
 import { fsRoutes } from "./routes/fs.js";
+import { automationRoutes } from "./routes/automation.js";
+import { startDiscordNotifier } from "./services/discord.js";
 import { CreateError } from "./services/create/errors.js";
 import { shutdownAll } from "./services/process.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
@@ -66,6 +68,7 @@ await app.register(logsRoutes);
 await app.register(backupsRoutes);
 await app.register(createRoutes);
 await app.register(fsRoutes);
+await app.register(automationRoutes);
 
 // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist)
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -81,6 +84,7 @@ if (webDist) {
 }
 
 startScheduler(app.log);
+startDiscordNotifier();
 // 지난번에 만들기 도중 꺼졌다면 그때 만들던 파일을 정리
 await recoverInterruptedJobs(app.log);
 

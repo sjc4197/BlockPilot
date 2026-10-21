@@ -25,6 +25,8 @@ import type {
   FsListing,
   DeleteServerResult,
   SystemInfo,
+  AutomationView,
+  AutomationUpdate,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -41,6 +43,7 @@ export const keys = {
   logs: (id: string) => ["server", id, "logs"] as const,
   logFile: (id: string, kind: string, name: string) => ["server", id, "logs", kind, name] as const,
   backups: (id: string) => ["server", id, "backups"] as const,
+  automation: (id: string) => ["server", id, "automation"] as const,
 };
 
 // ---------- 인증 ----------
@@ -300,5 +303,26 @@ export function useDeleteServer(id: string) {
       qc.invalidateQueries({ queryKey: keys.servers });
       qc.removeQueries({ queryKey: keys.server(id) });
     },
+  });
+}
+
+// ---------- 알림·자동화 ----------
+
+export const useAutomation = (id: string) =>
+  useQuery({ queryKey: keys.automation(id), queryFn: () => api<AutomationView>(`/api/servers/${id}/automation`), refetchInterval: 10_000 });
+
+export function useUpdateAutomation(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (u: AutomationUpdate) => api<AutomationView>(`/api/servers/${id}/automation`, { method: "PUT", json: u }),
+    onSuccess: (v) => qc.setQueryData(keys.automation(id), v),
+  });
+}
+
+export function useDiscordTest(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ ok: true }>(`/api/servers/${id}/automation/discord/test`, { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.automation(id) }),
   });
 }

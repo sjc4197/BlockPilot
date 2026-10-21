@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Gauge, Globe, Layers, ListTree, Settings2, Swords, Users, Zap, type LucideIcon } from "lucide-react";
+import { BellRing, Gauge, Globe, Layers, ListTree, Settings2, Swords, Users, Zap, type LucideIcon } from "lucide-react";
 import { PROPERTY_GROUPS, PROPERTY_META, PROPERTY_META_BY_KEY, type PropertyMeta, type PropertyGroup } from "@blockpilot/shared";
-import { useProperties, useServer, useUpdateProperties } from "../api/hooks";
+import { useAutomation, useProperties, useServer, useUpdateProperties } from "../api/hooks";
+import { AutomationPanel } from "../components/AutomationPanel";
 import { ServerDanger } from "../components/ServerDanger";
 import { Badge, Button, Card, Input, PageHeader, Select, Spinner, Toggle, cx, useToast } from "../lib/ui";
 
-type Tab = PropertyGroup | "advanced";
-const GROUP_ICON: Record<Tab, LucideIcon> = { gameplay: Swords, world: Layers, players: Users, network: Globe, performance: Gauge, advanced: ListTree };
+type Tab = PropertyGroup | "advanced" | "automation";
+const GROUP_ICON: Record<Tab, LucideIcon> = { gameplay: Swords, world: Layers, players: Users, network: Globe, performance: Gauge, advanced: ListTree, automation: BellRing };
 
 export default function Settings() {
   const { id = "" } = useParams();
   const { data, isLoading } = useProperties(id);
   const { data: server } = useServer(id);
   const update = useUpdateProperties(id);
+  const { data: automation } = useAutomation(id);
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("gameplay");
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -49,8 +51,9 @@ export default function Settings() {
   const groups: { id: Tab; label: string; count: number }[] = [
     ...PROPERTY_GROUPS.map((g) => ({ id: g.id as Tab, label: g.label, count: PROPERTY_META.filter((m) => m.group === g.id).length })),
     { id: "advanced", label: "고급", count: advancedEntries.length },
+    { id: "automation", label: "알림·자동화", count: 0 },
   ];
-  const dirtyInGroup = (g: Tab) => Object.keys(draft).filter((k) => (g === "advanced" ? !knownKeys.has(k) : PROPERTY_META_BY_KEY[k]?.group === g)).length;
+  const dirtyInGroup = (g: Tab) => (g === "automation" ? 0 : Object.keys(draft).filter((k) => (g === "advanced" ? !knownKeys.has(k) : PROPERTY_META_BY_KEY[k]?.group === g)).length);
 
   return (
     <div className="space-y-5 pb-24">
@@ -79,13 +82,15 @@ export default function Settings() {
               >
                 <Icon className={cx("h-4 w-4", active ? "text-redstone" : "text-slate-500")} />
                 <span className="flex-1">{g.label}</span>
-                {dirty > 0 ? <span className="h-1.5 w-1.5 bg-redstone shadow-[0_0_6px_rgba(255,59,47,.7)]" /> : <span className="text-[11px] text-slate-600 tnum">{g.count}</span>}
+                {dirty > 0 ? <span className="h-1.5 w-1.5 bg-redstone shadow-[0_0_6px_rgba(255,59,47,.7)]" /> : g.id !== "automation" && <span className="text-[11px] text-slate-600 tnum">{g.count}</span>}
               </button>
             );
           })}
         </nav>
 
-        {tab !== "advanced" ? (
+        {tab === "automation" ? (
+          automation ? <AutomationPanel serverId={id} view={automation} /> : <Spinner />
+        ) : tab !== "advanced" ? (
           <Card padded={false} className="divide-y-2 divide-bevel-lo">
             {PROPERTY_META.filter((m) => m.group === tab).map((m) => (
               <FieldRow key={m.key} meta={m} value={value(m.key)} dirty={m.key in draft} live={live} onChange={(v) => set(m.key, v)} />
