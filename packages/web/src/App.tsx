@@ -95,8 +95,8 @@ export function Logo({ className, size = "md" }: { className?: string; size?: "m
   const dots = lg ? 22 : 12;
   const dot = lg ? 5 : 3;
   const tuck = lg ? 12 : 6;
-  // 레버 그림 오른쪽 빈칸(16칸 중 3칸)만큼 더 당겨서 가루가 받침에 바로 붙게
-  const reach = tuck + (lg ? 14 : 7);
+  // 레버 그림 오른쪽 빈칸(16칸 중 2칸)만큼만 당겨서, 가루가 돌 받침 바로 옆에서 시작하고 받침과 겹치지 않게
+  const reach = tuck + (lg ? 7 : 3);
   return (
     <span className={cx("logo-c inline-flex items-end", className)} data-on={on} style={{ "--lamp-delay": `${dots * 45 + 260}ms` } as CSSProperties}>
       <LeverGlyph className={lg ? "h-16 w-[73px] shrink-0" : "h-8 w-[37px] shrink-0"} />
