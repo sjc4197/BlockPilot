@@ -120,6 +120,8 @@ export class ManagedServer extends EventEmitter {
       windowsVerbatimArguments: verbatim,
     });
     this.child = child;
+    // 서버가 먼저 끝나 입력 파이프가 닫혀도(EPIPE 등) BlockPilot 이 죽지 않게
+    child.stdin!.on("error", (e) => this.pushLine("system", `서버 입력 오류: ${e.message}`));
 
     this.splitters = (["stdout", "stderr"] as const).map((source) => {
       const sp = new LineSplitter(platform.decode, (line) => {
@@ -129,7 +131,7 @@ export class ManagedServer extends EventEmitter {
       child[source]!.on("data", (d: Buffer) => {
         sp.push(d);
         // pause 안내는 줄바꿈 없이 나오므로 남은 조각도 본다
-        if (PAUSE_PROMPT.test(sp.pending())) this.child?.stdin?.end("\r\n");
+        if (PAUSE_PROMPT.test(sp.pending())) this.answerPause();
       });
       return sp;
     });
@@ -262,14 +264,21 @@ export class ManagedServer extends EventEmitter {
   }
 
   private writeStdin(line: string) {
-    this.child?.stdin?.write(line + "\n");
+    const stdin = this.child?.stdin;
+    if (stdin && !stdin.writableEnded && !stdin.destroyed) stdin.write(line + "\n");
+  }
+
+  /** start.bat 끝의 pause 에 키 입력을 넘기고 입력을 닫는다. 안내가 조각과 완성된 줄로 두 번 보일 수 있어 한 번만 */
+  private answerPause() {
+    const stdin = this.child?.stdin;
+    if (stdin && !stdin.writableEnded && !stdin.destroyed) stdin.end("\r\n");
   }
 
   /** 로그 줄에서 상태 변화를 읽어낸다 */
   private inspect(line: string) {
     // Windows start.bat 끝의 pause: java 가 끝났는데 cmd 가 키 입력을 기다리면 넘겨 준다
     if (PAUSE_PROMPT.test(line)) {
-      this.child?.stdin?.end("\r\n");
+      this.answerPause();
       return;
     }
     if (!this.ready && /\]: Done \(/.test(line)) {

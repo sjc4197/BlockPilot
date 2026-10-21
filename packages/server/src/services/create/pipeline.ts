@@ -272,6 +272,9 @@ function firstRun(job: CreateJob, target: string, scriptName: string): Promise<v
     const { cmd, args, verbatim } = platform.scriptCommand(scriptName);
     const child = spawn(cmd, args, { cwd: target, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...platform.childEnv() }, ...platform.spawnOptions(), windowsVerbatimArguments: verbatim });
     job.trackChild(child);
+    child.stdin!.on("error", () => {
+      /* 서버가 먼저 끝나 입력 파이프가 닫힌 경우 — 종료 처리는 exit 에서 */
+    });
     const recent: string[] = [];
     let done = false;
     let settled = false;
