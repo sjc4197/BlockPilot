@@ -10,6 +10,8 @@ export type OsId = "macos" | "linux" | "windows";
 export interface LaunchCommand {
   cmd: string;
   args: string[];
+  /** Windows: args 를 따옴표 처리 없이 그대로 넘긴다 (cmd.exe 는 자기 방식의 따옴표를 쓰므로) */
+  verbatim?: boolean;
 }
 
 export interface PlatformWords {

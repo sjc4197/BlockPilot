@@ -269,8 +269,8 @@ export function explainServerFailure(log: string): { code: CreateError["code"]; 
 /** 시작 스크립트로 켜서 Done 이 뜨면 stop 을 보내고 정상 종료를 기다린다 */
 function firstRun(job: CreateJob, target: string, scriptName: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const { cmd, args } = platform.scriptCommand(scriptName);
-    const child = spawn(cmd, args, { cwd: target, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...platform.childEnv() }, ...platform.spawnOptions() });
+    const { cmd, args, verbatim } = platform.scriptCommand(scriptName);
+    const child = spawn(cmd, args, { cwd: target, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...platform.childEnv() }, ...platform.spawnOptions(), windowsVerbatimArguments: verbatim });
     job.trackChild(child);
     const recent: string[] = [];
     let done = false;

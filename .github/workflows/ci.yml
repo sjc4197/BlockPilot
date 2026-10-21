@@ -18,7 +18,7 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       # 실패 요약을 읽기 쉽게 색상 코드 없이
       NO_COLOR: "1"
@@ -42,6 +42,8 @@ jobs:
       # 테스트용 일회성 서버를 띄우려면 eula=true 가 필요해서, 이 저장소의 CI 를 돌리는 사람이 Minecraft EULA
       # (https://aka.ms/MinecraftEULA) 에 동의한다는 뜻으로 아래 값을 켠다. 앱의 실제 화면에서는 여전히 사용자가 직접 체크해야 한다.
       - name: 실제 서버 만들기 E2E
+        # 단계 제한 시간을 넘기면 '실패'로 처리돼 아래 요약이 남는다 (작업 전체 제한에 걸리면 '취소'라 요약이 안 남음)
+        timeout-minutes: 35
         run: |
           set -o pipefail
           npm run test:e2e --workspace=packages/server 2>&1 | tee e2e-output.log

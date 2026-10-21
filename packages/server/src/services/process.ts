@@ -91,9 +91,10 @@ export class ManagedServer extends EventEmitter {
 
     let cmd: string;
     let args: string[];
+    let verbatim = false;
     if (info.startScript) {
       // 이 OS 의 시작 스크립트(start.sh / start.bat)를 그대로 실행 → 메모리 등은 스크립트 설정을 따른다
-      ({ cmd, args } = platform.scriptCommand(info.startScript));
+      ({ cmd, args, verbatim = false } = platform.scriptCommand(info.startScript));
     } else if (info.launchJar) {
       cmd = platform.javaExe;
       args = ["-Xms2G", "-Xmx4G", "-jar", info.launchJar, "nogui"];
@@ -116,6 +117,7 @@ export class ManagedServer extends EventEmitter {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...platform.childEnv() },
       ...platform.spawnOptions(),
+      windowsVerbatimArguments: verbatim,
     });
     this.child = child;
 

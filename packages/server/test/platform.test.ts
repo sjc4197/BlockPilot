@@ -96,3 +96,41 @@ describe.runIf(process.platform !== "win32")("POSIX killTree", () => {
     expect(alive(grandPid)).toBe(false);
   });
 });
+
+describe("scriptCommand runs this OS's start scripts for real", () => {
+  // Windows 에서 `cmd /c start.bat` 은 내장 명령 START 로 읽혀 스크립트가 안 돌고 멈춘다 → 실제로 실행해서 확인
+  it.each(["start", "run"])("%s script runs from a folder with a space and Korean in its name", async (base) => {
+    const fsp = await import("node:fs/promises");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { spawn } = await import("node:child_process");
+    const { platform } = await import("../src/services/platform/index.js");
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), "bp-script-"));
+    const dir = path.join(root, "내 서버 1");
+    await fsp.mkdir(dir);
+    try {
+      const name = platform.startScripts.find((s) => s.startsWith(base))!;
+      const body = name.endsWith(".bat") ? "@echo off\r\necho script-ran-ok\r\n" : "#!/bin/sh\necho script-ran-ok\n";
+      await fsp.writeFile(path.join(dir, name), body, { mode: 0o755 });
+      const { cmd, args, verbatim } = platform.scriptCommand(name);
+      const child = spawn(cmd, args, { cwd: dir, stdio: ["pipe", "pipe", "pipe"], ...platform.spawnOptions(), windowsVerbatimArguments: verbatim });
+      let out = "";
+      child.stdout!.on("data", (d) => (out += d));
+      child.stderr!.on("data", (d) => (out += d));
+      const code = await new Promise<number | null>((resolve, reject) => {
+        const t = setTimeout(() => {
+          platform.killTree(child, true);
+          reject(new Error(`스크립트가 끝나지 않음. 출력: ${out}`));
+        }, 15_000);
+        child.once("exit", (c) => {
+          clearTimeout(t);
+          resolve(c);
+        });
+      });
+      expect(out).toContain("script-ran-ok");
+      expect(code).toBe(0);
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  }, 20_000);
+});

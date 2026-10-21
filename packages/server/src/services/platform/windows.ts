@@ -52,7 +52,9 @@ export const windows: Platform = {
 
   startScripts: ["start.bat", "run.bat", "start.cmd"],
   foreignScripts: ["start.sh", "run.sh"],
-  scriptCommand: (script) => ({ cmd: process.env.ComSpec ?? "cmd.exe", args: ["/d", "/s", "/c", script] }),
+  // `cmd /c start.bat` 은 cmd 가 내장 명령 START 로 읽어 버린다 (echo.bat → "bat" 출력과 같은 함정).
+  // 그래서 .\ 를 붙인 경로를 따옴표로 감싸 넘긴다. /s 가 바깥 따옴표 한 쌍을 벗기므로 Node 의 shell 실행과 같은 모양.
+  scriptCommand: (script) => ({ cmd: process.env.ComSpec ?? "cmd.exe", args: ["/d", "/s", "/c", `"".\\${script}""`], verbatim: true }),
   // 자기 콘솔을 갖게 해서 BlockPilot 창의 Ctrl+C 가 서버로 바로 가지 않게. 창은 숨김
   spawnOptions: () => ({ detached: true, windowsHide: true }),
   childEnv: () => {
