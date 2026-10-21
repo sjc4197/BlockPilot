@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, FolderSearch, Hammer, LayoutDashboard, RotateCcw, X } from "lucide-react";
 import type { CreateJobStatus, CreateServerInput, CreateStep } from "@blockpilot/shared";
-import { useCancelCreate, useCreateJob, useCreateOptions, useStartCreate, useVersionInfo, keys } from "../api/hooks";
+import { useCancelCreate, useCreateJob, useCreateOptions, useStartCreate, useSystem, useVersionInfo, keys } from "../api/hooks";
 import { ApiRequestError } from "../api/client";
 import { FolderPicker } from "../components/FolderPicker";
 import { Lamp, TntIcon } from "../lib/pixel";
@@ -76,6 +76,7 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
   const [eula, setEula] = useState(false);
 
   const start = useStartCreate();
+  const here = useSystem().data?.words.thisComputer ?? "이 컴퓨터";
   const { data: vinfo, isFetching: vLoading, error: vError } = useVersionInfo(mc);
   const folder = folderNameOf(name);
 
@@ -192,7 +193,7 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
                   <b className="font-block text-[12px] text-white">Java {vinfo.javaMajor}</b>{" "}
                   <span className="text-slate-400">
                     {vinfo.java.source === "system"
-                      ? `이 Mac 에 설치된 ${vinfo.java.version} 을 써요`
+                      ? `${here}에 설치된 ${vinfo.java.version} 을 써요`
                       : vinfo.java.source === "cached"
                         ? `앱 폴더에 받아 둔 ${vinfo.java.version} 을 써요`
                         : `이 없어서 앱 폴더에 받아요${vinfo.java.downloadMb ? ` (약 ${vinfo.java.downloadMb}MB)` : ""} · 시스템에는 설치하지 않아요`}
@@ -233,7 +234,7 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
           <Field label="포트">
             <Input id="new-port" type="number" min={1} max={65535} value={port} onChange={(e) => setPort(e.target.value)} />
           </Field>
-          <Field label="시작 메모리" hint={`이 Mac 메모리 ${gb(options.totalMemMb)}`}>
+          <Field label="시작 메모리" hint={`${here} 메모리 ${gb(options.totalMemMb)}`}>
             <Select id="new-min" value={minMb} onChange={(e) => setMinMb(Number(e.target.value))}>
               {memOptions.filter((m) => m <= maxMb).map((m) => (
                 <option key={m} value={m}>

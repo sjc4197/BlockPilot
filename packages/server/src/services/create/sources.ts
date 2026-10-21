@@ -162,9 +162,10 @@ export interface JdkPackage {
   size: number;
 }
 
-export async function getJdkPackage(major: number, arch: Arch, signal?: AbortSignal): Promise<JdkPackage> {
-  return cached(`jdk:${major}:${arch}`, TEN_MIN, async () => {
-    const url = `${ADOPTIUM}/assets/latest/${major}/hotspot?architecture=${arch}&image_type=jdk&os=mac&vendor=eclipse`;
+/** os: Adoptium 의 os 값 (mac, linux, alpine-linux, windows) */
+export async function getJdkPackage(major: number, arch: Arch, os: string, signal?: AbortSignal): Promise<JdkPackage> {
+  return cached(`jdk:${major}:${arch}:${os}`, TEN_MIN, async () => {
+    const url = `${ADOPTIUM}/assets/latest/${major}/hotspot?architecture=${arch}&image_type=jdk&os=${encodeURIComponent(os)}&vendor=eclipse`;
     const list = await fetchJson<{ version: { semver: string }; binary: { package: { name: string; link: string; checksum: string; size: number } } }[]>(url, { signal });
     const pkg = list[0]?.binary?.package;
     if (!pkg) throw new CreateError("not_found", `Java ${major} 를 내려받을 수 있는 배포판을 찾지 못했어요.`, "다른 Minecraft 버전을 고르거나, Java 를 직접 설치한 뒤 다시 시도해 주세요.", url);

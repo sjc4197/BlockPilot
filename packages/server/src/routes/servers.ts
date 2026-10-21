@@ -60,6 +60,8 @@ export async function serversRoutes(app: FastifyInstance) {
       levelName: p["level-name"] ?? "world",
       eulaAccepted: info.eulaAccepted,
       hasStartScript: info.hasStartScript,
+      startScript: info.startScript,
+      foreignScript: info.foreignScript,
       javaVersion,
       modCount: modFiles.filter((f) => f.endsWith(".jar")).length,
       process: processStatus,

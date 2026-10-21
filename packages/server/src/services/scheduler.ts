@@ -65,8 +65,7 @@ export async function runScheduledBackup(serverId: string, dir: string, keep: nu
   }
   s.running = true;
   try {
-    await managed.flushSaves();
-    const b = await createBackup(dir, { scheduled: true });
+    const b = await managed.withSavesPaused(() => createBackup(dir, { scheduled: true }));
     await pruneScheduled(dir, keep);
     s.lastRunAt = new Date().toISOString();
     s.lastError = undefined;

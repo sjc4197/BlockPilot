@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { FileCode2, FileJson, FileText, FolderOpen, RotateCcw, Save, Search } from "lucide-react";
 import type { ConfigFileEntry, ConfigValidationResult } from "@blockpilot/shared";
-import { useConfigFile, useConfigFiles, useSaveConfigFile, validateConfig } from "../api/hooks";
+import { useConfigFile, useConfigFiles, useSaveConfigFile, useSystem, validateConfig } from "../api/hooks";
 import { Badge, Button, Card, EmptyState, Input, Kbd, PageHeader, Spinner, cx, fmtBytes, fmtDate, useToast } from "../lib/ui";
 
 const FORMAT_TONE: Record<ConfigFileEntry["format"], string> = { toml: "text-violet-400", json: "text-amber-400", json5: "text-amber-400", yaml: "text-sky-400", properties: "text-emerald-400", text: "text-slate-400" };
@@ -81,6 +81,7 @@ export default function ConfigFiles() {
 }
 
 function Editor({ serverId, path }: { serverId: string; path: string }) {
+  const modKey = useSystem().data?.words.modKey ?? "Ctrl";
   const { data, isLoading, error } = useConfigFile(serverId, path);
   const save = useSaveConfigFile(serverId);
   const toast = useToast();
@@ -157,7 +158,7 @@ function Editor({ serverId, path }: { serverId: string; path: string }) {
       />
       <div className="flex items-center justify-between shadow-[inset_0_2px_0_#08080a] px-4 py-1.5 text-[11px] text-slate-500">
         <span>
-          <Kbd>⌘</Kbd> + <Kbd>S</Kbd> 저장 · <Kbd>Tab</Kbd> 들여쓰기
+          <Kbd>{modKey}</Kbd> + <Kbd>S</Kbd> 저장 · <Kbd>Tab</Kbd> 들여쓰기
         </span>
         {dirty && <span className="text-red-300">저장되지 않은 변경</span>}
       </div>

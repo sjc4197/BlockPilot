@@ -1,10 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import net from "node:net";
-import path from "node:path";
-import fs from "node:fs/promises";
 import type { ConsoleLine, ProcessStatus } from "@blockpilot/shared";
 import { conflict, badRequest } from "../lib/errors.js";
+import { LineSplitter } from "../lib/lines.js";
+import { platform } from "./platform/index.js";
 import { detectServer } from "./serverInfo.js";
 import { readPropertiesFile, toRecord } from "./properties.js";
 import { rconOnce, stripColor, RconError } from "./rcon.js";
@@ -27,8 +27,7 @@ export class ManagedServer extends EventEmitter {
   private startedAt?: string;
   private stopping = false;
   private players = new Set<string>();
-  private stdoutBuf = "";
-  private stderrBuf = "";
+  private splitters: LineSplitter[] = [];
   private externalCache: { at: number; status: ProcessStatus } | null = null;
 
   constructor(
@@ -90,15 +89,14 @@ export class ManagedServer extends EventEmitter {
 
     let cmd: string;
     let args: string[];
-    if (info.hasStartScript) {
-      const script = await fs.access(path.join(this.dir, "start.sh")).then(() => "start.sh", () => "run.sh");
-      cmd = "bash";
-      args = [script];
+    if (info.startScript) {
+      // 이 OS 의 시작 스크립트(start.sh / start.bat)를 그대로 실행 → 메모리 등은 스크립트 설정을 따른다
+      ({ cmd, args } = platform.scriptCommand(info.startScript));
     } else if (info.launchJar) {
-      cmd = "java";
+      cmd = platform.javaExe;
       args = ["-Xms2G", "-Xmx4G", "-jar", info.launchJar, "nogui"];
     } else {
-      throw badRequest("실행할 start.sh 또는 서버 jar를 찾지 못했습니다.");
+      throw badRequest(`실행할 시작 스크립트(${platform.startScripts.join(", ")}) 또는 서버 jar를 찾지 못했습니다.`);
     }
 
     this.ready = false;
@@ -106,18 +104,30 @@ export class ManagedServer extends EventEmitter {
     this.players.clear();
     this.externalCache = null;
     this.startedAt = new Date().toISOString();
+    if (!info.startScript && info.foreignScript) {
+      this.pushLine("system", `${info.foreignScript} 는 다른 OS 용 시작 스크립트라 쓰지 않고 서버 jar 를 직접 실행해요.`);
+    }
     this.pushLine("system", `$ ${cmd} ${args.join(" ")}`);
 
-    const child = spawn(cmd, args, { cwd: this.dir, stdio: ["pipe", "pipe", "pipe"], env: process.env });
+    const child = spawn(cmd, args, {
+      cwd: this.dir,
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, ...platform.childEnv() },
+      ...platform.spawnOptions(),
+    });
     this.child = child;
 
-    child.stdout!.setEncoding("utf8");
-    child.stderr!.setEncoding("utf8");
-    child.stdout!.on("data", (d: string) => this.onData("stdout", d));
-    child.stderr!.on("data", (d: string) => this.onData("stderr", d));
+    this.splitters = (["stdout", "stderr"] as const).map((source) => {
+      const sp = new LineSplitter(platform.decode, (line) => {
+        this.pushLine(source, line);
+        this.inspect(line);
+      });
+      child[source]!.on("data", (d: Buffer) => sp.push(d));
+      return sp;
+    });
     child.on("error", (e) => this.pushLine("system", `프로세스 오류: ${e.message}`));
     child.on("exit", (code, signal) => {
-      this.flushBuffers();
+      for (const sp of this.splitters) sp.flush();
       this.pushLine("system", `서버 프로세스 종료 (code=${code ?? "null"}${signal ? `, signal=${signal}` : ""})`);
       this.child = null;
       this.ready = false;
@@ -147,11 +157,11 @@ export class ManagedServer extends EventEmitter {
     this.writeStdin("stop");
 
     if (await this.waitExit(child, STOP_GRACE_MS)) return;
-    this.pushLine("system", "응답이 없어 SIGTERM 전송");
-    child.kill("SIGTERM");
+    this.pushLine("system", "응답이 없어 종료 요청을 보냈어요 (시작 스크립트와 java 모두)");
+    platform.killTree(child, false);
     if (await this.waitExit(child, KILL_GRACE_MS)) return;
-    this.pushLine("system", "강제 종료 (SIGKILL)");
-    child.kill("SIGKILL");
+    this.pushLine("system", "강제 종료");
+    platform.killTree(child, true);
     await this.waitExit(child, 5_000);
   }
 
@@ -193,11 +203,37 @@ export class ManagedServer extends EventEmitter {
     return false;
   }
 
-  /** 월드 저장을 강제한다 (백업 전). 실행 중이 아니면 아무것도 안 함. */
-  async flushSaves(): Promise<boolean> {
-    if (!(await this.tryCommand("save-all flush"))) return false;
-    await new Promise((r) => setTimeout(r, 3000));
-    return true;
+  /**
+   * 서버가 켜져 있으면 자동 저장을 멈추고(save-off) 지금까지 내용을 디스크에 쓴 뒤(save-all flush) fn 을 실행하고,
+   * 끝나면 자동 저장을 다시 켠다(save-on). 백업 zip 이 쓰는 도중의 월드 파일을 담지 않게 하기 위함.
+   * 꺼져 있으면 fn 만 실행한다.
+   */
+  async withSavesPaused<T>(fn: () => Promise<T>): Promise<T> {
+    if (!(await this.tryCommand("save-off"))) return fn();
+    try {
+      const saved = this.waitForLine(/Saved the game/i, 15_000);
+      await this.tryCommand("save-all flush");
+      await saved;
+      return await fn();
+    } finally {
+      await this.tryCommand("save-on").catch(() => {});
+    }
+  }
+
+  /** 다음 출력 줄 중 pattern 에 맞는 줄을 기다린다 (RCON 응답도 출력으로 들어온다). 시간이 지나면 그냥 진행 */
+  private waitForLine(pattern: RegExp, ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.off("line", onLine);
+        resolve();
+      };
+      const onLine = (l: ConsoleLine) => {
+        if (pattern.test(l.text)) done();
+      };
+      const timer = setTimeout(done, ms);
+      this.on("line", onLine);
+    });
   }
 
   // ---------- 내부 ----------
@@ -221,25 +257,13 @@ export class ManagedServer extends EventEmitter {
     this.child?.stdin?.write(line + "\n");
   }
 
-  private onData(source: "stdout" | "stderr", chunk: string) {
-    const key = source === "stdout" ? "stdoutBuf" : "stderrBuf";
-    this[key] += chunk;
-    const parts = this[key].split(/\r?\n/);
-    this[key] = parts.pop() ?? "";
-    for (const p of parts) {
-      this.pushLine(source, p);
-      this.inspect(p);
-    }
-  }
-
-  private flushBuffers() {
-    if (this.stdoutBuf) this.pushLine("stdout", this.stdoutBuf);
-    if (this.stderrBuf) this.pushLine("stderr", this.stderrBuf);
-    this.stdoutBuf = this.stderrBuf = "";
-  }
-
   /** 로그 줄에서 상태 변화를 읽어낸다 */
   private inspect(line: string) {
+    // Windows start.bat 끝의 pause: java 가 끝났는데 cmd 가 키 입력을 기다리면 넘겨 준다
+    if (/Press any key to continue|계속하려면 아무 키나 누르십시오/i.test(line)) {
+      this.child?.stdin?.end("\r\n");
+      return;
+    }
     if (!this.ready && /\]: Done \(/.test(line)) {
       this.ready = true;
       void this.emitStatus();

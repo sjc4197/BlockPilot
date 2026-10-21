@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, FolderOpen, Hammer, Plus, Server, Trash2 } from "lucide-react";
-import { useCreateOptions, useRegisterServer, useRemoveServer, useServers } from "../api/hooks";
+import { useCreateOptions, useRegisterServer, useRemoveServer, useServers, useSystem } from "../api/hooks";
 import { Logo } from "../App";
 import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, Spinner, useToast } from "../lib/ui";
 
@@ -12,6 +12,7 @@ export default function ServerSelect() {
   const toast = useToast();
   const navigate = useNavigate();
   const { data: createOpts } = useCreateOptions();
+  const { data: sys } = useSystem();
   const [path, setPath] = useState("");
   const [name, setName] = useState("");
 
@@ -41,7 +42,7 @@ export default function ServerSelect() {
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 font-block text-[12px] text-slate-200">
             <Hammer className="h-4 w-4 text-redstone" /> 새 서버 만들기
-            {createOpts && !createOpts.supported && <Badge tone="warning">macOS 전용 · Linux·Windows 준비 중</Badge>}
+            {createOpts && !createOpts.supported && <Badge tone="warning">이 OS 는 준비 중</Badge>}
           </h2>
           <p className="mt-1.5 text-sm text-slate-400">빈 폴더만 고르면 Fabric 서버를 처음부터 만들어요. Java 가 없으면 앱 폴더에 받아서 써요.</p>
         </div>
@@ -117,6 +118,16 @@ export default function ServerSelect() {
           </ul>
         )}
       </section>
+
+      {sys && (
+        <footer className="mt-10 flex flex-wrap items-center justify-center gap-2 text-[12px] text-slate-500">
+          <span className="font-block">이 컴퓨터</span>
+          <span className="text-slate-300">
+            {sys.osLabel} · {sys.archLabel}
+          </span>
+          {sys.support.manage === "wip" && <Badge tone="warning">이 OS 지원은 준비 중이라 일부 기능이 다르게 동작할 수 있어요</Badge>}
+        </footer>
+      )}
     </div>
   );
 }

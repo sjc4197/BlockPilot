@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import type { ServerLoader } from "@blockpilot/shared";
 import { badRequest } from "../lib/errors.js";
+import { platform } from "./platform/index.js";
 
 export interface DetectedServer {
   loader: ServerLoader;
@@ -11,6 +12,10 @@ export interface DetectedServer {
   /** 직접 java 로 띄울 때 쓸 jar (start.sh 없을 때) */
   launchJar?: string;
   hasStartScript: boolean;
+  /** 이 OS 에서 실행할 시작 스크립트 (start.sh / run.sh / start.bat …) */
+  startScript?: string;
+  /** 다른 OS 용 시작 스크립트만 있을 때 그 이름 */
+  foreignScript?: string;
   eulaAccepted: boolean;
 }
 
@@ -33,7 +38,7 @@ export async function validateServerDir(dir: string) {
     throw badRequest("폴더가 존재하지 않습니다.");
   }
   if (!stat.isDirectory()) throw badRequest("폴더 경로가 아닙니다.");
-  const markers = ["server.properties", "eula.txt", "fabric-server-launch.jar", "server.jar", "start.sh", "run.sh", "mods", "world"];
+  const markers = ["server.properties", "eula.txt", "fabric-server-launch.jar", "server.jar", "start.sh", "run.sh", "start.bat", "run.bat", "mods", "world"];
   const found = await Promise.all(markers.map((m) => exists(path.join(resolved, m))));
   if (!found.some(Boolean)) {
     throw badRequest("마인크래프트 서버 폴더로 보이지 않습니다 (server.properties, eula.txt, 서버 jar 등이 없음).");
@@ -94,12 +99,15 @@ export async function detectServer(dir: string): Promise<DetectedServer> {
   }
 
   const eula = await fs.readFile(path.join(dir, "eula.txt"), "utf8").catch(() => "");
+  const startScript = platform.startScripts.find(has);
   return {
     loader,
     loaderVersion,
     mcVersion,
     launchJar,
-    hasStartScript: has("start.sh") || has("run.sh"),
+    hasStartScript: !!startScript,
+    startScript,
+    foreignScript: startScript ? undefined : platform.foreignScripts.find(has),
     eulaAccepted: /^\s*eula\s*=\s*true/im.test(eula),
   };
 }
@@ -125,8 +133,9 @@ export function getJavaVersion(): Promise<string | undefined> {
  * start.sh 에 java 절대 경로가 적혀 있으면(새 서버 만들기로 만든 서버) 그 Java 를, 아니면 시스템 java 를 본다.
  */
 export async function getServerJavaVersion(dir: string): Promise<string | undefined> {
-  const script = await fs.readFile(path.join(dir, "start.sh"), "utf8").catch(() => "");
-  const pinned = script.match(/^\s*exec\s+"(\/[^"]+\/bin\/java)"/m)?.[1];
+  const name = platform.startScripts[0];
+  const script = await fs.readFile(path.join(dir, name), "utf8").catch(() => "");
+  const pinned = platform.pinnedJava(script);
   if (pinned) {
     const v = await new Promise<string | undefined>((resolve) => {
       execFile(pinned, ["-version"], { timeout: 10_000 }, (err, _o, stderr) => resolve(err ? undefined : String(stderr).match(/version "([^"]+)"/)?.[1]));

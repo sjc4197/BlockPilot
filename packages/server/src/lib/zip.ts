@@ -1,4 +1,7 @@
 import yauzl from "yauzl";
+import { createWriteStream } from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
 
 type Matcher = string[] | ((name: string) => boolean);
 
@@ -49,4 +52,37 @@ function collect(
     });
   });
   zip.readEntry();
+}
+
+/**
+ * zip 을 dest 아래에 푼다 (Windows JDK 용). 항목 이름이 dest 밖을 가리키면(../, 절대 경로) 거부한다.
+ */
+export function extractZipTo(file: string, dest: string): Promise<void> {
+  const root = path.resolve(dest);
+  return new Promise((resolve, reject) => {
+    yauzl.open(file, { lazyEntries: true }, (err, zip) => {
+      if (err || !zip) return reject(err);
+      zip.on("error", reject);
+      zip.on("end", () => resolve());
+      zip.on("entry", (entry: yauzl.Entry) => {
+        const target = path.resolve(root, entry.fileName);
+        if (target !== root && !target.startsWith(root + path.sep)) return reject(new Error(`zip 항목이 폴더 밖을 가리켜요: ${entry.fileName}`));
+        if (entry.fileName.endsWith("/")) {
+          fsp.mkdir(target, { recursive: true }).then(() => zip.readEntry(), reject);
+          return;
+        }
+        fsp.mkdir(path.dirname(target), { recursive: true }).then(() => {
+          zip.openReadStream(entry, (e, stream) => {
+            if (e || !stream) return reject(e);
+            const out = createWriteStream(target);
+            out.on("error", reject);
+            out.on("close", () => zip.readEntry());
+            stream.on("error", reject);
+            stream.pipe(out);
+          });
+        }, reject);
+      });
+      zip.readEntry();
+    });
+  });
 }

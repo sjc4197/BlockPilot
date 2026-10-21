@@ -8,6 +8,8 @@ import { assertDeletableTarget } from "./create/target.js";
 import { forgetManaged, type ManagedServer } from "./process.js";
 import { isBackupRunning } from "./scheduler.js";
 import { validateServerDir } from "./serverInfo.js";
+import { platform } from "./platform/index.js";
+import { isInsidePath, samePath } from "../lib/paths.js";
 
 /**
  * 서버 폴더를 디스크에서 완전히 지우고 목록에서도 뺀다. 되돌릴 수 없다.
@@ -45,13 +47,13 @@ export async function deleteServerFolder(server: RegisteredServer, managed: Mana
   for (const other of await listServers()) {
     if (other.id === server.id) continue;
     const otherReal = await fsp.realpath(other.path).catch(() => path.resolve(other.path));
-    if (otherReal === real || otherReal.startsWith(real + path.sep)) {
+    if (isInsidePath(otherReal, real)) {
       throw conflict(`이 폴더 안에 다른 등록된 서버 '${other.name}' 가 있어서 지울 수 없어요.`);
     }
   }
 
   const job = activeJob();
-  if (job?.journal && path.resolve(job.journal.target).startsWith(real)) {
+  if (job?.journal && isInsidePath(job.journal.target, real)) {
     throw conflict("이 폴더에서 새 서버를 만들고 있어요. 끝난 뒤 다시 시도해 주세요.");
   }
 
@@ -62,11 +64,11 @@ export async function deleteServerFolder(server: RegisteredServer, managed: Mana
     const code = (e as { code?: string }).code;
     const reason = code === "EACCES" || code === "EPERM" ? "권한이 없는 파일이 있어요" : (e as Error).message;
     // 폴더가 남아 있으면 목록에서도 빼지 않는다 (사용자가 다시 시도하거나 직접 정리할 수 있게)
-    if (stillThere) throw conflict(`일부 파일을 지우지 못했어요 (${reason}). 남은 파일은 Finder 에서 확인해 주세요.`);
+    if (stillThere) throw conflict(`일부 파일을 지우지 못했어요 (${reason}). 남은 파일은 ${platform.words.fileManager}에서 확인해 주세요.`);
   }
 
   let removedLink: string | undefined;
-  if (registered !== real) {
+  if (!samePath(registered, real)) {
     const st = await fsp.lstat(registered).catch(() => null);
     if (st?.isSymbolicLink()) {
       await fsp.unlink(registered).catch(() => {});

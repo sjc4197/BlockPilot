@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 단위 테스트
+        run: npm test
+      - name: 빌드
+        run: npm run build
+      # 새 서버 만들기 → 켜기 → 끄기 → 삭제. 그 OS 에서 새 서버 만들기를 켠 단계부터 실제로 돈다 (아니면 건너뜀).
+      # 테스트용 일회성 서버를 띄우려면 eula=true 가 필요해서, 이 저장소의 CI 를 돌리는 사람이 Minecraft EULA
+      # (https://aka.ms/MinecraftEULA) 에 동의한다는 뜻으로 아래 값을 켠다. 앱의 실제 화면에서는 여전히 사용자가 직접 체크해야 한다.
+      - name: 실제 서버 만들기 E2E
+        run: npm run test:e2e --workspace=packages/server
+        env:
+          BLOCKPILOT_E2E: "1"
+          BLOCKPILOT_E2E_ACCEPT_EULA: "1"

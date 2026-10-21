@@ -3,6 +3,7 @@ import path from "node:path";
 import { PROPERTY_META_BY_KEY } from "@blockpilot/shared";
 import { writeFileAtomic } from "../lib/atomicWrite.js";
 import { badRequest } from "../lib/errors.js";
+import { platform } from "./platform/index.js";
 
 /**
  * server.properties 파서.
@@ -30,10 +31,15 @@ export function parseProperties(text: string): PropertyLine[] {
   });
 }
 
-export function serializeProperties(lines: PropertyLine[]): string {
+/** 파일이 원래 쓰던 줄바꿈 (Windows 에서 Java 가 쓴 파일은 CRLF) */
+export function detectEol(text: string): "\r\n" | "\n" {
+  return text.includes("\r\n") ? "\r\n" : "\n";
+}
+
+export function serializeProperties(lines: PropertyLine[], eol: "\r\n" | "\n" = "\n"): string {
   return lines
     .map((l) => (l.kind === "entry" ? `${escapeKey(l.key)}=${escapeValue(l.value)}` : l.raw))
-    .join("\n");
+    .join(eol);
 }
 
 /** 변경 사항을 적용. 기존 키는 제자리에서 값만 바꾸고, 새 키는 끝에 추가. */
@@ -68,18 +74,18 @@ export async function readPropertiesFile(serverDir: string) {
   const file = path.join(serverDir, "server.properties");
   try {
     const [text, stat] = await Promise.all([fs.readFile(file, "utf8"), fs.stat(file)]);
-    return { lines: parseProperties(text), mtime: stat.mtime.toISOString(), exists: true };
+    return { lines: parseProperties(text), eol: detectEol(text), mtime: stat.mtime.toISOString(), exists: true };
   } catch (e: any) {
-    if (e.code === "ENOENT") return { lines: [] as PropertyLine[], mtime: new Date(0).toISOString(), exists: false };
+    if (e.code === "ENOENT") return { lines: [] as PropertyLine[], eol: (platform.id === "windows" ? "\r\n" : "\n") as "\r\n" | "\n", mtime: new Date(0).toISOString(), exists: false };
     throw e;
   }
 }
 
 export async function writePropertiesChanges(serverDir: string, changes: Record<string, string>) {
   const file = path.join(serverDir, "server.properties");
-  const { lines } = await readPropertiesFile(serverDir);
+  const { lines, eol } = await readPropertiesFile(serverDir);
   const next = applyChanges(lines, changes);
-  await writeFileAtomic(file, serializeProperties(next));
+  await writeFileAtomic(file, serializeProperties(next, eol));
   return toRecord(next);
 }
 

@@ -41,6 +41,10 @@ export interface ServerSummary extends RegisteredServer {
   levelName: string;
   eulaAccepted: boolean;
   hasStartScript: boolean;
+  /** 실행에 쓰는 시작 스크립트 이름 (start.sh / start.bat …) */
+  startScript?: string;
+  /** 다른 OS 용 시작 스크립트만 있을 때 (쓰지 않고 jar 를 직접 실행) */
+  foreignScript?: string;
   javaVersion?: string;
   modCount: number;
   process: ProcessStatus;
@@ -339,12 +343,14 @@ export interface FsListing {
   path: string;
   parent: string | null;
   home: string;
+  /** 화면에 보여 줄 경로 조각 (OS 마다 구분자가 달라 서버가 계산) */
+  crumbs: { label: string; path: string }[];
   /** 이 폴더가 비었는지 (.DS_Store 등 제외) */
   empty: boolean;
   isServer: boolean;
   entries: { name: string; path: string; empty: boolean | null; isServer: boolean }[];
   truncated: boolean;
-  shortcuts: { label: string; path: string }[];
+  shortcuts: { label: string; path: string; kind: "home" | "folder" | "drive" }[];
 }
 
 // ---------- 공통 ----------
@@ -352,6 +358,24 @@ export interface FsListing {
 export interface ApiError {
   error: string;
   message: string;
+}
+
+// ---------- 이 컴퓨터 (자동 인식) ----------
+
+export interface SystemInfo {
+  os: "macos" | "linux" | "windows";
+  /** 예: "macOS 26.6.2", "Ubuntu 24.04.1 LTS", "Windows 11 (빌드 22631)" */
+  osLabel: string;
+  arch: string;
+  /** 예: "Apple Silicon", "x64", "ARM64" */
+  archLabel: string;
+  libc?: "glibc" | "musl";
+  support: { manage: "ok" | "wip"; create: boolean };
+  /** 지원하지 않거나 준비 중인 이유 */
+  reason?: string;
+  words: { thisComputer: string; fileManager: string; modKey: string };
+  pathExample: string;
+  sep: "/" | "\\";
 }
 
 // ---------- 서버 삭제 ----------

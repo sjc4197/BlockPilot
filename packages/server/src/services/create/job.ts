@@ -6,6 +6,7 @@ import type { CreateJobState, CreateJobStatus, CreateServerInput, CreateStep, Cr
 import { BLOCKPILOT_HOME } from "../../config/store.js";
 import { CreateError, toCreateError } from "./errors.js";
 import { cleanupTarget, removeTempPath } from "./target.js";
+import { platform } from "../platform/index.js";
 
 /**
  * 새 서버 만들기 작업 하나.
@@ -139,9 +140,10 @@ export class CreateJob {
   private killChildren() {
     for (const c of this.children) {
       if (c.exitCode !== null || c.signalCode !== null) continue;
-      c.kill("SIGTERM");
+      // 설치기·시작 스크립트의 자식(java)까지 함께
+      platform.killTree(c, false);
       setTimeout(() => {
-        if (c.exitCode === null && c.signalCode === null) c.kill("SIGKILL");
+        if (c.exitCode === null && c.signalCode === null) platform.killTree(c, true);
       }, 5000).unref();
     }
   }

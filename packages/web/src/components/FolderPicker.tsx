@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowUp, Folder, FolderOpen, HardDrive, Home, Server, X } from "lucide-react";
 import { useFsList } from "../api/hooks";
-import { ApiRequestError } from "../api/client";
 import { Badge, Button, Callout, Spinner, cx } from "../lib/ui";
 
 /**
@@ -10,16 +9,10 @@ import { Badge, Button, Callout, Spinner, cx } from "../lib/ui";
  * - 비어 있지 않으면 그 안에 서버 이름으로 새 폴더를 만든다
  */
 export function FolderPicker({ initialPath, folderName, onPick, onClose }: { initialPath: string; folderName: string; onPick: (path: string) => void; onClose: () => void }) {
-  const [current, setCurrent] = useState<string>(initialPath);
-  const { data, error, isFetching } = useFsList(current);
-
-  // 처음 연 경로가 아직 없는 폴더면(기본값 등) 있는 상위 폴더까지 올라간다
-  useEffect(() => {
-    if (error instanceof ApiRequestError && error.code === "invalid_path" && current !== "~") {
-      const up = current.replace(/\/[^/]+\/?$/, "") || "/";
-      setCurrent(up === current ? "~" : up);
-    }
-  }, [error, current]);
+  // 처음엔 입력된 경로(아직 없을 수 있음)의 가장 가까운 상위 폴더로 연다. 그 뒤로는 고른 폴더 그대로
+  const [nav, setNav] = useState<{ path: string; nearest: boolean }>({ path: initialPath, nearest: true });
+  const setCurrent = (p: string) => setNav({ path: p, nearest: false });
+  const { data, error, isFetching } = useFsList(nav.path, nav.nearest);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -27,8 +20,8 @@ export function FolderPicker({ initialPath, folderName, onPick, onClose }: { ini
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const crumbs = data ? data.path.split("/").filter(Boolean) : [];
-  const newChild = data ? `${data.path.replace(/\/$/, "")}/${folderName}` : "";
+  const sep = data?.path.includes("\\") ? "\\" : "/";
+  const newChild = data ? `${data.path.replace(/[\\/]+$/, "")}${sep}${folderName}` : "";
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal aria-label="폴더 찾기" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -43,7 +36,7 @@ export function FolderPicker({ initialPath, folderName, onPick, onClose }: { ini
         <div className="flex min-h-0 flex-1">
           <aside className="w-48 shrink-0 space-y-1 overflow-y-auto p-3 shadow-[inset_-2px_0_0_#08080a]">
             {data?.shortcuts.map((s) => {
-              const Icon = s.label === "홈" ? Home : s.path.startsWith("/Volumes/") ? HardDrive : Folder;
+              const Icon = s.kind === "home" ? Home : s.kind === "drive" ? HardDrive : Folder;
               return (
                 <button key={s.path} onClick={() => setCurrent(s.path)} className={cx("flex w-full items-center gap-2 px-2.5 py-2 text-left font-block text-[12px] transition-colors focus-ring", data.path === s.path ? "slab text-white" : "text-slate-400 hover:bg-ink-3 hover:text-slate-200")}>
                   <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -59,15 +52,12 @@ export function FolderPicker({ initialPath, folderName, onPick, onClose }: { ini
                 상위 폴더
               </Button>
               <div className="well flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-2 py-1 font-mono text-[12px] text-slate-400">
-                <button className="hover:text-white" onClick={() => setCurrent("/")}>
-                  /
-                </button>
-                {crumbs.map((c, i) => (
-                  <span key={i} className="flex shrink-0 items-center gap-0.5">
-                    <button className={cx("hover:text-white", i === crumbs.length - 1 && "text-slate-100")} onClick={() => setCurrent("/" + crumbs.slice(0, i + 1).join("/"))}>
-                      {c}
+                {data?.crumbs.map((c, i) => (
+                  <span key={c.path} className="flex shrink-0 items-center gap-0.5">
+                    <button className={cx("hover:text-white", i === data.crumbs.length - 1 && "text-slate-100")} onClick={() => setCurrent(c.path)}>
+                      {c.label.replace(/[\\/]+$/, "") || "/"}
                     </button>
-                    {i < crumbs.length - 1 && <span className="text-slate-600">/</span>}
+                    {i < data.crumbs.length - 1 && !(i === 0 && c.label === "/") && <span className="text-slate-600">{sep}</span>}
                   </span>
                 ))}
               </div>
@@ -75,7 +65,7 @@ export function FolderPicker({ initialPath, folderName, onPick, onClose }: { ini
             </div>
 
             <div className="well mx-4 min-h-0 flex-1 overflow-y-auto p-1">
-              {error && !(error instanceof ApiRequestError && error.code === "invalid_path") ? (
+              {error ? (
                 <div className="p-3">
                   <Callout tone="danger">{(error as Error).message}</Callout>
                 </div>

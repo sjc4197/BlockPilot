@@ -49,7 +49,8 @@ describe("deleteServerFolder", () => {
     const { server: tmp } = await fakeServer("real-only", realDir);
     // 실제 폴더 대신 링크 경로로 다시 등록
     const link = path.join(root, "link-to-server");
-    await fsp.symlink(realDir, link);
+    // Windows 는 관리자 권한 없이 만들 수 있는 junction 으로 (POSIX 에서는 type 을 무시)
+    await fsp.symlink(realDir, link, "junction");
     const { removeServer } = await import("../src/config/store.js");
     await removeServer(tmp.id);
     const server = await addServer({ path: link, name: "linked" });

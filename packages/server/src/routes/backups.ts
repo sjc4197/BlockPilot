@@ -20,8 +20,7 @@ export async function backupsRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { label } = (req.body ?? {}) as { label?: string };
     const { dir, managed } = await loadContext(id);
-    await managed.flushSaves();
-    const b = await createBackup(dir, { label });
+    const b = await managed.withSavesPaused(() => createBackup(dir, { label }));
     reply.code(201);
     return b;
   });

@@ -51,9 +51,10 @@ describe("prepareTarget", () => {
   it("rejects relative paths, missing parents and system folders", async () => {
     expect(((await prepareTarget("servers/x").catch((e) => e)) as CreateError).code).toBe("invalid_path");
     expect(((await prepareTarget(path.join(root, "a", "b")).catch((e) => e)) as CreateError).code).toBe("invalid_path");
-    expect(() => assertDeletableTarget("/")).toThrow(CreateError);
+    expect(() => assertDeletableTarget(path.parse(process.cwd()).root)).toThrow(CreateError);
     expect(() => assertDeletableTarget(os.homedir())).toThrow(CreateError);
-    expect(() => assertDeletableTarget("/Applications")).toThrow(CreateError);
+    const system = process.platform === "win32" ? (process.env.SystemRoot ?? "C:\\Windows") : process.platform === "darwin" ? "/Applications" : "/usr";
+    expect(() => assertDeletableTarget(system)).toThrow(CreateError);
   });
 });
 
@@ -122,7 +123,8 @@ describe("CreateJob", () => {
       await fsp.mkdir(target);
       await fsp.writeFile(path.join(target, "fabric-server-launch.jar"), "x");
       j.startStep("first-run");
-      const child = spawn("sleep", ["30"]);
+      // sleep 은 Windows 에 없으니 Node 로 30초 기다리는 프로세스
+      const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"]);
       childPid = child.pid!;
       j.trackChild(child);
       await new Promise((resolve, reject) => child.once("exit", () => reject(new Error("exited"))));

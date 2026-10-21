@@ -49,7 +49,8 @@ export default function Dashboard() {
               <Badge>
                 <Coffee className="h-3 w-3" /> Java {s.javaVersion ?? "없음"}
               </Badge>
-              <Badge>{s.hasStartScript ? "start.sh" : "java 직접 실행"}</Badge>
+              <Badge>{s.startScript ?? "java 직접 실행"}</Badge>
+              {s.foreignScript && <Badge tone="warning">{s.foreignScript} 는 다른 OS 용이라 쓰지 않음</Badge>}
             </div>
           </div>
           <ProcessControls serverId={id} status={{ ...s.process, state, onlinePlayers: players }} size="lg" />

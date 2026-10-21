@@ -1,0 +1,8 @@
+# 저장소 안에서는 LF 로 통일 (Windows 에서 받아도 그대로)
+* text=auto eol=lf
+# Windows 배치 파일은 cmd 가 CRLF 를 기대
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.jar binary
+*.woff2 binary

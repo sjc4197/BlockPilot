@@ -24,6 +24,7 @@ import type {
   CreateJobStatus,
   FsListing,
   DeleteServerResult,
+  SystemInfo,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -262,8 +263,16 @@ export const useCreateOptions = () => useQuery({ queryKey: ["create", "options"]
 export const useVersionInfo = (mc: string | undefined) =>
   useQuery({ queryKey: ["create", "version", mc], queryFn: () => api<CreateVersionInfo>(`/api/create/version-info?mc=${encodeURIComponent(mc!)}`), enabled: !!mc, staleTime: 60_000 });
 
-export const useFsList = (path: string | null) =>
-  useQuery({ queryKey: ["fs", path], queryFn: () => api<FsListing>(`/api/fs/list${path ? `?path=${encodeURIComponent(path)}` : ""}`), enabled: path !== undefined, retry: false });
+/** nearest: 아직 없는 경로면 있는 상위 폴더를 연다 (처음 열 때) */
+export const useFsList = (path: string | null, nearest = false) =>
+  useQuery({
+    queryKey: ["fs", path, nearest],
+    queryFn: () => api<FsListing>(`/api/fs/list?${new URLSearchParams({ ...(path ? { path } : {}), ...(nearest ? { nearest: "1" } : {}) })}`),
+    retry: false,
+  });
+
+/** BlockPilot 이 돌고 있는 컴퓨터 (OS 는 자동 인식, 바뀌지 않으므로 한 번만 받음) */
+export const useSystem = () => useQuery({ queryKey: ["system"], queryFn: () => api<SystemInfo>("/api/system"), staleTime: Infinity });
 
 export function useStartCreate() {
   return useMutation({ mutationFn: (input: CreateServerInput) => api<{ jobId: string }>("/api/create", { method: "POST", json: input }) });

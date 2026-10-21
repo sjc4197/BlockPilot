@@ -6,6 +6,8 @@ import { BLOCKPILOT_HOME } from "../../config/store.js";
 import { downloadFile } from "./download.js";
 import { CreateError } from "./errors.js";
 import { getJdkPackage, type Arch } from "./sources.js";
+import { platform } from "../platform/index.js";
+import { extractZipTo } from "../../lib/zip.js";
 
 /**
  * Java 찾기와 앱 전용 JDK 캐시.
@@ -72,24 +74,18 @@ export async function javaVersionOf(javaPath: string): Promise<{ version: string
  * 1) macOS java_home  2) PATH 의 java (실제 java.home 을 읽어 절대 경로로 고정)
  */
 export async function findSystemJava(major: number): Promise<JavaRuntime | null> {
-  if (process.platform === "darwin") {
-    try {
-      const { stdout } = await run("/usr/libexec/java_home", ["-v", String(major)]);
-      const home = stdout.trim();
-      if (home) {
-        const p = path.join(home, "bin", "java");
-        const v = await javaVersionOf(p);
-        if (v?.major === major) return { path: p, ...v, source: "system" };
-      }
-    } catch {
-      /* 해당 버전 없음 */
-    }
+  // 1) OS 별 설치 위치 (macOS java_home, Linux /usr/lib/jvm·SDKMAN, Windows JAVA_HOME·Program Files)
+  for (const home of await platform.javaHomeCandidates(major)) {
+    const p = path.join(home, "bin", platform.javaExe);
+    const v = await javaVersionOf(p);
+    if (v?.major === major) return { path: p, ...v, source: "system" };
   }
+  // 2) PATH 의 java — 실제 java.home 을 읽어 절대 경로로 고정
   try {
     const { stderr } = await run("java", ["-XshowSettings:properties", "-version"]);
     const v = parseJavaVersion(stderr);
     const home = stderr.match(/^\s*java\.home = (.+)$/m)?.[1]?.trim();
-    if (v?.major === major && home) return { path: path.join(home, "bin", "java"), ...v, source: "system" };
+    if (v?.major === major && home) return { path: path.join(home, "bin", platform.javaExe), ...v, source: "system" };
   } catch {
     /* PATH 에 java 없음 */
   }
@@ -127,7 +123,8 @@ export async function installRuntime(
   arch: Arch,
   opts: { onProgress?: (done: number, total?: number) => void; signal?: AbortSignal; onTempDir?: (dir: string) => void } = {},
 ): Promise<JavaRuntime> {
-  const pkg = await getJdkPackage(major, arch, opts.signal);
+  const jdk = platform.jdk();
+  const pkg = await getJdkPackage(major, arch, jdk.os, opts.signal);
   await fsp.mkdir(RUNTIMES_DIR, { recursive: true });
   const tmp = path.join(RUNTIMES_DIR, `.tmp-${randomUUID().slice(0, 8)}`);
   opts.onTempDir?.(tmp);
@@ -139,7 +136,8 @@ export async function installRuntime(
     const extractDir = path.join(tmp, "x");
     await fsp.mkdir(extractDir);
     try {
-      await run("tar", ["-xzf", archive, "-C", extractDir], 5 * 60_000);
+      if (jdk.archive === "zip") await extractZipTo(archive, extractDir);
+      else await run("tar", ["-xzf", archive, "-C", extractDir], 5 * 60_000);
     } catch (e) {
       throw new CreateError("java_failed", "받은 Java 압축 파일을 풀지 못했어요.", "디스크 공간을 확인한 뒤 다시 시도해 주세요.", String((e as { stderr?: string }).stderr ?? e));
     }
@@ -147,7 +145,9 @@ export async function installRuntime(
 
     const [top] = (await fsp.readdir(extractDir)).filter((n) => !n.startsWith("."));
     if (!top) throw new CreateError("java_failed", "받은 Java 압축 파일이 비어 있어요.", "다시 시도해 주세요.");
-    const rel = (await exists(path.join(extractDir, top, "Contents", "Home", "bin", "java"))) ? path.join("Contents", "Home", "bin", "java") : path.join("bin", "java");
+    let rel: string | undefined;
+    for (const cand of jdk.javaRel) if (await exists(path.join(extractDir, top, ...cand.split("/")))) rel = path.join(...cand.split("/"));
+    if (!rel) throw new CreateError("java_failed", "받은 Java 안에서 실행 파일을 찾지 못했어요.", "다시 시도해 주세요.", jdk.javaRel.join(", "));
 
     const finalName = `temurin-${pkg.semver.replace(/[^0-9A-Za-z.+_-]/g, "")}-${arch}`;
     const finalDir = path.join(RUNTIMES_DIR, finalName);

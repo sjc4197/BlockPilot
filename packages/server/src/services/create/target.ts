@@ -2,31 +2,26 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { BLOCKPILOT_HOME, listServers } from "../../config/store.js";
+import { expandHome as expandHomeWith, isInsidePath, samePath } from "../../lib/paths.js";
+import { platform } from "../platform/index.js";
 import { CreateError } from "./errors.js";
 
 /**
  * 서버를 만들 폴더 검증과, 실패 시 "앱이 만든 것만" 지우는 정리.
  */
 
-/** 폴더가 '비었다'고 볼 때 무시하는 macOS 메타 파일 */
-export const IGNORABLE = new Set([".DS_Store", "._.DS_Store", ".localized"]);
+/** 폴더가 '비었다'고 볼 때 무시하는 OS 메타 파일 (.DS_Store, desktop.ini 등) */
+export const IGNORABLE = platform.ignorable;
 
-const FORBIDDEN = ["/", "/System", "/Library", "/usr", "/bin", "/sbin", "/etc", "/var", "/private", "/Applications", "/Users", "/Volumes", "/opt"];
-
-export function expandHome(p: string): string {
-  if (p === "~") return os.homedir();
-  if (p.startsWith("~/")) return path.join(os.homedir(), p.slice(2));
-  return p;
-}
-
-const isInside = (child: string, parent: string) => child === parent || child.startsWith(parent.endsWith(path.sep) ? parent : parent + path.sep);
+export const expandHome = (p: string) => expandHomeWith(p, os.homedir());
 
 /** 지워도 되는 위치인가. 시스템·홈·앱 폴더 자체나 너무 얕은 경로는 거부 */
 export function assertDeletableTarget(target: string) {
   if (!path.isAbsolute(target)) throw new CreateError("invalid_path", "폴더 경로는 전체 경로여야 해요.", "다른 폴더를 골라 주세요.");
   const t = path.resolve(target);
-  const depth = t.split(path.sep).filter(Boolean).length;
-  if (depth < 2 || FORBIDDEN.includes(t) || t === os.homedir() || isInside(t, BLOCKPILOT_HOME) || isInside(BLOCKPILOT_HOME, t)) {
+  // 드라이브 문자(C:)나 루트는 깊이에 넣지 않는다
+  const depth = t.slice(path.parse(t).root.length).split(path.sep).filter(Boolean).length;
+  if (depth < 2 || platform.isForbidden(t) || samePath(t, os.homedir()) || isInsidePath(t, BLOCKPILOT_HOME) || isInsidePath(BLOCKPILOT_HOME, t)) {
     throw new CreateError("invalid_path", `'${t}' 은(는) 정리할 수 없는 위치예요.`, "다른 폴더를 골라 주세요.");
   }
   return t;
@@ -49,13 +44,13 @@ export interface PreparedTarget {
 export async function prepareTarget(input: string): Promise<PreparedTarget> {
   const raw = expandHome(input.trim());
   if (!raw || !path.isAbsolute(raw)) {
-    throw new CreateError("invalid_path", "폴더 경로는 / 또는 ~/ 로 시작하는 전체 경로여야 해요.", "폴더 찾기 버튼으로 고르거나 전체 경로를 입력해 주세요.");
+    throw new CreateError("invalid_path", `폴더 경로는 전체 경로여야 해요 (예: ${platform.pathExample}).`, "폴더 찾기 버튼으로 고르거나 전체 경로를 입력해 주세요.");
   }
   const target = assertDeletableTarget(path.resolve(raw));
 
   for (const s of await listServers()) {
     const sp = path.resolve(s.path);
-    if (isInside(target, sp) || isInside(sp, target)) {
+    if (isInsidePath(target, sp) || isInsidePath(sp, target)) {
       throw new CreateError("invalid_path", `이미 등록된 서버 '${s.name}' 폴더와 겹쳐요.`, "다른 폴더를 골라 주세요.", s.path);
     }
   }
@@ -118,6 +113,6 @@ export async function cleanupTarget(j: { target: string; targetCreated: boolean;
 /** 앱 폴더 안의 임시 경로만 지운다 */
 export async function removeTempPath(p: string) {
   const r = path.resolve(p);
-  if (!isInside(r, BLOCKPILOT_HOME) || r === BLOCKPILOT_HOME) return;
+  if (!isInsidePath(r, BLOCKPILOT_HOME) || samePath(r, BLOCKPILOT_HOME)) return;
   await fsp.rm(r, { recursive: true, force: true });
 }
