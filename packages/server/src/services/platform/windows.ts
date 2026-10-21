@@ -100,8 +100,11 @@ export const windows: Platform = {
         "rem Created by BlockPilot. Change -Xms (start) and -Xmx (max) to adjust memory.",
         'cd /d "%~dp0"',
         `"${javaPath}" -Xms${minMb}M -Xmx${maxMb}M -jar fabric-server-launch.jar nogui`,
+        "set BP_EXIT=%ERRORLEVEL%",
         "rem When started by double-click, keep the window open if the server stopped with an error.",
-        "if not defined BLOCKPILOT if errorlevel 1 pause",
+        'if not defined BLOCKPILOT if not "%BP_EXIT%"=="0" pause',
+        // 마지막 if 줄이 종료 코드를 0 으로 덮지 않도록 java 의 종료 코드로 끝낸다 (BlockPilot 이 비정상 종료를 알아보게)
+        "exit /b %BP_EXIT%",
         "",
       ].join("\r\n"),
     };

@@ -34,7 +34,8 @@ describe("start scripts", () => {
     expect(s.body.split("\r\n").length).toBeGreaterThan(5);
     expect(s.body).not.toMatch(/[^\r]\n/);
     expect(s.body).toContain("chcp 65001");
-    expect(s.body).toContain("if not defined BLOCKPILOT if errorlevel 1 pause");
+    expect(s.body).toContain('if not defined BLOCKPILOT if not "%BP_EXIT%"=="0" pause');
+    expect(s.body).toContain("exit /b %BP_EXIT%");
     expect(platforms.windows.pinnedJava(s.body)).toBe(java);
   });
 });
