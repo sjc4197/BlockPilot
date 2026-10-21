@@ -116,6 +116,8 @@ log("공식 Node 해시 확인 (sha256 일치)");
 const extractDir = path.join(cache, base);
 if (!fs.existsSync(extractDir)) {
   if (T.ext === "zip" && process.platform === "linux") run("unzip", ["-q", archive, "-d", cache]);
+  // Windows: Git Bash 의 GNU tar 는 "D:\…" 를 원격 주소로 읽고 zip 도 못 푼다 → Windows 기본 tar.exe(bsdtar)
+  else if (process.platform === "win32") run(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe"), ["-xf", archive, "-C", cache]);
   else run("tar", ["-xf", archive, "-C", cache]);
 }
 const nodeBin = T.os === "win" ? path.join(extractDir, "node.exe") : path.join(extractDir, "bin", "node");
