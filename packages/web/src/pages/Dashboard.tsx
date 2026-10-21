@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Activity, Boxes, Coffee, Copy, Gamepad2, Globe, Layers, Swords, Users, type LucideIcon } from "lucide-react";
-import { useAutomation, useSendCommand, useServer } from "../api/hooks";
+import { useAutomation, useSendCommand, useServer, useSkipScheduledRestart } from "../api/hooks";
+import { fmtSchedule } from "../components/AutomationPanel";
 import { CrashBanner } from "../components/CrashBanner";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const { lines, status } = useConsole(id);
   const place = usePlayOnce(`dash-${id}`);
   const { data: automation } = useAutomation(id);
+  const skipRestart = useSkipScheduledRestart(id);
   if (!s) return null;
 
   const state = status?.state ?? s.process.state;
@@ -77,6 +79,19 @@ export default function Dashboard() {
                 </Badge>
                 <Badge>{s.startScript ?? "java 직접 실행"}</Badge>
                 {s.foreignScript && <Badge tone="warning">{s.foreignScript} 는 다른 OS 용이라 쓰지 않음</Badge>}
+              {automation?.scheduledRestart.enabled && automation.scheduledRestart.nextAt && (
+                <button
+                  type="button"
+                  className="focus-ring"
+                  title={automation.scheduledRestart.skipNext ? "눌러서 건너뛰기 취소" : "눌러서 이번만 건너뛰기"}
+                  onClick={() => skipRestart.mutate(!automation.scheduledRestart.skipNext)}
+                >
+                  <Badge tone={automation.scheduledRestart.skipNext ? "neutral" : "lamp"}>
+                    예약 재시작 {fmtSchedule(automation.scheduledRestart.nextAt)}
+                    {automation.scheduledRestart.skipNext ? " · 건너뜀" : " · 건너뛰기"}
+                  </Badge>
+                </button>
+              )}
               </div>
             </div>
             <ProcessControls serverId={id} status={{ ...s.process, state, onlinePlayers: players }} size="lg" />

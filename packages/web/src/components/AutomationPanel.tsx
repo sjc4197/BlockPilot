@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { BellRing, RotateCcw, Send, Trash2 } from "lucide-react";
+import { AlarmClock, BellRing, RotateCcw, Send, Trash2 } from "lucide-react";
 import { DISCORD_EVENTS, DISCORD_EVENT_LABEL, type AutomationView } from "@blockpilot/shared";
-import { useDiscordTest, useUpdateAutomation } from "../api/hooks";
-import { Badge, Button, Callout, Card, Field, Input, SectionTitle, Select, Toggle, fmtDate, useToast } from "../lib/ui";
+import { useDiscordTest, useSkipScheduledRestart, useUpdateAutomation } from "../api/hooks";
+import { Badge, Button, Callout, Card, Field, Input, SectionTitle, Select, Toggle, cx, fmtDate, useToast } from "../lib/ui";
 
 /** 서버 설정 → 알림·자동화 탭 */
 export function AutomationPanel({ serverId, view }: { serverId: string; view: AutomationView }) {
@@ -10,6 +10,7 @@ export function AutomationPanel({ serverId, view }: { serverId: string; view: Au
     <div className="space-y-5">
       <DiscordCard serverId={serverId} view={view} />
       <AutoRestartCard serverId={serverId} view={view} />
+      <ScheduledRestartCard serverId={serverId} view={view} />
     </div>
   );
 }
@@ -121,6 +122,77 @@ function AutoRestartCard({ serverId, view }: { serverId: string; view: Automatio
           </span>
         )}
       </div>
+    </Card>
+  );
+}
+
+const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** "10월 22일 (목) 05:00" */
+export function fmtSchedule(iso: string) {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${DAYS[d.getDay()]}) ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function ScheduledRestartCard({ serverId, view }: { serverId: string; view: AutomationView }) {
+  const update = useUpdateAutomation(serverId);
+  const skip = useSkipScheduledRestart(serverId);
+  const toast = useToast();
+  const s = view.scheduledRestart;
+  const onErr = (e: unknown) => toast("err", (e as Error).message);
+  const [time, setTime] = useState(s.time);
+  const toggleDay = (d: number) => {
+    const days = s.days.includes(d) ? s.days.filter((x) => x !== d) : [...s.days, d].sort();
+    if (!days.length) return toast("info", "요일을 하나 이상 골라 주세요.");
+    update.mutate({ scheduledRestart: { days } }, { onError: onErr });
+  };
+  return (
+    <Card className="space-y-4">
+      <SectionTitle right={<Toggle checked={s.enabled} onChange={(v) => update.mutate({ scheduledRestart: { enabled: v } }, { onError: onErr })} />}>
+        <span className="inline-flex items-center gap-2">
+          <AlarmClock className="h-4 w-4 text-redstone" /> 예약 재시작
+        </span>
+      </SectionTitle>
+      <p className="text-sm text-slate-400">정한 시각에 서버를 다시 켜서 렉과 메모리를 정리해요. 10분·5분·1분·10초 전에 게임 채팅으로 노란 공지를 띄우고, 1분 전에 월드를 저장해요. BlockPilot 이 켠 서버에만 동작해요.</p>
+      <div className="flex flex-wrap items-end gap-4">
+        <Field label="시각" className="w-32">
+          <Input id="sched-time" type="time" value={time} disabled={!s.enabled} onChange={(e) => setTime(e.target.value)} onBlur={() => time !== s.time && /^\d\d:\d\d$/.test(time) && update.mutate({ scheduledRestart: { time } }, { onError: onErr })} />
+        </Field>
+        <div>
+          <div className="mb-1.5 font-block text-[12px] text-slate-400">요일</div>
+          <div className="flex gap-1">
+            {DAYS.map((d, i) => (
+              <button
+                key={d}
+                type="button"
+                disabled={!s.enabled}
+                aria-pressed={s.days.includes(i)}
+                onClick={() => toggleDay(i)}
+                className={cx("h-9 w-9 font-block text-[12px] focus-ring disabled:opacity-40", s.days.includes(i) ? "bg-[#2a1d10] text-lamp shadow-[inset_2px_2px_0_#7a5a22,inset_-2px_-2px_0_#08080a]" : "bg-ink-3 text-slate-400 shadow-slab")}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className="well flex items-center gap-3 px-3 py-1.5 text-sm">
+          <span className="text-slate-300">아무도 없을 때만</span>
+          <Toggle size="sm" checked={s.onlyWhenEmpty} disabled={!s.enabled} onChange={(v) => update.mutate({ scheduledRestart: { onlyWhenEmpty: v } }, { onError: onErr })} />
+        </label>
+      </div>
+      {s.enabled && s.nextAt && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-slate-400">다음 재시작</span>
+          <Badge tone={s.skipNext ? "neutral" : "lamp"}>
+            {fmtSchedule(s.nextAt)}
+            {s.skipNext && " · 건너뜀"}
+          </Badge>
+          <Button size="sm" variant="ghost" loading={skip.isPending} onClick={() => skip.mutate(!s.skipNext, { onError: onErr })}>
+            {s.skipNext ? "되돌리기" : "이번만 건너뛰기"}
+          </Button>
+          {s.onlyWhenEmpty && <span className="text-[11px] text-slate-500">그 시각에 누가 접속해 있으면 공지 없이 건너뛰어요.</span>}
+        </div>
+      )}
     </Card>
   );
 }

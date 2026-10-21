@@ -326,3 +326,11 @@ export function useDiscordTest(id: string) {
     onSettled: () => qc.invalidateQueries({ queryKey: keys.automation(id) }),
   });
 }
+
+export function useSkipScheduledRestart(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (skip: boolean) => api<AutomationView>(`/api/servers/${id}/automation/scheduled-restart/skip`, { method: "POST", json: { skip } }),
+    onSuccess: (v) => qc.setQueryData(keys.automation(id), v),
+  });
+}

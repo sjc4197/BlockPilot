@@ -5,6 +5,7 @@ import { loadContext } from "../lib/context.js";
 import { badRequest, HttpError } from "../lib/errors.js";
 import { discordStatus, isWebhookUrl, sendTestMessage, webhookHint } from "../services/discord.js";
 import { automationRuntime } from "../services/automationState.js";
+import { refreshSchedule, setSkipNext } from "../services/scheduledRestart.js";
 
 /** 화면용: 웹훅 주소는 절대 돌려주지 않는다 */
 export async function automationView(id: string): Promise<AutomationView> {
@@ -22,6 +23,7 @@ export async function automationRoutes(app: FastifyInstance) {
   app.get("/api/servers/:id/automation", async (req) => {
     const { id } = req.params as { id: string };
     await loadContext(id);
+    await refreshSchedule(id);
     return automationView(id);
   });
 
@@ -38,6 +40,15 @@ export async function automationRoutes(app: FastifyInstance) {
       scheduledRestart: { ...cur.scheduledRestart, ...u.scheduledRestart },
     });
     await setAutomation(id, next);
+    await refreshSchedule(id);
+    return automationView(id);
+  });
+
+  app.post("/api/servers/:id/automation/scheduled-restart/skip", async (req) => {
+    const { id } = req.params as { id: string };
+    await loadContext(id);
+    const { skip } = (req.body ?? {}) as { skip?: boolean };
+    await setSkipNext(id, skip !== false);
     return automationView(id);
   });
 
