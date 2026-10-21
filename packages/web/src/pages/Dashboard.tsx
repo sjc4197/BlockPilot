@@ -5,7 +5,7 @@ import { useSendCommand, useServer } from "../api/hooks";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
 import { Lamp, SignalBar, type LampState } from "../lib/pixel";
-import { JoinFeed, PlayerHearts, RedstoneParticles } from "../lib/fx";
+import { JoinFeed, PlayerHearts, RedstoneParticles, usePlayOnce } from "../lib/fx";
 import { ProcessControls } from "../components/ProcessControls";
 import { Avatar, Badge, Callout, Card, ConfirmButton, SectionTitle, StatusBadge, cx, fmtAgo, useToast } from "../lib/ui";
 
@@ -15,6 +15,7 @@ export default function Dashboard() {
   const sendCmd = useSendCommand(id);
   const toast = useToast();
   const { lines, status } = useConsole(id);
+  const place = usePlayOnce(`dash-${id}`);
   if (!s) return null;
 
   const state = status?.state ?? s.process.state;
@@ -86,7 +87,7 @@ export default function Dashboard() {
         </div>
         {/* 통계 */}
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat k={0} icon={Users} label="접속자" value={`${players.length}`} sub={`/ ${s.properties.maxPlayers}명`} accent>
+          <Stat k={0} place={place} icon={Users} label="접속자" value={`${players.length}`} sub={`/ ${s.properties.maxPlayers}명`} accent>
             {s.properties.maxPlayers <= 20 ? (
               <div className="mt-2.5">
                 <PlayerHearts count={players.length} max={s.properties.maxPlayers} />
@@ -98,13 +99,13 @@ export default function Dashboard() {
               </div>
             )}
           </Stat>
-          <Stat k={1} icon={Boxes} label={s.loader === "paper" ? "플러그인" : "모드"} value={`${s.modCount}`} sub="개 설치됨" to={`/s/${id}/mods`} />
-          <Stat k={2} icon={Swords} label="난이도" value={difficultyLabel(s.properties.difficulty)} to={`/s/${id}/settings`} />
-          <Stat k={3} icon={Gamepad2} label="게임모드" value={gamemodeLabel(s.properties.gamemode)} to={`/s/${id}/settings`} />
-          <Stat k={4} lamp={s.properties.whitelist ? "on" : "off"} label="화이트리스트" value={s.properties.whitelist ? "켜짐" : "꺼짐"} to={`/s/${id}/players`} />
-          <Stat k={5} icon={Globe} label="포트" value={String(s.properties.port)} />
-          <Stat k={6} icon={Layers} label="월드" value={s.levelName} to={`/s/${id}/backups`} />
-          <Stat k={7} icon={Activity} label="MOTD" value={s.properties.motd || "(없음)"} small />
+          <Stat k={1} place={place} icon={Boxes} label={s.loader === "paper" ? "플러그인" : "모드"} value={`${s.modCount}`} sub="개 설치됨" to={`/s/${id}/mods`} />
+          <Stat k={2} place={place} icon={Swords} label="난이도" value={difficultyLabel(s.properties.difficulty)} to={`/s/${id}/settings`} />
+          <Stat k={3} place={place} icon={Gamepad2} label="게임모드" value={gamemodeLabel(s.properties.gamemode)} to={`/s/${id}/settings`} />
+          <Stat k={4} place={place} lamp={s.properties.whitelist ? "on" : "off"} label="화이트리스트" value={s.properties.whitelist ? "켜짐" : "꺼짐"} to={`/s/${id}/players`} />
+          <Stat k={5} place={place} icon={Globe} label="포트" value={String(s.properties.port)} />
+          <Stat k={6} place={place} icon={Layers} label="월드" value={s.levelName} to={`/s/${id}/backups`} />
+          <Stat k={7} place={place} icon={Activity} label="MOTD" value={s.properties.motd || "(없음)"} small />
         </section>
       </div>
 
@@ -157,6 +158,7 @@ export default function Dashboard() {
 
 function Stat({
   k = 0,
+  place,
   icon: Icon,
   lamp,
   label,
@@ -169,6 +171,8 @@ function Stat({
 }: {
   /** 전원 회로에서 몇 번째로 켜지는 카드인지 */
   k?: number;
+  /** 처음 볼 때 블록을 놓듯 떨어지며 나타남 */
+  place?: boolean;
   icon?: LucideIcon;
   lamp?: LampState;
   label: string;
@@ -200,11 +204,11 @@ function Stat({
   );
   const style = { "--k": k } as CSSProperties;
   return to ? (
-    <Link to={to} style={style} className="stat-power slab relative block p-4 transition-colors hover:bg-ink-3 active:shadow-pressed">
+    <Link to={to} style={style} className={cx("stat-power slab relative block p-4 transition-colors hover:bg-ink-3 active:shadow-pressed", place && "place-in")}>
       {inner}
     </Link>
   ) : (
-    <div style={style} className="stat-power slab relative p-4">
+    <div style={style} className={cx("stat-power slab relative p-4", place && "place-in")}>
       {inner}
     </div>
   );

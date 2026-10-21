@@ -160,6 +160,67 @@ body {
   text-shadow: 0.08em 0.08em 0 #08080a, 0 0 0.5em rgba(255, 59, 47, 0.55);
 }
 
+/* ---------- 핫바 메뉴 ---------- */
+
+.hotbar-frame {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  top: 0;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 2px #000, inset 0 0 0 3px #d8d8d8, inset 0 0 0 5px #6d6d6d;
+  transition: transform 0.18s steps(3), height 0.18s steps(3);
+}
+/* 게임 속 아이템 이름처럼 화면 아래 가운데(사이드바 제외)에 잠깐 */
+.item-name {
+  position: fixed;
+  bottom: 4.5rem;
+  left: calc(50% + 116px);
+  transform: translateX(-50%);
+  z-index: 40;
+  pointer-events: none;
+  font-family: "Galmuri11", ui-monospace, monospace;
+  font-size: 14px;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000;
+  white-space: nowrap;
+  animation: item-name 1.6s steps(8) forwards;
+}
+@keyframes item-name {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---------- 블록 놓기 등장 ---------- */
+
+.place-in {
+  animation: place-in 0.32s steps(4) both;
+  animation-delay: calc(var(--k, 0) * 70ms);
+}
+.place-in::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 4px;
+  height: 4px;
+  pointer-events: none;
+  box-shadow: -22px 0 0 #8f8f8f, 22px 0 0 #5e5e5e, -10px 3px 0 #737373, 12px 3px 0 #8f8f8f, 0 4px 0 #5e5e5e;
+  opacity: 0;
+  animation: place-puff 0.42s steps(4) both;
+  animation-delay: calc(var(--k, 0) * 70ms + 0.26s);
+}
+@keyframes place-in {
+  0% { opacity: 0; transform: translateY(-16px) scale(0.92); }
+  75% { opacity: 1; transform: translateY(2px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes place-puff {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-12px) scaleX(1.7); }
+}
+
 /* ---------- 대시보드 전원 회로 ---------- */
 
 .power-wire {

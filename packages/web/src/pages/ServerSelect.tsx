@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from "react";
+import { useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, FolderOpen, Hammer, Plus, Server, Trash2 } from "lucide-react";
 import { useCreateOptions, useRegisterServer, useRemoveServer, useServers, useSystem } from "../api/hooks";
 import { Logo } from "../App";
-import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, Spinner, useToast } from "../lib/ui";
+import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, Spinner, cx, useToast } from "../lib/ui";
+import { usePlayOnce } from "../lib/fx";
 
 export default function ServerSelect() {
   const { data: servers, isLoading } = useServers();
@@ -15,6 +16,7 @@ export default function ServerSelect() {
   const { data: sys } = useSystem();
   const [path, setPath] = useState("");
   const [name, setName] = useState("");
+  const place = usePlayOnce("server-list");
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -85,7 +87,7 @@ export default function ServerSelect() {
         ) : (
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
             {servers.map((s, i) => (
-              <li key={s.id} className="slab group flex animate-slide-up items-center gap-4 p-4" style={{ animationDelay: `${i * 40}ms` }}>
+              <li key={s.id} className={cx("slab group relative flex items-center gap-4 p-4", place && "place-in")} style={{ "--k": i } as CSSProperties}>
                 <div className="well grid h-11 w-11 shrink-0 place-items-center text-redstone">
                   <Server className="h-5 w-5" />
                 </div>
