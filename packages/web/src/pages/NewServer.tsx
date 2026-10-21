@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, FolderSearch, Hammer, LayoutDashboard, RotateCcw, X } from "lucide-react";
@@ -7,7 +7,8 @@ import { useCancelCreate, useCreateJob, useCreateOptions, useStartCreate, useSys
 import { ApiRequestError } from "../api/client";
 import { FolderPicker } from "../components/FolderPicker";
 import { Lamp, TntIcon } from "../lib/pixel";
-import { Badge, Button, Callout, Card, ConfirmButton, Field, Input, PageHeader, SectionTitle, Select, Spinner, Toggle, cx } from "../lib/ui";
+import { Badge, Button, Callout, Card, ConfirmButton, Field, Input, PageHeader, SectionTitle, Select, Spinner, Toggle, cx, useToast } from "../lib/ui";
+import { XpBar } from "../lib/fx";
 
 const MEMORY_STEPS_MB = [1024, 1536, 2048, 3072, 4096, 5120, 6144, 8192, 10240, 12288, 16384];
 const gb = (mb: number) => `${mb / 1024}GB`;
@@ -356,6 +357,15 @@ function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
+  const toast = useToast();
+  const celebrated = useRef(false);
+  useEffect(() => {
+    if (job?.state === "succeeded" && !celebrated.current) {
+      celebrated.current = true;
+      toast("ok", `새 서버를 만들었어요 · ${job.input.name}`, { icon: "grass", first: "create" });
+    }
+  }, [job?.state, job?.input.name, toast]);
+
   useEffect(() => {
     if (job?.state === "succeeded") qc.invalidateQueries({ queryKey: keys.servers });
     if (job && job.state !== "running") qc.invalidateQueries({ queryKey: ["create", "options"] });
@@ -387,6 +397,10 @@ function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
         }
       />
 
+      <Card>
+        <CreateXp job={job} />
+      </Card>
+
       <Card padded={false} className="divide-y-2 divide-bevel-lo">
         {job.steps.map((s) => (
           <StepRow key={s.id} step={s} />
@@ -415,6 +429,21 @@ function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
       </Card>
     </div>
   );
+}
+
+/** 경험치 바: 끝낸 단계 수 = 레벨, 지금 단계의 내려받기 진행률까지 더한 전체 진행률 = 바 */
+function CreateXp({ job }: { job: CreateJobStatus }) {
+  const total = job.steps.length;
+  const finished = job.steps.filter((s) => s.state === "done" || s.state === "skipped").length;
+  const current = job.steps.find((s) => s.state === "running" || s.state === "failed");
+  const frac = current?.progress?.total ? Math.min(1, current.progress.done / current.progress.total) : 0;
+  const value = job.state === "succeeded" ? 1 : (finished + (current?.state === "running" ? frac : 0)) / total;
+  const caption =
+    job.state === "succeeded" ? "완료! 대시보드에서 서버를 켤 수 있어요"
+    : job.state === "running" ? (current?.label ?? "준비 중")
+    : job.state === "cancelled" ? "취소했어요"
+    : `${current?.label ?? "만들기"} 에서 멈췄어요`;
+  return <XpBar level={finished} value={value} caption={caption} right={`${finished} / ${total} 단계`} tone={job.state === "failed" || job.state === "cancelled" ? "failed" : job.state === "succeeded" ? "done" : "active"} />;
 }
 
 function StepRow({ step: s }: { step: CreateStep }) {

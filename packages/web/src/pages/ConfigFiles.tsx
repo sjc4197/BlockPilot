@@ -105,7 +105,7 @@ function Editor({ serverId, path }: { serverId: string; path: string }) {
   if (!data || text === null) return null;
 
   const onSave = () =>
-    save.mutate({ path, content: text }, { onSuccess: () => toast("ok", "저장했습니다. 모드 설정은 보통 서버를 재시작해야 반영돼요."), onError: (e) => toast("err", (e as Error).message) });
+    save.mutate({ path, content: text }, { onSuccess: () => toast("ok", "저장했습니다. 모드 설정은 보통 서버를 재시작해야 반영돼요.", { icon: "book" }), onError: (e) => toast("err", (e as Error).message) });
 
   const lineCount = text.split("\n").length;
 

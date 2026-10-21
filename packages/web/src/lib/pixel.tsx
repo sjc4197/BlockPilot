@@ -79,3 +79,57 @@ export function SignalBar({ value, className }: { value: number; className?: str
     </span>
   );
 }
+
+/** 문자 지도로 그리는 작은 픽셀 그림 (팔레트에 없는 글자는 투명) */
+export function PixelArt({ map, pal, className }: { map: string[]; pal: Record<string, string>; className?: string }) {
+  const h = map.length;
+  const w = map[0]?.length ?? 0;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className={className} shapeRendering="crispEdges" aria-hidden>
+      {map.flatMap((row, y) => [...row].map((ch, x) => (pal[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1.02} height={1.02} fill={pal[ch]} /> : null)))}
+    </svg>
+  );
+}
+
+export const CHEST_PAL = { o: "#2b1a0c", b: "#a0672c", B: "#7a4a1d", l: "#d8d8d8", L: "#5a5a5a" };
+export const CHEST_LID = ["oooooooooooooo", "obbbbbbbbbbbbo", "obbbbbbbbbbbbo", "oBBBBBBBBBBBBo", "oooooolloooooo"];
+export const CHEST_BODY = ["obbbbbLLbbbbbo", "obbbbbbbbbbbbo", "obbbbbbbbbbbbo", "obbbbbbbbbbbbo", "oBBBBBBBBBBBBo", "oooooooooooooo"];
+const GRASS = ["gggggggg", "gGgggGgg", "dgdGgdgd", "dddddDdd", "dDdddddd", "ddddDddd", "dddDdddd", "DddddddD"];
+const GRASS_PAL = { g: "#5fa83a", G: "#4c8a2c", d: "#8a5a32", D: "#6b4424" };
+const BOOK = ["..kkkkk.", ".kbbbbwk", "kbbbbbwk", "kbbrbbwk", "kbbbbbwk", "kbbbbbwk", "kbbbbbk.", ".kkkkk.."];
+const BOOK_PAL = { k: "#2a1508", b: "#8a4a22", r: "#e8c25a", w: "#f2efe6" };
+
+/** 알림·연출에 쓰는 아이템 아이콘 */
+export function ItemIcon({ item, className }: { item: "chest" | "grass" | "book" | "lever" | "tnt" | "lamp"; className?: string }) {
+  if (item === "chest") return <PixelArt map={[...CHEST_LID, ...CHEST_BODY]} pal={CHEST_PAL} className={className} />;
+  if (item === "grass") return <PixelArt map={GRASS} pal={GRASS_PAL} className={className} />;
+  if (item === "book") return <PixelArt map={BOOK} pal={BOOK_PAL} className={className} />;
+  if (item === "tnt") return <TntIcon className={className} />;
+  if (item === "lever")
+    return (
+      <span data-on="true" className={className}>
+        <LeverGlyph className="h-full w-full" />
+      </span>
+    );
+  return <Lamp state="on" size={16} />;
+}
+export type ItemName = Parameters<typeof ItemIcon>[0]["item"];
+
+export function GrassBlock({ className }: { className?: string }) {
+  return <PixelArt map={GRASS} pal={GRASS_PAL} className={className} />;
+}
+
+const HEART = [".kkk.kkk.", "krrwkrrrk", "krwrrrrrk", "krrrrrrrk", ".krrrrrk.", "..krrrk..", "...krk...", "....k...."];
+/** 체력 하트. fill: 0 빈칸, 1 반 칸, 2 한 칸 */
+export function Heart({ fill, className }: { fill: 0 | 1 | 2; className?: string }) {
+  const map = HEART.map((row) =>
+    [...row]
+      .map((ch, x) => {
+        if (ch !== "r" && ch !== "w") return ch;
+        const full = fill === 2 || (fill === 1 && x < 5);
+        return full ? ch : "e";
+      })
+      .join(""),
+  );
+  return <PixelArt map={map} pal={{ k: "#1a0505", r: "#e8231a", w: "#ffb3ad", e: "#3b0d0d" }} className={className} />;
+}

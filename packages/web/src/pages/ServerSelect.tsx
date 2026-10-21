@@ -22,7 +22,7 @@ export default function ServerSelect() {
       { path: path.trim(), name: name.trim() || undefined },
       {
         onSuccess: (s) => {
-          toast("ok", `'${s.name}' 서버를 등록했습니다.`);
+          toast("ok", `'${s.name}' 서버를 등록했습니다.`, { icon: "grass", first: "register" });
           setPath("");
           setName("");
         },

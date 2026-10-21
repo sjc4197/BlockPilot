@@ -35,7 +35,7 @@ export default function Settings() {
   const save = () =>
     update.mutate(draft, {
       onSuccess: (r) => {
-        toast("ok", r.appliedLive.length ? `${r.appliedLive.length}개 즉시 적용, 파일에 저장했습니다.` : "저장했습니다.");
+        toast("ok", r.appliedLive.length ? `${r.appliedLive.length}개 즉시 적용, 파일에 저장했습니다.` : "저장했습니다.", { icon: "book" });
         if (r.needsRestart.length) toast("info", `재시작 후 반영: ${r.needsRestart.map((k) => PROPERTY_META_BY_KEY[k]?.label ?? k).join(", ")}`);
         setDraft({});
       },

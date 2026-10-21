@@ -76,7 +76,7 @@ function DeleteDialog({ server, onClose }: { server: ServerSummary; onClose: () 
   const submit = () =>
     del.mutate(typed, {
       onSuccess: (r) => {
-        toast("ok", `'${server.name}' 서버 폴더를 삭제했어요.`);
+        toast("ok", `'${server.name}' 서버 폴더를 삭제했어요.`, { icon: "tnt" });
         if (r.removedLink) toast("info", `등록에 쓰던 링크 ${r.removedLink} 도 지웠어요.`);
         navigate("/");
       },

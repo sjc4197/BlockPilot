@@ -65,7 +65,7 @@ export default function Backups() {
               onClick={() =>
                 create.mutate(label || undefined, {
                   onSuccess: (b) => {
-                    toast("ok", `${b.file} (${fmtBytes(b.sizeBytes)}) 백업 완료`);
+                    toast("ok", `${b.file} (${fmtBytes(b.sizeBytes)}) 백업 완료`, { icon: "chest", first: "backup" });
                     setLabel("");
                   },
                   onError: onErr,
@@ -109,7 +109,7 @@ export default function Backups() {
                 {data?.status.nextRunAt && ` · 다음 ${fmtDate(data.status.nextRunAt)}`}
                 {data?.status.running && " · 진행 중"}
               </span>
-              <Button size="sm" variant="primary" disabled={!settingsDirty} loading={saveSettings.isPending} onClick={() => saveSettings.mutate(settings, { onSuccess: () => toast("ok", "자동 백업 설정을 저장했습니다."), onError: onErr })}>
+              <Button size="sm" variant="primary" disabled={!settingsDirty} loading={saveSettings.isPending} onClick={() => saveSettings.mutate(settings, { onSuccess: () => toast("ok", "자동 백업 설정을 저장했습니다.", { icon: "book" }), onError: onErr })}>
                 설정 저장
               </Button>
             </div>
@@ -160,7 +160,7 @@ export default function Backups() {
                   disabled={!stopped || restore.isPending}
                   onConfirm={() =>
                     restore.mutate(b.file, {
-                      onSuccess: (r) => toast("ok", `${r.restored.join(", ")} 복원 완료. 이전 월드는 ${r.previousMovedTo} 에 옮겨뒀어요.`),
+                      onSuccess: (r) => toast("ok", `${r.restored.join(", ")} 복원 완료. 이전 월드는 ${r.previousMovedTo} 에 옮겨뒀어요.`, { icon: "chest" }),
                       onError: onErr,
                     })
                   }

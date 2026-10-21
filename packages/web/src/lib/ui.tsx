@@ -1,7 +1,7 @@
 import { createContext, forwardRef, useCallback, useContext, useState, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import type { ProcessState } from "@blockpilot/shared";
-import { DustLoader, Lamp, LeverGlyph, TntIcon, type LampState } from "./pixel";
+import { DustLoader, ItemIcon, Lamp, LeverGlyph, TntIcon, type ItemName, type LampState } from "./pixel";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -268,27 +268,56 @@ export function ConfirmButton({ label, confirmLabel = "정말요?", onConfirm, v
   );
 }
 
-// ---------- Toast ----------
+// ---------- Toast: 발전 과제 알림 ----------
 
 type ToastKind = "ok" | "err" | "info";
-type Toast = { id: number; kind: ToastKind; text: string };
-const ToastCtx = createContext<(kind: ToastKind, text: string) => void>(() => {});
+export interface ToastOptions {
+  /** 왼쪽 칸의 아이템 그림 */
+  icon?: ItemName;
+  /** 처음 한 번만 "도전 과제 완료!" 로 보여 줄 이름 (예: "backup") */
+  first?: string;
+}
+type Toast = { id: number; kind: ToastKind; text: string; icon: ItemName | null; title: string; tone: "gold" | "purple" | "red" | "plain"; leaving?: boolean };
+type PushToast = (kind: ToastKind, text: string, opts?: ToastOptions) => void;
+const ToastCtx = createContext<PushToast>(() => {});
+
+/** 처음 하는 일인지 (브라우저에 기억). 저장소를 못 쓰면 매번 처음이 아닌 걸로 */
+function firstTime(key: string) {
+  try {
+    const k = `blockpilot.first.${key}`;
+    if (localStorage.getItem(k)) return false;
+    localStorage.setItem(k, new Date().toISOString());
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const push = useCallback((kind: ToastKind, text: string) => {
+  const push = useCallback<PushToast>((kind, text, opts) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, kind, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === "err" ? 6500 : 3800);
+    const challenge = kind === "ok" && !!opts?.first && firstTime(opts.first);
+    const t: Toast =
+      kind === "err" ? { id, kind, text, icon: "tnt", title: "문제가 생겼어요", tone: "red" }
+      : kind === "info" ? { id, kind, text, icon: opts?.icon ?? null, title: "알림", tone: "plain" }
+      : { id, kind, text, icon: opts?.icon ?? "lamp", title: challenge ? "도전 과제 완료!" : "발전 과제 달성!", tone: challenge ? "purple" : "gold" };
+    setToasts((all) => [...all.slice(-3), t]);
+    const life = kind === "err" ? 6500 : challenge ? 5500 : 3800;
+    setTimeout(() => setToasts((all) => all.map((x) => (x.id === id ? { ...x, leaving: true } : x))), life);
+    setTimeout(() => setToasts((all) => all.filter((x) => x.id !== id)), life + 320);
   }, []);
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed bottom-5 right-5 z-50 flex w-[22rem] flex-col gap-2">
+      <div className="pointer-events-none fixed right-4 top-[4.25rem] z-50 flex w-[22rem] max-w-[calc(100vw-2rem)] flex-col items-end gap-2" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className="glass pointer-events-auto flex animate-slide-in-right items-start gap-3 px-4 py-3 text-sm text-slate-100">
-            {t.kind === "ok" ? <Lamp state="on" size={14} className="mt-0.5" /> : t.kind === "err" ? <TntIcon className="mt-0.5 h-4 w-4 shrink-0" /> : <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />}
-            <span className="min-w-0 flex-1 break-words">{t.text}</span>
+          <div key={t.id} role={t.kind === "err" ? "alert" : "status"} className={cx("adv pointer-events-auto", t.leaving && "adv-out")}>
+            <span className="adv-icon">{t.icon ? <ItemIcon item={t.icon} className="h-6 w-6" /> : <Info className="h-5 w-5 text-sky-300" />}</span>
+            <span className="min-w-0">
+              <span className={cx("block font-block text-[12px] leading-5", { gold: "text-[#ffff55]", purple: "text-[#ff6bff]", red: "text-[#ff6b5f]", plain: "text-slate-300" }[t.tone])}>{t.title}</span>
+              <span className="block break-words text-[13px] leading-snug text-white">{t.text}</span>
+            </span>
           </div>
         ))}
       </div>

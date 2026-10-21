@@ -41,7 +41,7 @@ export function ProcessControls({ serverId, status, size = "md" }: { serverId: s
 
   const run = (a: "start" | "stop" | "restart") =>
     action.mutate(a, {
-      onSuccess: () => toast("ok", a === "start" ? "서버를 시작합니다." : a === "stop" ? "서버를 중지했습니다." : "서버를 재시작합니다."),
+      onSuccess: () => toast("ok", a === "start" ? "서버를 시작합니다." : a === "stop" ? "서버를 중지했습니다." : "서버를 재시작합니다.", { icon: "lever" }),
       onError: (e) => {
         setIntent(null);
         toast("err", (e as Error).message);
