@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { parseLag, parseXmx } from "../src/services/perf.js";
-import { parsePs, sumTree, treeMemoryMb } from "../src/services/procmem.js";
+import { parsePs, parseTopMem, sumTree, treeMemoryMb } from "../src/services/procmem.js";
 import { getManaged, forgetManaged } from "../src/services/process.js";
 import { makeFakeServer, waitFor } from "./helpers/fakeServer.js";
 
@@ -17,6 +17,14 @@ describe("perf parsing", () => {
     const rows = parsePs("  1   0  100\n 10   1   50\n 11  10  4000\n 12  11  300\n 20   1  999\n");
     expect(sumTree(rows, 10)).toBe(4350);
     expect(sumTree(rows, 99)).toBeNull();
+  });
+
+  it("reads macOS top memory sizes", () => {
+    expect(parseTopMem("1040M")).toBe(1040 * 1024);
+    expect(parseTopMem("1040M+")).toBe(1040 * 1024);
+    expect(parseTopMem("512K")).toBe(512);
+    expect(parseTopMem("2G")).toBe(2 * 1024 * 1024);
+    expect(parseTopMem("-")).toBeNull();
   });
 });
 

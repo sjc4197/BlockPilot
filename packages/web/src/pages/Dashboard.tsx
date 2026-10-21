@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Activity, Boxes, Coffee, Copy, Gamepad2, Globe, Layers, Swords, Users, type LucideIcon } from "lucide-react";
 import { useAutomation, useSendCommand, useServer, useSkipScheduledRestart } from "../api/hooks";
@@ -22,6 +22,12 @@ export default function Dashboard() {
   const place = usePlayOnce(`dash-${id}`);
   const { data: automation } = useAutomation(id);
   const skipRestart = useSkipScheduledRestart(id);
+  // "N분 전 시작" 이 멈춰 보이지 않게 30초마다 다시 그린다
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
   if (!s) return null;
 
   const state = status?.state ?? s.process.state;
