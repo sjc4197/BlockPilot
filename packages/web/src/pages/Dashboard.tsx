@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Activity, Boxes, Coffee, Copy, Gamepad2, Globe, Layers, Swords, Users, type LucideIcon } from "lucide-react";
-import { useSendCommand, useServer } from "../api/hooks";
+import { useAutomation, useSendCommand, useServer } from "../api/hooks";
+import { CrashBanner } from "../components/CrashBanner";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
 import { Lamp, SignalBar, type LampState } from "../lib/pixel";
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const toast = useToast();
   const { lines, status } = useConsole(id);
   const place = usePlayOnce(`dash-${id}`);
+  const { data: automation } = useAutomation(id);
   if (!s) return null;
 
   const state = status?.state ?? s.process.state;
@@ -33,6 +35,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      {automation && <CrashBanner serverId={id} view={automation} state={state} />}
       {!s.eulaAccepted && (
         <Callout tone="warning" title="EULA 미동의">
           <code className="font-mono">eula.txt</code> 에 <code className="font-mono">eula=true</code> 가 없어 서버를 시작할 수 없습니다.

@@ -5,6 +5,8 @@ export interface AutomationRuntime {
   recentAttempts: number;
   gaveUp: boolean;
   lastCrash?: CrashSummary;
+  /** 자동 재시작이 예정된 시각 */
+  pendingRestartAt?: string;
   nextScheduledAt?: string;
   skipNext: boolean;
 }

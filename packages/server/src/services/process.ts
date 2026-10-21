@@ -9,6 +9,7 @@ import { detectServer } from "./serverInfo.js";
 import { readPropertiesFile, toRecord } from "./properties.js";
 import { rconOnce, stripColor, RconError } from "./rcon.js";
 import { emitServerEvent } from "./events.js";
+import { analyzeCrash } from "./crash.js";
 
 const HISTORY_SIZE = 500;
 /** Windows pause 안내 (영어·한국어) */
@@ -324,8 +325,14 @@ export class ManagedServer extends EventEmitter {
   /** 일부러 끈 게 아닌데 꺼졌다: 크래시 사건 (원인 요약은 crash.ts) */
   private onCrash(code: number | null, startedAt?: string) {
     const uptimeSeconds = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 1000) : undefined;
-    this.pushLine("system", "서버가 예기치 않게 꺼졌어요.");
-    emitServerEvent({ serverId: this.id, type: "crashed", online: 0, detail: `code=${code ?? "null"}${uptimeSeconds !== undefined ? ` uptime=${uptimeSeconds}s` : ""}` });
+    this.pushLine("system", "서버가 예기치 않게 꺼졌어요. 원인을 살펴보는 중…");
+    const recent = this.history.slice(-200).map((l) => l.text);
+    void analyzeCrash(this.dir, { startedAt, recent, exitCode: code, uptimeSeconds })
+      .catch(() => undefined)
+      .then((crash) => {
+        if (crash) this.pushLine("system", `원인 추정: ${crash.title} — ${crash.hint}`);
+        emitServerEvent({ serverId: this.id, type: "crashed", online: 0, crash });
+      });
   }
 
   private pushLine(source: ConsoleLine["source"], text: string) {

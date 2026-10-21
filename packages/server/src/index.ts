@@ -23,6 +23,7 @@ import { createRoutes } from "./routes/create.js";
 import { fsRoutes } from "./routes/fs.js";
 import { automationRoutes } from "./routes/automation.js";
 import { startDiscordNotifier } from "./services/discord.js";
+import { startAutoRestart } from "./services/autoRestart.js";
 import { CreateError } from "./services/create/errors.js";
 import { shutdownAll } from "./services/process.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
@@ -85,6 +86,7 @@ if (webDist) {
 
 startScheduler(app.log);
 startDiscordNotifier();
+startAutoRestart();
 // 지난번에 만들기 도중 꺼졌다면 그때 만들던 파일을 정리
 await recoverInterruptedJobs(app.log);
 

@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { BellRing, Send, Trash2 } from "lucide-react";
+import { BellRing, RotateCcw, Send, Trash2 } from "lucide-react";
 import { DISCORD_EVENTS, DISCORD_EVENT_LABEL, type AutomationView } from "@blockpilot/shared";
 import { useDiscordTest, useUpdateAutomation } from "../api/hooks";
-import { Badge, Button, Callout, Card, Field, Input, SectionTitle, Toggle, fmtDate, useToast } from "../lib/ui";
+import { Badge, Button, Callout, Card, Field, Input, SectionTitle, Select, Toggle, fmtDate, useToast } from "../lib/ui";
 
 /** 서버 설정 → 알림·자동화 탭 */
 export function AutomationPanel({ serverId, view }: { serverId: string; view: AutomationView }) {
   return (
     <div className="space-y-5">
       <DiscordCard serverId={serverId} view={view} />
+      <AutoRestartCard serverId={serverId} view={view} />
     </div>
   );
 }
@@ -85,6 +86,41 @@ function DiscordCard({ serverId, view }: { serverId: string; view: AutomationVie
       ) : (
         d.lastSentAt && <p className="text-[11px] text-slate-500 tnum">마지막으로 보낸 시각 {fmtDate(d.lastSentAt)}</p>
       )}
+    </Card>
+  );
+}
+
+function AutoRestartCard({ serverId, view }: { serverId: string; view: AutomationView }) {
+  const update = useUpdateAutomation(serverId);
+  const toast = useToast();
+  const a = view.autoRestart;
+  const onErr = (e: unknown) => toast("err", (e as Error).message);
+  return (
+    <Card className="space-y-4">
+      <SectionTitle right={<Toggle checked={a.enabled} onChange={(v) => update.mutate({ autoRestart: { enabled: v } }, { onError: onErr })} />}>
+        <span className="inline-flex items-center gap-2">
+          <RotateCcw className="h-4 w-4 text-redstone" /> 크래시 자동 재시작
+        </span>
+      </SectionTitle>
+      <p className="text-sm text-slate-400">
+        레버로 끈 게 아닌데 서버가 꺼지면 잠깐 뒤 다시 켜요. 10분 안에 세 번 넘게 꺼지면 같은 문제가 반복되는 거라 멈추고 알려 줘요. BlockPilot 이 켠 서버에만 동작해요.
+      </p>
+      <div className="flex flex-wrap items-end gap-4">
+        <Field label="다시 켜기까지" className="w-40">
+          <Select id="auto-restart-delay" value={a.delaySeconds} disabled={!a.enabled} onChange={(e) => update.mutate({ autoRestart: { delaySeconds: Number(e.target.value) } }, { onError: onErr })}>
+            {[10, 30, 60, 120, 300].map((s) => (
+              <option key={s} value={s}>
+                {s < 60 ? `${s}초` : `${s / 60}분`}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        {a.enabled && (
+          <span className="pb-2 text-[12px] text-slate-500">
+            {a.gaveUp ? <Badge tone="danger">반복해서 꺼져 자동 재시작을 멈췄어요 · 레버로 켜면 다시 동작해요</Badge> : a.recentAttempts > 0 ? `최근 10분 동안 ${a.recentAttempts}번 다시 켰어요` : "아직 다시 켠 적 없어요"}
+          </span>
+        )}
+      </div>
     </Card>
   );
 }

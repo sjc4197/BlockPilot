@@ -52,7 +52,6 @@ export function formatEvent(e: ServerEvent, serverName: string): DiscordMessage 
     case "crashed": {
       const lines = [n];
       if (e.crash) lines.push(e.crash.title, `해결: ${e.crash.hint}`);
-      if (e.detail) lines.push(e.detail);
       return { title: "🔴 서버가 갑자기 꺼졌어요", description: lines.join("\n"), color: COLOR.red };
     }
     case "auto-restart":

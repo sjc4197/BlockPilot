@@ -475,7 +475,7 @@ export const DEFAULT_AUTOMATION: AutomationSettings = {
 /** 화면에 돌려주는 모양: 웹훅 주소 대신 설정 여부와 끝 네 글자만 */
 export interface AutomationView {
   discord: { webhookSet: boolean; webhookHint?: string; events: AutomationSettings["discord"]["events"]; lastSentAt?: string; lastError?: string };
-  autoRestart: AutomationSettings["autoRestart"] & { recentAttempts: number; gaveUp: boolean };
+  autoRestart: AutomationSettings["autoRestart"] & { recentAttempts: number; gaveUp: boolean; pendingAt?: string };
   scheduledRestart: AutomationSettings["scheduledRestart"] & { nextAt?: string; skipNext: boolean };
   lastCrash?: CrashSummary;
 }

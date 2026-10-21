@@ -12,7 +12,7 @@ export async function automationView(id: string): Promise<AutomationView> {
   const rt = automationRuntime(id);
   return {
     discord: { webhookSet: !!a.discord.webhookUrl, webhookHint: webhookHint(a.discord.webhookUrl), events: a.discord.events, ...discordStatus(id) },
-    autoRestart: { ...a.autoRestart, recentAttempts: rt.recentAttempts, gaveUp: rt.gaveUp },
+    autoRestart: { ...a.autoRestart, recentAttempts: rt.recentAttempts, gaveUp: rt.gaveUp, pendingAt: rt.pendingRestartAt },
     scheduledRestart: { ...a.scheduledRestart, nextAt: rt.nextScheduledAt, skipNext: rt.skipNext },
     lastCrash: rt.lastCrash,
   };
