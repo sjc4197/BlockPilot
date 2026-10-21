@@ -62,10 +62,11 @@ export const windows: Platform = {
     // BLOCKPILOT=1 이면 BlockPilot 이 만든 start.bat 이 끝에서 pause 하지 않는다
     return { BLOCKPILOT: "1", JAVA_TOOL_OPTIONS: prev ? `${prev} ${utf8Out}` : utf8Out };
   },
-  killTree(child: ChildProcess, force: boolean) {
+  killTree(child: ChildProcess) {
     if (child.pid === undefined) return;
-    // cmd.exe 만 죽이면 java 가 남는다 → /T 로 자식까지
-    spawnSync("taskkill", ["/PID", String(child.pid), "/T", ...(force ? ["/F"] : [])], { windowsHide: true });
+    // Windows 콘솔 프로그램에는 "부드럽게 끝내라"는 신호가 없다. 서버의 정상 종료는 이미 stdin 의 stop 으로 시도했으므로
+    // 여기서는 바로 강제 종료(/F)한다. cmd.exe 만 죽이면 java 가 남으니 /T 로 자식까지
+    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true });
   },
   decode: decodeWindows,
 

@@ -7,6 +7,7 @@ import type { CreateServerInput } from "@blockpilot/shared";
 import { prepareTarget, cleanupTarget, assertDeletableTarget } from "../src/services/create/target.js";
 import { CreateJob, JOBS_DIR, recoverInterruptedJobs, recovered } from "../src/services/create/job.js";
 import { CreateError } from "../src/services/create/errors.js";
+import { platform } from "../src/services/platform/index.js";
 
 const exists = (p: string) => fsp.access(p).then(() => true, () => false);
 let root: string;
@@ -31,12 +32,13 @@ describe("prepareTarget", () => {
     expect(r).toMatchObject({ existed: false, preexisting: [] });
   });
 
-  it("accepts an empty folder, ignoring macOS metadata files", async () => {
+  it("accepts an empty folder, ignoring this OS's metadata files (.DS_Store / desktop.ini …)", async () => {
     const d = path.join(root, "empty");
     await fsp.mkdir(d);
-    await fsp.writeFile(path.join(d, ".DS_Store"), "x");
+    const meta = [...platform.ignorable][0];
+    await fsp.writeFile(path.join(d, meta), "x");
     const r = await prepareTarget(d);
-    expect(r).toMatchObject({ existed: true, preexisting: [".DS_Store"] });
+    expect(r).toMatchObject({ existed: true, preexisting: [meta] });
   });
 
   it("rejects a folder with files in it, explaining in Korean", async () => {
