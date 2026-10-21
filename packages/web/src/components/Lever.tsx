@@ -1,30 +1,6 @@
 import type { CSSProperties } from "react";
 import { cx } from "../lib/ui";
-import { LeverGlyph, STONE_A, STONE_B } from "../lib/pixel";
-
-/** 로고용 정적 레버 마크 (8x8 픽셀) */
-export function PixelLeverMark({ className }: { className?: string }) {
-  const map = [".....kk.", "....hs..", "...ss...", "..ss....", ".ss.....", "cCcCcCcC", "CcCcCcCc"];
-  const pal: Record<string, string> = { k: "#3a3a3a", h: "#9c6b3c", s: "#7a5230", c: STONE_A, C: STONE_B };
-  return (
-    <svg viewBox="0 -0.5 8 8" className={className} shapeRendering="crispEdges" aria-hidden>
-      {map.flatMap((row, y) =>
-        [...row].map((ch, x) => (pal[ch] ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={pal[ch]} /> : null)),
-      )}
-    </svg>
-  );
-}
-
-/** 레드스톤 가루 한 줄. lit 개수만큼 왼쪽부터 켜져 있음 (로고 장식용) */
-export function DustRow({ count, lit, size, className }: { count: number; lit: number; size: number; className?: string }) {
-  return (
-    <span className={cx("flex justify-between", className)} aria-hidden>
-      {Array.from({ length: count }, (_, i) => (
-        <span key={i} className="dust" data-lit={i < lit} style={{ width: size, height: size, transform: i % 3 === 1 ? `translateY(${Math.max(1, size / 3)}px)` : undefined }} />
-      ))}
-    </span>
-  );
-}
+import { LeverGlyph } from "../lib/pixel";
 
 export type LeverVisual = "off" | "starting" | "on" | "stopping";
 

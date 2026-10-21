@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useParams, Link, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Archive, Boxes, ChevronRight, FileCode2, LayoutDashboard, ScrollText, Settings2, SquareTerminal, Users } from "lucide-react";
 import { useAuthInfo, useServer } from "./api/hooks";
 import { getToken, setToken, setUnauthorizedHandler } from "./api/client";
 import { StatusBadge, cx } from "./lib/ui";
-import { DustLoader } from "./lib/pixel";
+import { DustLoader, Lamp, LeverGlyph } from "./lib/pixel";
 import { ProcessControls } from "./components/ProcessControls";
-import { DustRow, PixelLeverMark } from "./components/Lever";
 import ServerSelect from "./pages/ServerSelect";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
@@ -75,17 +74,44 @@ const NAV = [
   { to: "backups", label: "백업", icon: Archive },
 ];
 
-/** J 시안: 레버 마크 + BLOCK/PILOT 픽셀 워드마크 + 레드스톤 가루 밑줄 */
+// 로고 레버는 앱을 처음 열 때 한 번만 당겨진다 (화면을 옮길 때마다 다시 켜지지 않게)
+let logoPowered = false;
+
+/**
+ * 로고 C 시안 "램프 점등": 앱의 전원 레버 + BLOCK/PILOT + 레드스톤 가루 + 램프.
+ * 레버가 넘어가면 신호가 가루를 타고 램프까지 가고, 램프가 켜지면 PILOT 이 빛난다.
+ */
 export function Logo({ className, size = "md" }: { className?: string; size?: "md" | "lg" }) {
   const lg = size === "lg";
+  const [on, setOn] = useState(logoPowered);
+  useEffect(() => {
+    if (on) return;
+    const t = setTimeout(() => {
+      logoPowered = true;
+      setOn(true);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [on]);
+  const dots = lg ? 22 : 12;
+  const dot = lg ? 5 : 3;
+  const tuck = lg ? 12 : 6;
+  // 레버 그림 오른쪽 빈칸(16칸 중 3칸)만큼 더 당겨서 가루가 받침에 바로 붙게
+  const reach = tuck + (lg ? 14 : 7);
   return (
-    <span className={cx("inline-flex items-center", lg ? "gap-4" : "gap-2.5", className)}>
-      <PixelLeverMark className={lg ? "h-16 w-16" : "h-8 w-8"} />
-      <span className="inline-flex flex-col">
-        <span className={cx("font-pixel font-bold leading-none text-white [text-shadow:2px_2px_0_#08080a]", lg ? "text-[38px]" : "text-[15px]")}>
-          BLOCK<span className="text-redstone">PILOT</span>
+    <span className={cx("logo-c inline-flex items-end", className)} data-on={on} style={{ "--lamp-delay": `${dots * 45 + 260}ms` } as CSSProperties}>
+      <LeverGlyph className={lg ? "h-16 w-[73px] shrink-0" : "h-8 w-[37px] shrink-0"} />
+      <span className="inline-flex flex-col" style={{ paddingLeft: tuck, gap: lg ? 13 : 6 }}>
+        <span className={cx("font-pixel font-bold leading-none text-white", lg ? "text-[38px] [text-shadow:3px_3px_0_#08080a]" : "text-[15px] [text-shadow:2px_2px_0_#08080a]")}>
+          BLOCK<span className="logo-pilot">PILOT</span>
         </span>
-        <DustRow count={lg ? 24 : 13} lit={lg ? 14 : 8} size={lg ? 5 : 3} className={lg ? "mt-3" : "mt-1.5"} />
+        <span className="flex items-end" style={{ marginLeft: -reach, gap: dot }}>
+          <span className="flex flex-1 items-end justify-between" style={{ gap: dot - 1 }}>
+            {Array.from({ length: dots }, (_, i) => (
+              <span key={i} className="dust" style={{ width: dot, height: dot, "--i": i, transform: i % 3 === 1 ? `translateY(${-Math.max(1, dot / 3)}px)` : undefined } as CSSProperties} />
+            ))}
+          </span>
+          <Lamp state={on ? "on" : "off"} size={lg ? 12 : 7} />
+        </span>
       </span>
     </span>
   );

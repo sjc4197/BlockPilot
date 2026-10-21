@@ -135,6 +135,31 @@ body {
   animation-delay: calc(var(--i, 0) * 110ms);
 }
 
+/* ---------- 로고: 레버 → 가루 → 램프 → PILOT ---------- */
+
+.logo-c .dust {
+  transition-delay: 0ms;
+}
+.logo-c[data-on="true"] .dust {
+  background: #ff3b2f;
+  box-shadow: 0 0 6px rgba(255, 59, 47, 0.6);
+  transition-delay: calc(var(--i, 0) * 45ms + 260ms);
+}
+.logo-c .lamp,
+.logo-c .lamp::after {
+  transition: background-color 0.2s, box-shadow 0.2s;
+  transition-delay: var(--lamp-delay, 800ms);
+}
+.logo-pilot {
+  color: #6b1a14;
+  transition: color 0.25s, text-shadow 0.25s;
+  transition-delay: var(--lamp-delay, 800ms);
+}
+.logo-c[data-on="true"] .logo-pilot {
+  color: #ff3b2f;
+  text-shadow: 0.08em 0.08em 0 #08080a, 0 0 0.5em rgba(255, 59, 47, 0.55);
+}
+
 /* ---------- 레드스톤 램프 (상태 표시) ---------- */
 
 .lamp {
