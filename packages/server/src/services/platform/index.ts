@@ -32,7 +32,8 @@ export const platform: Platform = current ? platforms[current] : linux;
  */
 const SUPPORT: Record<OsId, { manage: "ok" | "wip"; create: boolean }> = {
   macos: { manage: "ok", create: true },
-  linux: { manage: "wip", create: false },
+  // 1단계: Ubuntu CI 에서 실제 서버 만들기·켜기·끄기·삭제 E2E 로 확인
+  linux: { manage: "ok", create: true },
   windows: { manage: "wip", create: false },
 };
 
