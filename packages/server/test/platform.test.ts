@@ -122,7 +122,8 @@ describe("scriptCommand runs this OS's start scripts for real", () => {
           platform.killTree(child, true);
           reject(new Error(`스크립트가 끝나지 않음. 출력: ${out}`));
         }, 15_000);
-        child.once("exit", (c) => {
+        // exit 는 출력이 다 읽히기 전에 올 수 있어서, 출력 스트림까지 닫히는 close 를 기다린다
+        child.once("close", (c) => {
           clearTimeout(t);
           resolve(c);
         });
