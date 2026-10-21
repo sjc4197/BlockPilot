@@ -25,3 +25,13 @@ describe("server.properties line endings", () => {
     expect(out).toBe("#Minecraft server properties\r\npvp=false\r\nmotd=Hi\r\n");
   });
 });
+
+describe("LineSplitter.pending", () => {
+  it("exposes text that has no newline yet (Windows pause prompt)", () => {
+    const out: string[] = [];
+    const sp = new LineSplitter((b) => b.toString("utf8"), (l) => out.push(l));
+    sp.push(Buffer.from("[Server] Stopped\r\n계속하려면 아무 키나 누르십시오 . . . ", "utf8"));
+    expect(out).toEqual(["[Server] Stopped"]);
+    expect(sp.pending()).toMatch(/계속하려면 아무 키나 누르십시오/);
+  });
+});

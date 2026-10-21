@@ -22,6 +22,11 @@ export class LineSplitter {
     }
   }
 
+  /** 아직 줄바꿈이 오지 않은 조각 (Windows pause 의 "계속하려면 아무 키나…" 처럼 줄바꿈 없이 기다리는 안내를 알아보려고) */
+  pending(): string {
+    return this.buf.length ? this.decode(this.buf) : "";
+  }
+
   /** 프로세스가 끝났을 때 줄바꿈 없이 남은 마지막 조각 */
   flush() {
     if (this.buf.length) this.onLine(this.decode(this.buf));

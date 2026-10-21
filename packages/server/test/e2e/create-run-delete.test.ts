@@ -6,7 +6,7 @@ import { listServers } from "../../src/config/store.js";
 import { CreateJob } from "../../src/services/create/job.js";
 import { createPipeline, defaultDeps } from "../../src/services/create/pipeline.js";
 import { listLoaders } from "../../src/services/create/sources.js";
-import { systemInfo } from "../../src/services/platform/index.js";
+import { platform, systemInfo } from "../../src/services/platform/index.js";
 import { getManaged } from "../../src/services/process.js";
 import { deleteServerFolder } from "../../src/services/serverDelete.js";
 
@@ -74,9 +74,27 @@ describe.runIf(enabled)(`E2E (${systemInfo().osLabel}): 새 서버 만들기 →
       const history = managed.getHistory().map((l) => l.text).join("\n");
       expect(history).toMatch(/All dimensions are saved|Saving worlds/);
 
+      // 3-1) Windows: 사용자가 직접 만든 것처럼 끝에 pause 가 있는 start.bat 으로도 켜고 끌 수 있는지
+      if (platform.id === "windows" && !jdkDownload) {
+        const bat = path.join(server.path, "start.bat");
+        const java = platform.pinnedJava(await fsp.readFile(bat, "utf8"))!;
+        await fsp.writeFile(bat, ["@echo off", `"${java}" -Xmx1G -jar fabric-server-launch.jar nogui`, "pause", ""].join("\r\n"));
+        await managed.start();
+        await waitFor(async () => (await managed.status()).state === "running", 5 * 60_000, "pause 있는 start.bat 으로 켜기");
+        await managed.stop();
+        await waitFor(async () => (await managed.status()).state === "stopped", 60_000, "pause 있는 start.bat 이 끝나기");
+        expect(managed.getHistory().map((l) => l.text).join("\n")).not.toMatch(/강제 종료/);
+      }
+
       // 4) 폴더째 삭제
       await deleteServerFolder(server, managed, "e2e");
       expect(await fsp.stat(target).then(() => true, () => false)).toBe(false);
+
+      // CI 에서 로그인 없이 볼 수 있는 요약 (GitHub Actions 알림)
+      if (process.env.GITHUB_ACTIONS) {
+        const java = st.steps.find((s) => s.id === "java")?.note ?? "";
+        console.log(`::notice title=E2E ${systemInfo().osLabel} (${jdkDownload ? "앱 폴더 JDK" : "시스템 Java"})::만들기·켜기·끄기·삭제 통과 — ${java}${platform.id === "windows" && !jdkDownload ? " · pause 있는 start.bat 정상 종료" : ""}`);
+      }
       await fsp.rm(root, { recursive: true, force: true });
     },
     20 * 60_000,

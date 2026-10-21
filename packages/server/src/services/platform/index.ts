@@ -34,7 +34,8 @@ const SUPPORT: Record<OsId, { manage: "ok" | "wip"; create: boolean }> = {
   macos: { manage: "ok", create: true },
   // 1단계: Ubuntu CI 에서 실제 서버 만들기·켜기·끄기·삭제 E2E 로 확인
   linux: { manage: "ok", create: true },
-  windows: { manage: "wip", create: false },
+  // 2단계: Windows CI 에서 실제 서버 만들기·켜기·끄기·삭제(+ pause 있는 start.bat) E2E 로 확인
+  windows: { manage: "ok", create: true },
 };
 
 function osLabel(id: OsId | null): string {

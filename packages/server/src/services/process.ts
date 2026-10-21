@@ -10,6 +10,8 @@ import { readPropertiesFile, toRecord } from "./properties.js";
 import { rconOnce, stripColor, RconError } from "./rcon.js";
 
 const HISTORY_SIZE = 500;
+/** Windows pause 안내 (영어·한국어) */
+const PAUSE_PROMPT = /Press any key to continue|계속하려면 아무 키나 누르십시오/i;
 const STOP_GRACE_MS = 30_000;
 const KILL_GRACE_MS = 10_000;
 const EXTERNAL_CACHE_MS = 4_000;
@@ -122,7 +124,11 @@ export class ManagedServer extends EventEmitter {
         this.pushLine(source, line);
         this.inspect(line);
       });
-      child[source]!.on("data", (d: Buffer) => sp.push(d));
+      child[source]!.on("data", (d: Buffer) => {
+        sp.push(d);
+        // pause 안내는 줄바꿈 없이 나오므로 남은 조각도 본다
+        if (PAUSE_PROMPT.test(sp.pending())) this.child?.stdin?.end("\r\n");
+      });
       return sp;
     });
     child.on("error", (e) => this.pushLine("system", `프로세스 오류: ${e.message}`));
@@ -260,7 +266,7 @@ export class ManagedServer extends EventEmitter {
   /** 로그 줄에서 상태 변화를 읽어낸다 */
   private inspect(line: string) {
     // Windows start.bat 끝의 pause: java 가 끝났는데 cmd 가 키 입력을 기다리면 넘겨 준다
-    if (/Press any key to continue|계속하려면 아무 키나 누르십시오/i.test(line)) {
+    if (PAUSE_PROMPT.test(line)) {
       this.child?.stdin?.end("\r\n");
       return;
     }
