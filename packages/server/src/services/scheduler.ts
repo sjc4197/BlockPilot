@@ -3,6 +3,7 @@ import type { FastifyBaseLogger } from "fastify";
 import { getBackupSettings, listServers } from "../config/store.js";
 import { getManaged } from "./process.js";
 import { createBackup, pruneScheduled } from "./backups.js";
+import { emitServerEvent } from "./events.js";
 
 /**
  * 자동 백업 스케줄러. 1분마다 등록된 서버를 돌며 간격이 지난 서버를 백업한다.
@@ -70,6 +71,7 @@ export async function runScheduledBackup(serverId: string, dir: string, keep: nu
     s.lastRunAt = new Date().toISOString();
     s.lastError = undefined;
     log?.info({ server: serverId, file: b.file }, "자동 백업 완료");
+    emitServerEvent({ serverId, type: "backup", detail: `${b.file} (자동)` });
   } catch (e: any) {
     s.lastRunAt = new Date().toISOString();
     s.lastError = e?.message ?? String(e);

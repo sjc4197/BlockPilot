@@ -2,11 +2,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { DEFAULT_BACKUP_SETTINGS, type BackupSettings, type RegisteredServer } from "@blockpilot/shared";
+import { DEFAULT_AUTOMATION, DEFAULT_BACKUP_SETTINGS, type AutomationSettings, type BackupSettings, type RegisteredServer } from "@blockpilot/shared";
 import { notFound } from "../lib/errors.js";
 
 interface ServerSettings {
-  backup: BackupSettings;
+  backup?: BackupSettings;
+  /** 디스코드 알림·자동 재시작·예약 재시작. 웹훅 주소가 들어 있어 이 파일은 나만 읽기(600) */
+  automation?: Partial<AutomationSettings>;
 }
 
 interface ConfigFile {
@@ -85,6 +87,21 @@ export async function getBackupSettings(id: string): Promise<BackupSettings> {
 export async function setBackupSettings(id: string, backup: BackupSettings) {
   const cfg = await load();
   await save({ ...cfg, settings: { ...cfg.settings, [id]: { ...cfg.settings?.[id], backup } } });
+}
+
+export async function getAutomation(id: string): Promise<AutomationSettings> {
+  const a = (await load()).settings?.[id]?.automation ?? {};
+  const d = DEFAULT_AUTOMATION;
+  return {
+    discord: { ...d.discord, ...a.discord, events: { ...d.discord.events, ...a.discord?.events } },
+    autoRestart: { ...d.autoRestart, ...a.autoRestart },
+    scheduledRestart: { ...d.scheduledRestart, ...a.scheduledRestart },
+  };
+}
+
+export async function setAutomation(id: string, automation: AutomationSettings) {
+  const cfg = await load();
+  await save({ ...cfg, settings: { ...cfg.settings, [id]: { ...cfg.settings?.[id], automation } } });
 }
 
 // ---------- 인증 ----------

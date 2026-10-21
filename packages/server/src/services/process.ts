@@ -8,6 +8,7 @@ import { platform } from "./platform/index.js";
 import { detectServer } from "./serverInfo.js";
 import { readPropertiesFile, toRecord } from "./properties.js";
 import { rconOnce, stripColor, RconError } from "./rcon.js";
+import { emitServerEvent } from "./events.js";
 
 const HISTORY_SIZE = 500;
 /** Windows pause 안내 (영어·한국어) */
@@ -28,6 +29,8 @@ export class ManagedServer extends EventEmitter {
   private ready = false;
   private startedAt?: string;
   private stopping = false;
+  /** 레버·API·게임 안 /stop 처럼 일부러 끈 것인지. 아니면 꺼질 때 크래시로 본다 */
+  private intentionalStop = false;
   private players = new Set<string>();
   private splitters: LineSplitter[] = [];
   private externalCache: { at: number; status: ProcessStatus } | null = null;
@@ -104,6 +107,7 @@ export class ManagedServer extends EventEmitter {
 
     this.ready = false;
     this.stopping = false;
+    this.intentionalStop = false;
     this.players.clear();
     this.externalCache = null;
     this.startedAt = new Date().toISOString();
@@ -139,11 +143,16 @@ export class ManagedServer extends EventEmitter {
     child.on("exit", (code, signal) => {
       for (const sp of this.splitters) sp.flush();
       this.pushLine("system", `서버 프로세스 종료 (code=${code ?? "null"}${signal ? `, signal=${signal}` : ""})`);
+      const intentional = this.intentionalStop;
+      const startedAt = this.startedAt;
       this.child = null;
       this.ready = false;
       this.stopping = false;
+      this.intentionalStop = false;
       this.players.clear();
       void this.emitStatus();
+      if (intentional) emitServerEvent({ serverId: this.id, type: "stopped", online: 0 });
+      else this.onCrash(code, startedAt);
     });
     await this.emitStatus();
   }
@@ -162,6 +171,7 @@ export class ManagedServer extends EventEmitter {
     }
     if (this.stopping) return;
     this.stopping = true;
+    this.intentionalStop = true;
     await this.emitStatus();
     this.pushLine("system", "stop 명령 전송, 월드 저장을 기다리는 중...");
     this.writeStdin("stop");
@@ -284,24 +294,38 @@ export class ManagedServer extends EventEmitter {
     if (!this.ready && /\]: Done \(/.test(line)) {
       this.ready = true;
       void this.emitStatus();
+      emitServerEvent({ serverId: this.id, type: "started", online: 0 });
       return;
     }
     let m = line.match(/\]: (\S+) joined the game/);
     if (m) {
       this.players.add(m[1]);
       void this.emitStatus();
+      emitServerEvent({ serverId: this.id, type: "joined", player: m[1], online: this.players.size });
       return;
     }
     m = line.match(/\]: (\S+) left the game/);
     if (m) {
       this.players.delete(m[1]);
       void this.emitStatus();
+      emitServerEvent({ serverId: this.id, type: "left", player: m[1], online: this.players.size });
       return;
     }
-    if (/\]: Stopping the server/.test(line) && !this.stopping) {
-      this.stopping = true;
-      void this.emitStatus();
+    // 게임 안에서 /stop 한 것도 일부러 끈 것
+    if (/\]: Stopping the server/.test(line)) {
+      this.intentionalStop = true;
+      if (!this.stopping) {
+        this.stopping = true;
+        void this.emitStatus();
+      }
     }
+  }
+
+  /** 일부러 끈 게 아닌데 꺼졌다: 크래시 사건 (원인 요약은 crash.ts) */
+  private onCrash(code: number | null, startedAt?: string) {
+    const uptimeSeconds = startedAt ? Math.round((Date.now() - new Date(startedAt).getTime()) / 1000) : undefined;
+    this.pushLine("system", "서버가 예기치 않게 꺼졌어요.");
+    emitServerEvent({ serverId: this.id, type: "crashed", online: 0, detail: `code=${code ?? "null"}${uptimeSeconds !== undefined ? ` uptime=${uptimeSeconds}s` : ""}` });
   }
 
   private pushLine(source: ConsoleLine["source"], text: string) {

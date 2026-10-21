@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import path from "node:path";
 import { BackupSettings } from "@blockpilot/shared";
 import { createBackup, deleteBackup, listBackups, restoreBackup, BACKUP_DIR, worldDirs } from "../services/backups.js";
+import { emitServerEvent } from "../services/events.js";
 import { backupStatus } from "../services/scheduler.js";
 import { getBackupSettings, setBackupSettings } from "../config/store.js";
 import { loadContext } from "../lib/context.js";
@@ -21,6 +22,7 @@ export async function backupsRoutes(app: FastifyInstance) {
     const { label } = (req.body ?? {}) as { label?: string };
     const { dir, managed } = await loadContext(id);
     const b = await managed.withSavesPaused(() => createBackup(dir, { label }));
+    emitServerEvent({ serverId: id, type: "backup", detail: b.file });
     reply.code(201);
     return b;
   });

@@ -392,3 +392,98 @@ export interface DeleteServerResult {
   /** 등록 경로가 심볼릭 링크였다면 그 링크도 지움 */
   removedLink?: string;
 }
+
+// ---------- 서버 사건 · 알림 · 자동화 ----------
+
+/** 서버에서 일어난 일. 디스코드 알림·자동 재시작·통계가 모두 이것을 듣는다 */
+export type ServerEventType = "started" | "stopped" | "crashed" | "auto-restart" | "auto-restart-failed" | "scheduled-restart" | "joined" | "left" | "backup";
+
+export interface CrashSuspect {
+  id?: string;
+  name: string;
+  file?: string;
+}
+
+/** 크래시 원인 요약 */
+export interface CrashSummary {
+  kind: "mod" | "incompatible" | "memory" | "port" | "java" | "unknown";
+  /** 한 줄 설명 (예: "Naturalist 모드에서 오류가 났어요") */
+  title: string;
+  /** 해결 방법 */
+  hint: string;
+  suspects: CrashSuspect[];
+  /** crash-reports/ 안의 파일 이름 */
+  reportFile?: string;
+  at: string;
+  exitCode?: number | null;
+  uptimeSeconds?: number;
+}
+
+export interface ServerEvent {
+  serverId: string;
+  type: ServerEventType;
+  at: string;
+  player?: string;
+  /** 사건 직후 접속자 수 */
+  online?: number;
+  crash?: CrashSummary;
+  /** 사건마다 덧붙이는 짧은 설명 (백업 파일 이름, 재시작까지 남은 초 등) */
+  detail?: string;
+}
+
+export const DISCORD_EVENTS = ["started", "stopped", "crashed", "restarted", "joined", "left", "backup"] as const;
+export type DiscordEventKey = (typeof DISCORD_EVENTS)[number];
+export const DISCORD_EVENT_LABEL: Record<DiscordEventKey, string> = {
+  started: "서버 켜짐",
+  stopped: "서버 꺼짐",
+  crashed: "크래시",
+  restarted: "자동·예약 재시작",
+  joined: "입장",
+  left: "퇴장",
+  backup: "백업 완료",
+};
+
+const DiscordEvents = z.object(Object.fromEntries(DISCORD_EVENTS.map((k) => [k, z.boolean()])) as Record<DiscordEventKey, z.ZodBoolean>);
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "시각은 05:00 처럼 써 주세요.");
+
+export const AutomationSettings = z.object({
+  discord: z.object({
+    /** 비밀값. API 로는 돌려주지 않는다 */
+    webhookUrl: z.string(),
+    events: DiscordEvents,
+  }),
+  autoRestart: z.object({
+    enabled: z.boolean(),
+    delaySeconds: z.number().int().min(5).max(600),
+  }),
+  scheduledRestart: z.object({
+    enabled: z.boolean(),
+    time: HHMM,
+    /** 0=일요일 … 6=토요일 */
+    days: z.array(z.number().int().min(0).max(6)).min(1, "요일을 하나 이상 골라 주세요."),
+    onlyWhenEmpty: z.boolean(),
+  }),
+});
+export type AutomationSettings = z.infer<typeof AutomationSettings>;
+
+export const DEFAULT_AUTOMATION: AutomationSettings = {
+  discord: { webhookUrl: "", events: { started: true, stopped: true, crashed: true, restarted: true, joined: true, left: true, backup: false } },
+  autoRestart: { enabled: false, delaySeconds: 30 },
+  scheduledRestart: { enabled: false, time: "05:00", days: [0, 1, 2, 3, 4, 5, 6], onlyWhenEmpty: true },
+};
+
+/** 화면에 돌려주는 모양: 웹훅 주소 대신 설정 여부와 끝 네 글자만 */
+export interface AutomationView {
+  discord: { webhookSet: boolean; webhookHint?: string; events: AutomationSettings["discord"]["events"]; lastSentAt?: string; lastError?: string };
+  autoRestart: AutomationSettings["autoRestart"] & { recentAttempts: number; gaveUp: boolean };
+  scheduledRestart: AutomationSettings["scheduledRestart"] & { nextAt?: string; skipNext: boolean };
+  lastCrash?: CrashSummary;
+}
+
+/** 일부만 바꾸기. webhookUrl 은 "" 이면 지우고, 없으면 그대로 둔다 */
+export const AutomationUpdate = z.object({
+  discord: z.object({ webhookUrl: z.string().optional(), events: DiscordEvents.partial().optional() }).optional(),
+  autoRestart: AutomationSettings.shape.autoRestart.partial().optional(),
+  scheduledRestart: AutomationSettings.shape.scheduledRestart.partial().optional(),
+});
+export type AutomationUpdate = z.infer<typeof AutomationUpdate>;
