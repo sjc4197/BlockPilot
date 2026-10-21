@@ -5,6 +5,7 @@ import { useAutomation, useSendCommand, useServer, useSkipScheduledRestart } fro
 import { fmtSchedule } from "../components/AutomationPanel";
 import { CrashBanner } from "../components/CrashBanner";
 import { ConnectCard } from "../components/ConnectCard";
+import { PerfCard } from "../components/PerfCard";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
 import { Lamp, SignalBar, type LampState } from "../lib/pixel";
@@ -128,7 +129,10 @@ export default function Dashboard() {
         </section>
       </div>
 
-      <ConnectCard serverId={id} state={state} />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <PerfCard serverId={id} />
+        <ConnectCard serverId={id} state={state} />
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-5">
         {/* 접속자 */}

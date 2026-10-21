@@ -30,6 +30,7 @@ import type {
   NetworkInfo,
   PublicIpResult,
   ReachabilityResult,
+  PerfInfo,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -347,3 +348,6 @@ export const usePublicIp = () => useMutation({ mutationFn: () => api<PublicIpRes
 
 /** 버튼을 눌렀을 때만 외부 서비스(mcsrvstat.us)가 밖에서 접속해 본다 */
 export const useReachCheck = (id: string) => useMutation({ mutationFn: (ip: string) => api<ReachabilityResult>(`/api/servers/${id}/network/check`, { method: "POST", json: { ip } }) });
+
+/** 대시보드를 보는 동안만 5초마다 (서버도 조회가 있을 때만 측정한다) */
+export const usePerf = (id: string) => useQuery({ queryKey: ["server", id, "perf"], queryFn: () => api<PerfInfo>(`/api/servers/${id}/perf`), refetchInterval: 5000 });

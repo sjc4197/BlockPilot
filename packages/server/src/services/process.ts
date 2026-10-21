@@ -17,6 +17,8 @@ const PAUSE_PROMPT = /Press any key to continue|계속하려면 아무 키나 �
 const STOP_GRACE_MS = 30_000;
 const KILL_GRACE_MS = 10_000;
 const EXTERNAL_CACHE_MS = 4_000;
+/** /tick query 응답 줄 (콘솔 화면에는 숨긴다) */
+const TICK_LINE = /The game is running|Target tick rate|Average time per tick|Percentiles|Unknown or incomplete command|Incorrect argument for command|<--\[HERE\]|tick query/;
 
 /**
  * 서버 하나의 프로세스와 콘솔을 관리한다.
@@ -35,6 +37,8 @@ export class ManagedServer extends EventEmitter {
   private players = new Set<string>();
   private splitters: LineSplitter[] = [];
   private externalCache: { at: number; status: ProcessStatus } | null = null;
+  /** 성능 측정용 명령의 응답을 콘솔 화면에서 숨기는 시간 */
+  private silentUntil = 0;
 
   constructor(
     public readonly id: string,
@@ -42,6 +46,47 @@ export class ManagedServer extends EventEmitter {
   ) {
     super();
     this.setMaxListeners(100);
+  }
+
+  /** 시작 스크립트(또는 java) 프로세스 번호 */
+  childPid() {
+    return this.child?.pid;
+  }
+
+  /**
+   * 한 틱에 걸리는 평균 시간(ms)을 잰다 (/tick query, 1.20.3 이상). 응답은 콘솔 화면에 남기지 않는다.
+   * 지원하지 않는 버전이면 "unsupported", 응답이 없으면 null.
+   */
+  async probeTick(): Promise<number | "unsupported" | null> {
+    const parse = (text: string) => {
+      const m = text.match(/Average time per tick: ([\d.]+)ms/);
+      if (m) return Number(m[1]);
+      if (/Unknown or incomplete command|Incorrect argument for command/.test(text)) return "unsupported" as const;
+      return null;
+    };
+    if (!this.child) {
+      const st = await this.status();
+      if (st.state !== "external" || st.rcon !== "connected") return null;
+      const cfg = rconConfig(await this.props());
+      if (!cfg) return null;
+      return parse(stripColor(await rconOnce(cfg.host, cfg.port, cfg.password, "tick query").catch(() => "")));
+    }
+    if (!this.ready) return null;
+    this.silentUntil = Date.now() + 3000;
+    return new Promise((resolve) => {
+      const done = (v: number | "unsupported" | null) => {
+        clearTimeout(timer);
+        this.off("probe", onLine);
+        resolve(v);
+      };
+      const onLine = (text: string) => {
+        const v = parse(text);
+        if (v !== null) done(v);
+      };
+      const timer = setTimeout(() => done(null), 3000);
+      this.on("probe", onLine);
+      this.writeStdin("tick query");
+    });
   }
 
   getHistory() {
@@ -336,6 +381,10 @@ export class ManagedServer extends EventEmitter {
   }
 
   private pushLine(source: ConsoleLine["source"], text: string) {
+    if (source !== "system" && Date.now() < this.silentUntil && TICK_LINE.test(text)) {
+      this.emit("probe", text);
+      return;
+    }
     const line: ConsoleLine = { ts: Date.now(), text, source };
     this.history.push(line);
     if (this.history.length > HISTORY_SIZE) this.history.splice(0, this.history.length - HISTORY_SIZE);

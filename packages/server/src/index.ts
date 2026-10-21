@@ -26,6 +26,7 @@ import { networkRoutes } from "./routes/network.js";
 import { startDiscordNotifier } from "./services/discord.js";
 import { startAutoRestart } from "./services/autoRestart.js";
 import { startScheduledRestarts, stopScheduledRestarts } from "./services/scheduledRestart.js";
+import { startPerfSampler, stopPerfSampler } from "./services/perf.js";
 import { CreateError } from "./services/create/errors.js";
 import { shutdownAll } from "./services/process.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
@@ -91,6 +92,7 @@ startScheduler(app.log);
 startDiscordNotifier();
 startAutoRestart();
 startScheduledRestarts();
+startPerfSampler();
 // 지난번에 만들기 도중 꺼졌다면 그때 만들던 파일을 정리
 await recoverInterruptedJobs(app.log);
 
@@ -98,6 +100,7 @@ const stop = async () => {
   app.log.info("종료 중: 실행 중인 서버를 정리합니다");
   stopScheduler();
   stopScheduledRestarts();
+  stopPerfSampler();
   // 만들던 서버가 있으면 취소하고 이번에 만든 파일을 지운 뒤 끈다
   await cancelAllJobs();
   await shutdownAll();

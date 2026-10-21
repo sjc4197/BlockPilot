@@ -1,12 +1,20 @@
 import type { FastifyInstance } from "fastify";
 import type { ConsoleLine, ConsoleServerMessage, ConsoleClientMessage, ProcessStatus } from "@blockpilot/shared";
 import { loadContext } from "../lib/context.js";
+import { perfInfo } from "../services/perf.js";
 
 export async function processRoutes(app: FastifyInstance) {
   app.get("/api/servers/:id/process", async (req): Promise<ProcessStatus> => {
     const { id } = req.params as { id: string };
     const { managed } = await loadContext(id);
     return managed.status();
+  });
+
+  // 성능: 조회하는 동안만 측정한다
+  app.get("/api/servers/:id/perf", async (req) => {
+    const { id } = req.params as { id: string };
+    const { dir } = await loadContext(id);
+    return perfInfo(id, dir);
   });
 
   app.post("/api/servers/:id/process/start", async (req) => {

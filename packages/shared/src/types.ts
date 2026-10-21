@@ -517,3 +517,24 @@ export interface ReachabilityResult {
   /** 검사 서비스가 결과를 잠깐 저장해 두므로 방금 바꾼 설정은 늦게 보일 수 있음 */
   cachedNote: string;
 }
+
+// ---------- 성능 모니터 ----------
+
+export interface PerfSample {
+  t: number;
+  /** 서버 프로세스(자식 포함)가 실제로 쓰는 메모리 MB */
+  memMb?: number;
+  /** 한 틱에 걸린 평균 시간 ms (/tick query, 50ms 가 한계) */
+  mspt?: number;
+}
+
+export interface PerfInfo {
+  /** BlockPilot 이 켠 서버(또는 RCON 연결된 외부 서버)만 측정 */
+  measuring: boolean;
+  /** 시작 스크립트의 -Xmx (MB) */
+  maxMemMb?: number;
+  samples: PerfSample[];
+  tick: "ok" | "unsupported" | "unknown";
+  lag: { lastHour: number; worstMs?: number; lastAt?: string };
+  advice?: string;
+}
