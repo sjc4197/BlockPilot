@@ -27,6 +27,9 @@ import type {
   SystemInfo,
   AutomationView,
   AutomationUpdate,
+  NetworkInfo,
+  PublicIpResult,
+  ReachabilityResult,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -334,3 +337,13 @@ export function useSkipScheduledRestart(id: string) {
     onSuccess: (v) => qc.setQueryData(keys.automation(id), v),
   });
 }
+
+// ---------- 친구 접속 도우미 ----------
+
+export const useNetwork = (id: string) => useQuery({ queryKey: ["server", id, "network"], queryFn: () => api<NetworkInfo>(`/api/servers/${id}/network`), staleTime: 60_000 });
+
+/** 버튼을 눌렀을 때만 외부 서비스(ipify)에 묻는다 */
+export const usePublicIp = () => useMutation({ mutationFn: () => api<PublicIpResult>("/api/network/public-ip", { method: "POST" }) });
+
+/** 버튼을 눌렀을 때만 외부 서비스(mcsrvstat.us)가 밖에서 접속해 본다 */
+export const useReachCheck = (id: string) => useMutation({ mutationFn: (ip: string) => api<ReachabilityResult>(`/api/servers/${id}/network/check`, { method: "POST", json: { ip } }) });

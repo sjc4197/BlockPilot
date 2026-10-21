@@ -4,6 +4,7 @@ import { Activity, Boxes, Coffee, Copy, Gamepad2, Globe, Layers, Swords, Users, 
 import { useAutomation, useSendCommand, useServer, useSkipScheduledRestart } from "../api/hooks";
 import { fmtSchedule } from "../components/AutomationPanel";
 import { CrashBanner } from "../components/CrashBanner";
+import { ConnectCard } from "../components/ConnectCard";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
 import { Lamp, SignalBar, type LampState } from "../lib/pixel";
@@ -126,6 +127,8 @@ export default function Dashboard() {
           <Stat k={7} place={place} icon={Activity} label="MOTD" value={s.properties.motd || "(없음)"} small />
         </section>
       </div>
+
+      <ConnectCard serverId={id} state={state} />
 
       <div className="grid gap-5 lg:grid-cols-5">
         {/* 접속자 */}

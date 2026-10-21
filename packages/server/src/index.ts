@@ -22,6 +22,7 @@ import { backupsRoutes } from "./routes/backups.js";
 import { createRoutes } from "./routes/create.js";
 import { fsRoutes } from "./routes/fs.js";
 import { automationRoutes } from "./routes/automation.js";
+import { networkRoutes } from "./routes/network.js";
 import { startDiscordNotifier } from "./services/discord.js";
 import { startAutoRestart } from "./services/autoRestart.js";
 import { startScheduledRestarts, stopScheduledRestarts } from "./services/scheduledRestart.js";
@@ -71,6 +72,7 @@ await app.register(backupsRoutes);
 await app.register(createRoutes);
 await app.register(fsRoutes);
 await app.register(automationRoutes);
+await app.register(networkRoutes);
 
 // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist)
 const here = path.dirname(fileURLToPath(import.meta.url));

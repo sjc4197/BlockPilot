@@ -487,3 +487,33 @@ export const AutomationUpdate = z.object({
   scheduledRestart: AutomationSettings.shape.scheduledRestart.partial().optional(),
 });
 export type AutomationUpdate = z.infer<typeof AutomationUpdate>;
+
+// ---------- 친구 접속 도우미 ----------
+
+export interface LocalAddress {
+  /** 네트워크 장치 이름 (en0, Wi-Fi 등) */
+  iface: string;
+  address: string;
+  kind: "lan" | "vpn" | "other";
+}
+
+export interface NetworkInfo {
+  port: number;
+  /** server.properties 의 server-ip (비어 있으면 모든 주소에서 받음) */
+  serverIp?: string;
+  local: LocalAddress[];
+}
+
+export interface PublicIpResult {
+  ip: string;
+}
+
+export interface ReachabilityResult {
+  ip: string;
+  port: number;
+  reachable: boolean;
+  version?: string;
+  players?: { online: number; max: number };
+  /** 검사 서비스가 결과를 잠깐 저장해 두므로 방금 바꾼 설정은 늦게 보일 수 있음 */
+  cachedNote: string;
+}
