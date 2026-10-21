@@ -5,6 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+defaults:
+  run:
+    # Windows 에서도 같은 스크립트를 쓰도록 bash (러너에 Git Bash 가 있음)
+    shell: bash
+
 jobs:
   test:
     name: ${{ matrix.os }}
@@ -15,8 +20,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -24,14 +29,29 @@ jobs:
       - name: 타입 검사
         run: npm run typecheck
       - name: 단위 테스트
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
       - name: 빌드
         run: npm run build
       # 새 서버 만들기 → 켜기 → 끄기 → 삭제. 그 OS 에서 새 서버 만들기를 켠 단계부터 실제로 돈다 (아니면 건너뜀).
       # 테스트용 일회성 서버를 띄우려면 eula=true 가 필요해서, 이 저장소의 CI 를 돌리는 사람이 Minecraft EULA
       # (https://aka.ms/MinecraftEULA) 에 동의한다는 뜻으로 아래 값을 켠다. 앱의 실제 화면에서는 여전히 사용자가 직접 체크해야 한다.
       - name: 실제 서버 만들기 E2E
-        run: npm run test:e2e --workspace=packages/server
+        run: |
+          set -o pipefail
+          npm run test:e2e --workspace=packages/server 2>&1 | tee e2e-output.log
         env:
           BLOCKPILOT_E2E: "1"
           BLOCKPILOT_E2E_ACCEPT_EULA: "1"
+          # Linux·Windows 에서는 JDK 를 앱 폴더에 받아 쓰는 경로도 한 번 더 확인
+          BLOCKPILOT_E2E_JDK_DOWNLOAD: ${{ matrix.os != 'macos-latest' && '1' || '' }}
+      # 실패하면 출력 마지막 부분을 주석(annotation)으로 남긴다 — 로그인 없이도 실패 원인을 볼 수 있게
+      - name: 실패 내용 요약
+        if: failure()
+        run: |
+          for f in test-output.log e2e-output.log; do
+            [ -f "$f" ] || continue
+            body=$(tail -n 80 "$f" | sed -e 's/%/%25/g' -e 's/\r//g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=${{ matrix.os }} ${f}::${body}"
+          done

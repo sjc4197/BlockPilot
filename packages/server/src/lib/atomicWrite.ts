@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { retryFs } from "./retry.js";
 
 const BACKUP_DIR = ".blockpilot-backup";
 const MAX_BACKUPS_PER_FILE = 10;
@@ -12,7 +13,7 @@ export async function writeFileAtomic(filePath: string, content: string): Promis
   await backupIfExists(filePath);
   const tmp = `${filePath}.${process.pid}.tmp`;
   await fs.writeFile(tmp, content, "utf8");
-  await fs.rename(tmp, filePath);
+  await retryFs(() => fs.rename(tmp, filePath));
 }
 
 async function backupIfExists(filePath: string) {

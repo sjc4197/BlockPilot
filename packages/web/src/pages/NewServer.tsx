@@ -12,9 +12,10 @@ import { Badge, Button, Callout, Card, ConfirmButton, Field, Input, PageHeader, 
 const MEMORY_STEPS_MB = [1024, 1536, 2048, 3072, 4096, 5120, 6144, 8192, 10240, 12288, 16384];
 const gb = (mb: number) => `${mb / 1024}GB`;
 
-/** 서버 이름 → 폴더 이름 */
+/** 서버 이름 → 폴더 이름. 어느 OS 에서도 쓸 수 있게: 공백은 -, 끝의 점 제거, Windows 예약 이름(CON 등) 피하기 */
 function folderNameOf(name: string) {
-  const s = name.trim().replace(/\s+/g, "-").replace(/[^A-Za-z0-9가-힣_.-]/g, "");
+  let s = name.trim().replace(/\s+/g, "-").replace(/[^A-Za-z0-9가-힣_.-]/g, "").replace(/[.]+$/, "");
+  if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i.test(s)) s = `${s}-server`;
   return s || "my-server";
 }
 
@@ -294,6 +295,8 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
         </label>
       </Card>
 
+      <OsNotice />
+
       {err && (
         <Callout tone="danger" title={err.message}>
           {err.hint}
@@ -322,6 +325,27 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
       )}
     </div>
   );
+}
+
+/** OS 마다 처음 만들 때 알아 두면 좋은 것 */
+function OsNotice() {
+  const { data: sys } = useSystem();
+  if (sys?.os === "windows") {
+    return (
+      <Callout tone="warning" title="Windows 방화벽">
+        최초 실행 때 "Windows 보안 경고" 창이 뜨면 <b>액세스 허용</b>을 눌러 주세요. 허용해야 친구들이 접속할 수 있어요.
+      </Callout>
+    );
+  }
+  if (sys?.os === "linux") {
+    return (
+      <Callout tone="info" title="Linux 서버라면">
+        방화벽(ufw)을 쓰고 있으면 <code className="font-mono">sudo ufw allow 25565/tcp</code> 처럼 서버 포트를 열어 주세요. 화면 없는 원격 서버(VPS)라면 BlockPilot 을{" "}
+        <code className="font-mono">BLOCKPILOT_HOST=0.0.0.0 npm start</code> 로 켜고, 터미널에 나온 접속 토큰으로 다른 PC 브라우저에서 들어오면 돼요.
+      </Callout>
+    );
+  }
+  return null;
 }
 
 // ---------- 진행 화면 ----------

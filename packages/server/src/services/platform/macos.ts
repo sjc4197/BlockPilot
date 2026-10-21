@@ -28,8 +28,9 @@ export const macos: Platform = {
   startScriptFor: posixStartScript,
   pinnedJava: posixPinnedJava,
 
-  pathKey: (p) => path.resolve(p),
-  isForbidden: (p) => FORBIDDEN.includes(path.resolve(p)),
+  // POSIX 경로 규칙은 어느 OS 에서 평가해도 POSIX 로 (테스트·원격 경로 대비)
+  pathKey: (p) => path.posix.resolve(p),
+  isForbidden: (p) => FORBIDDEN.includes(path.posix.resolve(p)),
   ignorable: new Set([".DS_Store", "._.DS_Store", ".localized"]),
   isHiddenEntry: posixHidden,
   async folderShortcuts() {

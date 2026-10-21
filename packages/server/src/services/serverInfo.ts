@@ -99,7 +99,9 @@ export async function detectServer(dir: string): Promise<DetectedServer> {
   }
 
   const eula = await fs.readFile(path.join(dir, "eula.txt"), "utf8").catch(() => "");
-  const startScript = platform.startScripts.find(has);
+  // 시작 스크립트 이름은 대소문자 무시로 찾는다 (Windows 는 Start.bat 도 같은 파일)
+  const findName = (n: string) => files.find((f) => f.toLowerCase() === n.toLowerCase());
+  const startScript = platform.startScripts.map(findName).find(Boolean);
   return {
     loader,
     loaderVersion,
@@ -107,7 +109,7 @@ export async function detectServer(dir: string): Promise<DetectedServer> {
     launchJar,
     hasStartScript: !!startScript,
     startScript,
-    foreignScript: startScript ? undefined : platform.foreignScripts.find(has),
+    foreignScript: startScript ? undefined : platform.foreignScripts.map(findName).find(Boolean),
     eulaAccepted: /^\s*eula\s*=\s*true/im.test(eula),
   };
 }

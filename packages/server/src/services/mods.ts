@@ -6,6 +6,7 @@ import type { ModInfo, ModDependency } from "@blockpilot/shared";
 import { readZipEntries, readZipEntriesFromBuffer } from "../lib/zip.js";
 import { assertPlainFilename } from "../lib/safePath.js";
 import { notFound, badRequest } from "../lib/errors.js";
+import { retryFs } from "../lib/retry.js";
 
 const DISABLED_SUFFIX = ".disabled";
 
@@ -96,7 +97,7 @@ export async function setModEnabled(serverDir: string, file: string, enabled: bo
   const to = path.join(modsDir, enabled ? base : base + DISABLED_SUFFIX);
   if (from === to) return path.basename(to);
   try {
-    await fs.rename(from, to);
+    await retryFs(() => fs.rename(from, to));
   } catch (e: any) {
     if (e.code === "ENOENT") throw notFound("모드 파일을 찾을 수 없습니다.");
     throw e;

@@ -97,13 +97,13 @@ export async function cleanupTarget(j: { target: string; targetCreated: boolean;
   for (const name of entries) {
     if (keep.has(name)) continue;
     // readdir 이름에는 경로 구분자가 없으므로 항상 target 바로 아래
-    await fsp.rm(path.join(target, name), { recursive: true, force: true });
+    await fsp.rm(path.join(target, name), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     removed.push(name);
   }
   if (j.targetCreated) {
     const left = await fsp.readdir(target).catch(() => [] as string[]);
     if (left.every((n) => IGNORABLE.has(n))) {
-      await fsp.rm(target, { recursive: true, force: true });
+      await fsp.rm(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
       removed.push(`(폴더) ${target}`);
     }
   }

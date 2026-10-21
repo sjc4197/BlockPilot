@@ -58,7 +58,7 @@ export async function deleteServerFolder(server: RegisteredServer, managed: Mana
   }
 
   try {
-    await fsp.rm(real, { recursive: true, force: false, maxRetries: 2 });
+    await fsp.rm(real, { recursive: true, force: false, maxRetries: 5, retryDelay: 200 });
   } catch (e) {
     const stillThere = await fsp.stat(real).then(() => true, () => false);
     const code = (e as { code?: string }).code;

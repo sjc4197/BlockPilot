@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { CreateError, toCreateError } from "./errors.js";
+import { retryFs } from "../../lib/retry.js";
 
 export type HashAlgo = "sha1" | "sha256";
 
@@ -90,7 +91,7 @@ async function downloadOnce(o: DownloadOptions) {
         `${o.hash.algo} 기대값 ${o.hash.expected}\n${o.hash.algo} 실제값 ${digest}\n${o.url}`,
       );
     }
-    await fsp.rename(part, o.dest);
+    await retryFs(() => fsp.rename(part, o.dest));
     return { bytes: done, digest };
   } catch (e) {
     await fsp.rm(part, { force: true });

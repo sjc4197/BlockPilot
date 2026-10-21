@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { listServers } from "../../src/config/store.js";
 import { CreateJob } from "../../src/services/create/job.js";
-import { createPipeline } from "../../src/services/create/pipeline.js";
+import { createPipeline, defaultDeps } from "../../src/services/create/pipeline.js";
 import { listLoaders } from "../../src/services/create/sources.js";
 import { systemInfo } from "../../src/services/platform/index.js";
 import { getManaged } from "../../src/services/process.js";
@@ -30,12 +30,19 @@ async function waitFor(check: () => Promise<boolean>, ms: number, what: string) 
   throw new Error(`시간 초과: ${what}`);
 }
 
+/**
+ * jdkDownload=true 면 시스템 Java 를 못 찾은 것처럼 해서, JDK 를 앱 폴더에 받아 쓰는 경로까지 확인한다.
+ * (제품 코드는 그대로, 파이프라인에 넘기는 Java 찾기 함수만 바꿈)
+ */
+const cases = [{ name: "시스템 Java", jdkDownload: false }];
+if (process.env.BLOCKPILOT_E2E_JDK_DOWNLOAD === "1") cases.push({ name: "JDK 를 앱 폴더에 받아서", jdkDownload: true });
+
 describe.runIf(enabled)(`E2E (${systemInfo().osLabel}): 새 서버 만들기 → 켜기 → 끄기 → 삭제`, () => {
-  it(
-    "works end to end",
-    async () => {
+  it.each(cases)(
+    "$name",
+    async ({ jdkDownload }) => {
       const root = await fsp.mkdtemp(path.join(os.tmpdir(), "bp-e2e-"));
-      const target = path.join(root, "e2e-server");
+      const target = path.join(root, jdkDownload ? "e2e-jdk" : "e2e-server");
       const loader = (await listLoaders(MC)).find((l) => l.stable)!.version;
 
       // 1) 만들기
@@ -48,7 +55,7 @@ describe.runIf(enabled)(`E2E (${systemInfo().osLabel}): 새 서버 만들기 →
         properties: { "server-port": PORT, "max-players": "2" },
         eulaAccepted: true,
       });
-      await job.run(createPipeline());
+      await job.run(createPipeline(jdkDownload ? { ...defaultDeps, findSystemJava: async () => null, findCachedRuntime: async () => null } : defaultDeps));
       const st = job.status();
       console.log(st.steps.map((s) => `[${s.state}] ${s.label}${s.note ? ` — ${s.note}` : ""}`).join("\n"));
       if (st.state !== "succeeded") console.log(st.log.slice(-40).join("\n"));
