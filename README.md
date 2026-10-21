@@ -17,6 +17,7 @@
   <img alt="React" src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black">
   <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white">
   <img alt="License MIT" src="https://img.shields.io/badge/License-MIT-green">
+  <a href="https://github.com/sjc4197/BlockPilot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sjc4197/BlockPilot/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 <p align="center">
@@ -37,7 +38,7 @@
 
 | 화면 | 할 수 있는 것 |
 |---|---|
-| **새 서버 만들기** | 빈 폴더만 고르면 Fabric 서버를 처음부터 구축. 정식 버전·로더 선택, 필요한 Java 를 앱 폴더에 자동 준비, 모든 다운로드 해시 검증, 최초 실행까지 마치고 목록에 등록 (macOS) |
+| **새 서버 만들기** | 빈 폴더만 고르면 Fabric 서버를 처음부터 구축. 정식 버전·로더 선택, 필요한 Java 를 앱 폴더에 자동 준비, 모든 다운로드 해시 검증, 최초 실행까지 마치고 목록에 등록 |
 | **대시보드** | 로더·버전·접속자·모드 수 요약, 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔 |
 | **서버 설정** | `server.properties`를 게임플레이 / 월드 / 플레이어 / 네트워크 / 성능 탭의 폼으로 편집. 그 외 키는 고급 탭에서 raw 편집. 주석과 키 순서 보존. 맨 아래 **서버 관리**에서 목록 등록 해제(파일 유지) 또는 **서버 삭제**(폴더째 영구 삭제) |
 | **플레이어** | 화이트리스트 · OP · 밴(플레이어/IP). 닉네임만 입력하면 Mojang API로 UUID 자동 조회 |
@@ -53,10 +54,12 @@
 
 | | macOS | Linux | Windows |
 |---|---|---|---|
-| 기존 서버 연결·관리 | ✅ 지원 | 🚧 준비 중 | 🚧 준비 중 |
-| 새 서버 만들기 (Fabric) | ✅ 지원 (Apple Silicon · Intel) | 🚧 준비 중 | 🚧 준비 중 |
+| 기존 서버 연결·관리 | ✅ | ✅ | ✅ |
+| 새 서버 만들기 (Fabric) | ✅ Apple Silicon · Intel | ✅ x64 · ARM64 (Ubuntu·Debian·Fedora 등, Alpine) | ✅ Windows 10·11, x64 · ARM64 |
+| 서버 시작 스크립트 | `start.sh` / `run.sh` | `start.sh` / `run.sh` | `start.bat` / `run.bat` (끝의 `pause` 처리) |
 
-지금은 macOS 에서만 테스트하고 지원해요. Linux·Windows 는 확장으로 추가할 예정이에요.
+OS 는 고르지 않아요. BlockPilot 이 켜질 때 돌고 있는 컴퓨터를 자동으로 알아보고, 첫 화면 아래에 "이 컴퓨터: OS · CPU" 로 보여 줘요.
+push 할 때마다 GitHub Actions 가 macOS·Ubuntu·Windows 에서 단위 테스트와 **실제 서버 만들기 → 켜기 → 끄기 → 삭제** 를 돌려요.
 
 ## 스크린샷
 
@@ -83,8 +86,8 @@
 
 ### 요구 사항
 
-- **macOS**
-- **Node.js 20 이상**
+- **macOS · Linux · Windows** 중 하나
+- **Node.js 20 이상** ([nodejs.org](https://nodejs.org) 에서 LTS 설치)
 - 기존 서버를 연결할 때: 그 서버 폴더와 서버를 돌릴 Java
 - 새 서버를 만들 때: 빈 폴더만 있으면 돼요. Java 가 없으면 BlockPilot 이 앱 폴더에 받아서 써요
 
@@ -100,17 +103,20 @@ npm start
 
 브라우저에서 **http://127.0.0.1:4800** 을 엽니다.
 
+- **Windows** — PowerShell 이나 명령 프롬프트에서 위 명령을 그대로 쓰면 돼요. 서버를 처음 켤 때 "Windows 보안 경고(방화벽)" 창이 뜨면 **액세스 허용**을 눌러야 친구들이 접속할 수 있어요.
+- **Linux** — 방화벽(ufw)을 쓰면 서버 포트를 열어 주세요 (`sudo ufw allow 25565/tcp`). 화면 없는 원격 서버라면 아래 "외부에서 접속하기"를 참고하세요.
+
 ### 사용법
 
-1. **서버 등록** — 첫 화면에서 서버 폴더의 절대 경로를 입력합니다. (예: `/Users/me/minecraft/servers/survival`) BlockPilot이 마인크래프트 서버 폴더인지 확인하고 로더·버전을 감지합니다.
-2. **시작** — 대시보드의 ▶ 시작 버튼. 폴더에 `start.sh` / `run.sh` 가 있으면 **그 스크립트를 그대로 실행**하므로 메모리 옵션(`-Xmx` 등)은 스크립트에서 관리하면 됩니다. 스크립트가 없으면 감지된 서버 jar를 `java -Xms2G -Xmx4G -jar … nogui` 로 띄웁니다.
+1. **서버 등록** — 첫 화면에서 서버 폴더의 절대 경로를 입력합니다. (예: `/Users/me/minecraft/survival`, `C:\Minecraft\survival`) BlockPilot이 마인크래프트 서버 폴더인지 확인하고 로더·버전을 감지합니다.
+2. **시작** — 대시보드의 ▶ 시작 버튼. 폴더에 그 OS 의 시작 스크립트(`start.sh`·`run.sh` / Windows 는 `start.bat`·`run.bat`)가 있으면 **그 스크립트를 그대로 실행**하므로 메모리 옵션(`-Xmx` 등)은 스크립트에서 관리하면 됩니다. 스크립트가 없으면 감지된 서버 jar를 `java -Xms2G -Xmx4G -jar … nogui` 로 띄웁니다.
 3. **설정 변경** — 서버 설정 탭에서 값을 바꾸고 하단 저장 바를 누릅니다. 실행 중이면 즉시 적용된 항목과 재시작이 필요한 항목을 알려줍니다.
 4. **친구 초대** — 플레이어 탭에서 닉네임 입력 → 추가. 모드 서버라면 모드 탭의 **친구용 zip 다운로드**로 클라이언트에 넣을 모드를 한 번에 전달할 수 있습니다.
-5. **중지** — ■ 중지는 `stop` 명령을 보내 월드 저장을 기다린 뒤 종료합니다 (30초 무응답 시 SIGTERM → SIGKILL). BlockPilot 자체를 `Ctrl+C` 로 끄면 떠 있는 서버도 같은 방식으로 정리합니다.
+5. **중지** — ■ 중지는 `stop` 명령을 보내 월드 저장을 기다린 뒤 종료합니다 (30초 무응답 시 시작 스크립트와 java 를 함께 강제 종료). BlockPilot 자체를 `Ctrl+C` 로 끄면 떠 있는 서버도 같은 방식으로 정리합니다.
 
 > **BlockPilot 밖에서 서버를 띄운 경우** — 대시보드에 "외부 실행 중"으로 표시됩니다. `server.properties` 에서 `enable-rcon=true`, `rcon.password=…` 를 설정하고 서버를 재시작하면 콘솔 명령·중지·접속자 조회가 RCON으로 동작합니다.
 
-### 새 서버 만들기 (macOS)
+### 새 서버 만들기
 
 첫 화면의 **새 서버 만들기** → 폴더를 고르고 버전·기본 설정을 정한 뒤 EULA 에 직접 동의하면, 나머지는 BlockPilot 이 해요.
 
@@ -127,9 +133,9 @@ npm start
 
 1. **사전 점검** — 폴더가 비었는지, 포트·메모리·디스크 여유, 닉네임이 실제로 있는지
 2. **버전 확인** — Minecraft 정식 버전과 Fabric 로더 호환, 이 버전이 요구하는 Java (1.21.x → 21, 26.x → 25)
-3. **Java 준비** — 이 Mac 에 정확히 그 버전 JDK 가 있으면 사용, 없으면 Temurin 을 `~/.blockpilot/runtimes/` 에 받아서 사용 (시스템에는 설치하지 않음)
+3. **Java 준비** — 이 컴퓨터에 정확히 그 버전 JDK 가 있으면 사용(macOS `java_home`, Linux `/usr/lib/jvm`·SDKMAN, Windows `JAVA_HOME`·Program Files, 그리고 PATH), 없으면 Temurin 을 앱 폴더(`~/.blockpilot/runtimes/`, Windows 는 `%USERPROFILE%\.blockpilot\runtimes\`)에 받아서 사용. 시스템에는 설치하지 않아요
 4. **server.jar · Fabric 설치** — 공식 설치기로 설치하고 라이브러리까지 전부 해시 대조
-5. **설정 파일** — `start.sh`(Java 경로·메모리 고정), `server.properties`, `eula.txt`, 닉네임을 OP·화이트리스트에 추가
+5. **설정 파일** — `start.sh` 또는 Windows 는 `start.bat`(Java 경로·메모리 고정), `server.properties`, `eula.txt`, 닉네임을 OP·화이트리스트에 추가
 6. **최초 실행** — 월드를 만들고 `Done` 이 뜨면 정상 종료
 7. **등록** — 서버 목록에 추가하고 대시보드로
 
@@ -150,7 +156,11 @@ npm start
 기본값은 `127.0.0.1` 바인딩, 인증 없음입니다. 다른 기기에서 접속하려면:
 
 ```bash
-BLOCKPILOT_HOST=0.0.0.0 npm start
+BLOCKPILOT_HOST=0.0.0.0 npm start            # macOS · Linux
+```
+
+```powershell
+$env:BLOCKPILOT_HOST="0.0.0.0"; npm start   # Windows PowerShell
 ```
 
 외부 주소에 바인딩하면 접속 토큰이 자동 생성되어 터미널 로그에 출력되고, 대시보드가 토큰 입력 화면을 띄웁니다. 토큰을 직접 정하려면 `BLOCKPILOT_TOKEN=원하는값` 을 함께 넘기세요.
@@ -225,10 +235,11 @@ npm run typecheck    # 세 패키지 tsc --noEmit
 
 ## 로드맵
 
-- [x] 새 서버 만들기 — Fabric · macOS
+- [x] 새 서버 만들기 — Fabric (macOS · Linux · Windows)
 - [ ] 새 서버 만들기 — Paper · Forge · NeoForge
-- [ ] Linux 지원 (기존 서버 관리 검증, 새 서버 만들기용 JDK)
-- [ ] Windows 지원 (`start.bat`, `pause`, 경로 처리, 종료 신호)
+- [x] Linux 지원
+- [x] Windows 지원 ([실제 PC 점검 체크리스트](docs/windows-checklist.md))
+- [ ] Node 설치 없이 실행되는 설치 파일, Linux 부팅 시 자동 실행(systemd)
 - [ ] Modrinth API 연동 모드 검색·설치
 - [ ] 플레이어 통계 (`stats/`, `playerdata/` 파싱)
 
