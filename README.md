@@ -5,9 +5,12 @@
   </picture>
 </p>
 
+<h3 align="center">레버 하나로 굴리는 마인크래프트 서버</h3>
+
 <p align="center">
-  마인크래프트 서버 폴더 경로 하나만 등록하면<br>
-  설정 · 모드 · 플레이어 · 콘솔 · 로그 · 백업을 브라우저에서 관리하는 로컬 대시보드
+  친구들과 함께하는 마인크래프트 서버를 브라우저에서 관리하는 로컬 대시보드예요.<br>
+  이미 있는 서버 폴더를 등록하거나 빈 폴더에서 Fabric 서버를 새로 만들고,<br>
+  설정 · 모드 · 플레이어 · 콘솔 · 로그 · 백업 · 통계를 한 화면에서 다뤄요.
 </p>
 
 <p align="center">
@@ -24,15 +27,15 @@
   <img src="docs/screenshots/02-dashboard.png" alt="BlockPilot 대시보드" width="820">
 </p>
 
+<table>
+  <tr>
+    <td width="33%" valign="top"><b>손 안 대고 굴러가는 서버</b><br>크래시가 나면 원인(모드 충돌·메모리·포트·Java)을 한글로 짚고 다시 켜요. 정한 시각엔 게임 안에 공지하고 재시작해요.</td>
+    <td width="33%" valign="top"><b>친구들과 나누는 소식</b><br>켜짐·꺼짐·입장·퇴장·크래시가 디스코드 채널로 올라가요. 친구에게 줄 접속 주소와 밖에서 접속되는지 검사도 버튼 하나예요.</td>
+    <td width="33%" valign="top"><b>망가뜨리지 않는 변경</b><br>켜져 있으면 콘솔 명령으로, 꺼져 있으면 백업을 남긴 뒤 파일로 바꿔요. 모드는 Modrinth 에서 해시를 검증해 받고 이전 버전을 보관해요.</td>
+  </tr>
+</table>
+
 ---
-
-## 왜 만들었나
-
-친구들과 서바이벌 서버를 돌리다 보면 `server.properties` 열어서 난이도 고치고, `whitelist.json`에 UUID 찾아 넣고, 모드 버전 충돌 로그 뒤지는 일이 반복됩니다. BlockPilot은 그 작업을 전부 GUI로 옮기되, **서버가 이미 하고 있는 일을 망치지 않는 것**을 최우선으로 설계했습니다.
-
-- 서버가 **실행 중이면** 콘솔 명령(`difficulty`, `whitelist add` …)으로 즉시 반영하고, 명령으로 못 바꾸는 항목은 파일에 저장한 뒤 "재시작 필요"로 표시합니다. (마인크래프트는 종료 시 설정 파일을 다시 쓰기 때문에, 실행 중에 파일을 직접 고치면 덮어써집니다.)
-- 서버가 **중지 상태면** 파일을 직접 수정합니다. 쓰기 전에 `.blockpilot-backup/`에 사본을 남기고 임시 파일 → rename으로 원자적으로 교체합니다.
-- BlockPilot **밖에서 띄운 서버**도 RCON이 켜져 있으면 명령·중지·접속자 조회가 됩니다.
 
 ## 기능
 
@@ -86,7 +89,7 @@ push 할 때마다 GitHub Actions 가 macOS·Ubuntu·Windows 에서 단위 테�
 <table>
   <tr>
     <td align="center"><b>서버 설정</b><br><img src="docs/screenshots/03-settings.png" width="420"></td>
-    <td align="center"><b>모드 (의존성 표시)</b><br><img src="docs/screenshots/05-mods.png" width="420"></td>
+    <td align="center"><b>모드 (의존성·업데이트 표시)</b><br><img src="docs/screenshots/05-mods.png" width="420"></td>
   </tr>
   <tr>
     <td align="center"><b>플레이어</b><br><img src="docs/screenshots/04-players.png" width="420"></td>
@@ -99,6 +102,14 @@ push 할 때마다 GitHub Actions 가 macOS·Ubuntu·Windows 에서 단위 테�
   <tr>
     <td align="center"><b>백업</b><br><img src="docs/screenshots/09-backups.png" width="420"></td>
     <td align="center"><b>서버 선택</b><br><img src="docs/screenshots/01-servers.png" width="420"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>알림·자동화 (디스코드·자동 재시작·예약 재시작)</b><br><img src="docs/screenshots/14-automation.png" width="420"></td>
+    <td align="center"><b>통계 점수판</b><br><img src="docs/screenshots/15-stats.png" width="420"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Modrinth 에서 찾기</b><br><img src="docs/screenshots/16-modrinth.png" width="420"></td>
+    <td align="center"><b>휴대폰 화면</b><br><img src="docs/screenshots/17-mobile.png" width="420"></td>
   </tr>
 </table>
 
@@ -238,6 +249,12 @@ BlockPilot/
 ```
 
 ### 안전장치
+
+변경은 **서버가 하던 일을 망치지 않게** 반영해요.
+
+- 서버가 **실행 중이면** 콘솔 명령(`difficulty`, `whitelist add` …)으로 즉시 반영하고, 명령으로 못 바꾸는 항목은 파일에 저장한 뒤 "재시작 필요"로 표시해요. 마인크래프트는 종료할 때 설정 파일을 다시 쓰기 때문에, 실행 중에 파일을 직접 고치면 덮어써져요.
+- 서버가 **중지 상태면** 파일을 직접 고쳐요. 쓰기 전에 `.blockpilot-backup/`에 사본을 남기고 임시 파일 → rename 으로 한 번에 바꿔요.
+- BlockPilot **밖에서 띄운 서버**도 RCON 이 켜져 있으면 명령·중지·접속자 조회가 돼요.
 
 - 브라우저 교차 출처 차단: CORS를 열지 않고, `/api/*`(WebSocket 포함)는 `Origin`이 대시보드 자신과 같을 때만 허용. `Host` 헤더도 검사해 DNS 리바인딩 방어
 - 모든 파일 접근은 등록된 서버 폴더 하위인지 검증 (`../` 탈출 차단)

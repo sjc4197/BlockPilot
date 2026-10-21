@@ -6,6 +6,10 @@ import { Badge, Card, EmptyState, Input, PageHeader, Select, Spinner, cx, fmtByt
 
 type Level = "all" | "warn" | "error";
 
+/** 성능 모니터가 30초마다 보내는 /tick query 의 응답 줄 (서버 로그 파일에도 남는다) */
+// 한 응답이 여러 줄로 찍혀서 둘째 줄부터는 시각 머리말이 없다
+const TICK_PROBE = /(^|\]: )(The game is running normally|Target tick rate: |Average time per tick: |Percentiles: P50)/;
+
 export default function Logs() {
   const { id = "" } = useParams();
   const { data: files, isLoading } = useLogs(id);
@@ -13,6 +17,7 @@ export default function Logs() {
   const [filter, setFilter] = useState("");
   const [level, setLevel] = useState<Level>("all");
   const [tail, setTail] = useState(2000);
+  const [hideProbe, setHideProbe] = useState(true);
   const { data: log, isFetching } = useLogFile(id, sel?.kind ?? null, sel?.name ?? null, tail);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -22,6 +27,7 @@ export default function Logs() {
 
   const lines = useMemo(() => {
     let l = log?.lines ?? [];
+    if (hideProbe) l = l.filter((x) => !TICK_PROBE.test(x));
     if (level === "warn") l = l.filter((x) => /\/(WARN|ERROR|FATAL)\]/.test(x));
     if (level === "error") l = l.filter((x) => /\/(ERROR|FATAL)\]|Exception|\tat /.test(x));
     if (filter) {
@@ -29,7 +35,7 @@ export default function Logs() {
       l = l.filter((x) => x.toLowerCase().includes(f));
     }
     return l;
-  }, [log, level, filter]);
+  }, [log, level, filter, hideProbe]);
 
   useEffect(() => {
     if (boxRef.current && sel?.name === "latest.log") boxRef.current.scrollTop = boxRef.current.scrollHeight;
@@ -88,6 +94,10 @@ export default function Logs() {
                 </option>
               ))}
             </Select>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-400" title="BlockPilot 성능 모니터가 30초마다 보내는 /tick query 응답">
+              <input type="checkbox" className="accent-[#ff3b2f]" checked={hideProbe} onChange={(e) => setHideProbe(e.target.checked)} />
+              성능 측정 줄 숨기기
+            </label>
             <div className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500 tnum">
               {counts.warn > 0 && <Badge tone="warning">WARN {counts.warn}</Badge>}
               {counts.error > 0 && <Badge tone="danger">ERROR {counts.error}</Badge>}
