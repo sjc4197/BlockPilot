@@ -4,7 +4,7 @@ import { Boxes, ClipboardList, Download, Package, Plus, Search, Trash2 } from "l
 import type { ModInfo } from "@blockpilot/shared";
 import { useDeleteMod, useMods, useServer, useToggleMod, useUploadMods } from "../api/hooks";
 import { withToken } from "../api/client";
-import { Badge, Button, Callout, ConfirmButton, EmptyState, Input, LinkButton, PageHeader, Spinner, Toggle, cx, fmtBytes, useToast } from "../lib/ui";
+import { Badge, Button, Callout, EmptyState, HoldButton, Input, LinkButton, PageHeader, Spinner, Toggle, cx, fmtBytes, useToast } from "../lib/ui";
 
 export default function Mods() {
   const { id = "" } = useParams();
@@ -159,7 +159,7 @@ function ModCard({ mod: m, locked, delay, onToggle, onDelete }: { mod: ModInfo; 
           <span className="truncate font-mono text-[11px] text-slate-500" title={m.file}>
             {m.file} · {fmtBytes(m.sizeBytes)}
           </span>
-          <ConfirmButton size="sm" variant="ghost" icon={Trash2} label="삭제" confirmLabel="정말 삭제?" disabled={locked} onConfirm={onDelete} />
+          <HoldButton icon={Trash2} label="삭제" disabled={locked} onConfirm={onDelete} />
         </div>
       </div>
     </li>

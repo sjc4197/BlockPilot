@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { Ban, Crown, Globe, ShieldCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import type { PlayerListKind, WhitelistEntry, OpEntry, BannedPlayerEntry, BannedIpEntry } from "@blockpilot/shared";
 import { useAddPlayer, usePlayerList, useRemovePlayer, useServer, useUpdateProperties } from "../api/hooks";
-import { Avatar, Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, PageHeader, Select, Spinner, Tabs, Toggle, useToast } from "../lib/ui";
+import { Avatar, Badge, Button, Card, EmptyState, HoldButton, Field, Input, PageHeader, Select, Spinner, Tabs, Toggle, useToast } from "../lib/ui";
 
 const TABS = [
   { id: "whitelist", label: "화이트리스트", icon: ShieldCheck },
@@ -144,7 +144,7 @@ function ListPanel({ serverId, kind }: { serverId: string; kind: PlayerListKind 
                     {"reason" in e && <span className="ml-2 font-sans text-slate-500">· {e.reason}</span>}
                   </div>
                 </div>
-                <ConfirmButton size="sm" variant="ghost" icon={UserMinus} label="제거" confirmLabel="제거할까요?" onConfirm={() => removeEntry(key, label)} />
+                <HoldButton icon={UserMinus} label="제거" onConfirm={() => removeEntry(key, label)} />
               </div>
             );
           })}

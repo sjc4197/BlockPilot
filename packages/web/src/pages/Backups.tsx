@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Archive, Clock, Download, HardDriveDownload, History, Trash2 } from "lucide-react";
 import type { BackupSettings } from "@blockpilot/shared";
 import { useBackups, useCreateBackup, useDeleteBackup, useRestoreBackup, useSaveBackupSettings, useServer } from "../api/hooks";
 import { withToken } from "../api/client";
-import { Badge, Button, Callout, Card, ConfirmButton, EmptyState, Field, Input, LinkButton, PageHeader, Select, Spinner, Toggle, fmtBytes, fmtDate, useToast } from "../lib/ui";
+import { Badge, Button, Callout, Card, ConfirmButton, EmptyState, HoldButton, Field, Input, LinkButton, PageHeader, Select, Spinner, Toggle, cx, fmtBytes, fmtDate, useToast } from "../lib/ui";
+import { CHEST_BODY, CHEST_LID, CHEST_PAL, GrassBlock, PixelArt } from "../lib/pixel";
 
 const INTERVALS = [
   { value: 0, label: "끔" },
@@ -27,6 +28,13 @@ export default function Backups() {
   const toast = useToast();
   const [label, setLabel] = useState("");
   const [settings, setSettings] = useState<BackupSettings | null>(null);
+  // 방금 만든 백업은 목록 맨 위 칸에서 잠깐 빛난다
+  const [fresh, setFresh] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fresh) return;
+    const t = setTimeout(() => setFresh(null), 2200);
+    return () => clearTimeout(t);
+  }, [fresh]);
 
   useEffect(() => {
     if (data && !settings) setSettings(data.status.settings);
@@ -56,6 +64,7 @@ export default function Backups() {
             <HardDriveDownload className="h-4 w-4 text-redstone" /> 지금 백업
           </h2>
           <div className="flex items-end gap-3">
+            <BackupChest open={create.isPending} />
             <Field label="이름표 (선택)" className="flex-1">
               <Input placeholder="예: 네더-가기-전" value={label} onChange={(e) => setLabel(e.target.value)} />
             </Field>
@@ -65,6 +74,7 @@ export default function Backups() {
               onClick={() =>
                 create.mutate(label || undefined, {
                   onSuccess: (b) => {
+                    setFresh(b.file);
                     toast("ok", `${b.file} (${fmtBytes(b.sizeBytes)}) 백업 완료`, { icon: "chest", first: "backup" });
                     setLabel("");
                   },
@@ -136,7 +146,7 @@ export default function Backups() {
         ) : (
           <Card padded={false} className="divide-y-2 divide-bevel-lo">
             {data.backups.map((b) => (
-              <div key={b.file} className="flex flex-wrap items-center gap-3 px-5 py-3">
+              <div key={b.file} className={cx("flex flex-wrap items-center gap-3 px-5 py-3", b.file === fresh && "backup-fresh")}>
                 <div className="well grid h-9 w-9 shrink-0 place-items-center text-slate-400">
                   <Archive className="h-4 w-4" />
                 </div>
@@ -165,12 +175,39 @@ export default function Backups() {
                     })
                   }
                 />
-                <ConfirmButton size="sm" variant="ghost" icon={Trash2} label="삭제" confirmLabel="정말 삭제?" onConfirm={() => del.mutate(b.file, { onError: onErr })} />
+                <HoldButton icon={Trash2} label="삭제" onConfirm={() => del.mutate(b.file, { onError: onErr })} />
               </div>
             ))}
           </Card>
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * 연출 7 상자 백업: 백업을 만드는 동안 뚜껑이 열리고 월드 블록이 들어간다. 끝나면 뚜껑이 닫힌다.
+ */
+function BackupChest({ open }: { open: boolean }) {
+  const [drops, setDrops] = useState(0);
+  const [shown, setShown] = useState(false);
+  const openedAt = useRef(0);
+  useEffect(() => {
+    if (open) {
+      openedAt.current = Date.now();
+      setShown(true);
+      setDrops((n) => n + 1);
+      return;
+    }
+    // 백업이 금방 끝나도 블록이 들어가는 게 보이도록 뚜껑을 잠깐 더 열어 둔다
+    const t = setTimeout(() => setShown(false), Math.max(0, 750 - (Date.now() - openedAt.current)));
+    return () => clearTimeout(t);
+  }, [open]);
+  return (
+    <div className={cx("backup-chest", shown && "is-open")} aria-hidden>
+      {drops > 0 && <GrassBlock key={drops} className="chest-item" />}
+      <PixelArt map={CHEST_LID} pal={CHEST_PAL} className="chest-lid" />
+      <PixelArt map={CHEST_BODY} pal={CHEST_PAL} className="chest-body" />
     </div>
   );
 }

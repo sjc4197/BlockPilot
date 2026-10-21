@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Archive, LogOut, X } from "lucide-react";
 import type { ServerSummary } from "@blockpilot/shared";
 import { useDeleteServer, useRemoveServer } from "../api/hooks";
 import { TntIcon } from "../lib/pixel";
-import { Button, Callout, Card, ConfirmButton, Field, Input, SectionTitle, useToast, type IconType } from "../lib/ui";
+import { burst, flash } from "../lib/burst";
+import { Button, Callout, Card, ConfirmButton, Field, Input, SectionTitle, cx, useToast, type IconType } from "../lib/ui";
 
 const BigTnt: IconType = ({ className }) => <TntIcon className={className} />;
 const PrimedTnt: IconType = ({ className }) => <TntIcon className={className} primed />;
@@ -73,21 +74,41 @@ function DeleteDialog({ server, onClose }: { server: ServerSummary; onClose: () 
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, del.isPending]);
 
-  const submit = () =>
+  // 연출 5: 영구 삭제를 누르면 TNT 가 깜빡이며 부풀고(삭제 진행), 끝나면 터진다. 실패하면 터지지 않고 원인을 보여 준다
+  const tntRef = useRef<HTMLSpanElement>(null);
+  const [fuse, setFuse] = useState(false);
+  const [boom, setBoom] = useState(false);
+  const submit = () => {
+    const lit = Date.now();
+    setFuse(true);
     del.mutate(typed, {
       onSuccess: (r) => {
-        toast("ok", `'${server.name}' 서버 폴더를 삭제했어요.`, { icon: "tnt" });
-        if (r.removedLink) toast("info", `등록에 쓰던 링크 ${r.removedLink} 도 지웠어요.`);
-        navigate("/");
+        const explode = () => {
+          setFuse(false);
+          setBoom(true);
+          const box = tntRef.current?.getBoundingClientRect();
+          flash();
+          if (box) burst(box.left + box.width / 2, box.top + box.height / 2, { count: 34, colors: ["#f2efe6", "#bdbdbd", "#8f8f8f", "#ffb347", "#d93a2b", "#5e5e5e"], spread: 150, size: [4, 8], ring: true });
+          toast("ok", `'${server.name}' 서버 폴더를 삭제했어요.`, { icon: "tnt" });
+          if (r.removedLink) toast("info", `등록에 쓰던 링크 ${r.removedLink} 도 지웠어요.`);
+          setTimeout(() => navigate("/"), 650);
+        };
+        // 삭제가 금방 끝나도 심지가 타는 게 보이도록 최소 1.2초
+        setTimeout(explode, Math.max(0, 1200 - (Date.now() - lit)));
       },
+      onError: () => setFuse(false),
     });
+  };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4" role="dialog" aria-modal aria-label="서버 삭제" onMouseDown={(e) => e.target === e.currentTarget && !del.isPending && onClose()}>
       <div className="glass w-[min(560px,96vw)]">
         <header className="flex items-center justify-between px-5 py-3 shadow-[inset_0_-2px_0_#08080a]">
           <h2 className="flex items-center gap-2.5 font-block text-[12px] text-white">
-            <TntIcon className="h-5 w-5" /> 서버를 완전히 삭제할까요?
+            <span ref={tntRef} className={cx("inline-block h-5 w-5", fuse && "tnt-fuse", boom && "invisible")}>
+              <TntIcon className="h-5 w-5" />
+            </span>
+            {fuse ? "심지에 불이 붙었어요…" : boom ? "삭제했어요" : "서버를 완전히 삭제할까요?"}
           </h2>
           <Button size="sm" variant="ghost" icon={X} onClick={onClose} disabled={del.isPending} aria-label="닫기" />
         </header>
@@ -111,7 +132,7 @@ function DeleteDialog({ server, onClose }: { server: ServerSummary; onClose: () 
           {!stopped && <Callout tone="warning">서버가 켜져 있어요. 레버를 내려 서버를 끈 뒤 삭제할 수 있어요.</Callout>}
 
           <Field label={<span>확인을 위해 서버 이름 <b className="text-white">{server.name}</b> 을(를) 그대로 입력하세요</span>}>
-            <Input id="del-confirm" autoFocus autoComplete="off" spellCheck={false} value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === "Enter" && matches && stopped && submit()} />
+            <Input id="del-confirm" autoFocus autoComplete="off" spellCheck={false} value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === "Enter" && matches && stopped && !fuse && !boom && submit()} />
           </Field>
 
           {del.error && <Callout tone="danger">{(del.error as Error).message}</Callout>}
@@ -121,7 +142,7 @@ function DeleteDialog({ server, onClose }: { server: ServerSummary; onClose: () 
           <Button variant="ghost" onClick={onClose} disabled={del.isPending}>
             취소
           </Button>
-          <Button variant="danger" icon={matches ? PrimedTnt : BigTnt} disabled={!matches || !stopped} loading={del.isPending} onClick={submit}>
+          <Button variant="danger" icon={matches ? PrimedTnt : BigTnt} disabled={!matches || !stopped || fuse || boom} loading={del.isPending} onClick={submit}>
             영구 삭제
           </Button>
         </footer>

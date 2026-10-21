@@ -1,6 +1,7 @@
-import { createContext, forwardRef, useCallback, useContext, useState, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { createContext, forwardRef, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentType, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
 import type { ProcessState } from "@blockpilot/shared";
+import { CRACK, burst } from "./burst";
 import { DustLoader, ItemIcon, Lamp, LeverGlyph, TntIcon, type ItemName, type LampState } from "./pixel";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
@@ -265,6 +266,102 @@ export function ConfirmButton({ label, confirmLabel = "정말요?", onConfirm, v
     >
       {arm ? confirmLabel : label}
     </Button>
+  );
+}
+
+// ---------- HoldButton: 꾹 눌러 캐기 ----------
+
+const HOLD_MS = 1000;
+
+/**
+ * 되돌리기 쉬운 삭제용. 누르고 있으면 블록처럼 금이 가다가 다 차면 부서지며 실행된다.
+ * 중간에 떼면 금이 다시 메워진다. 짧게 누르면 "꾹 눌러 주세요" 안내. 키보드는 스페이스·엔터를 누르고 있기.
+ */
+export function HoldButton({ label, onConfirm, icon: Icon, size = "sm", variant = "ghost", disabled, className }: { label: ReactNode; onConfirm: () => void; icon?: IconType; size?: Size; variant?: Variant; disabled?: boolean; className?: string }) {
+  const btn = useRef<HTMLButtonElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const prog = useRef(0);
+  const raf = useRef(0);
+  const [hint, setHint] = useState(false);
+  const [broken, setBroken] = useState(false);
+
+  const draw = (f: number) => {
+    const g = canvas.current?.getContext("2d");
+    if (!g) return;
+    g.clearRect(0, 0, 48, 14);
+    const n = Math.floor(CRACK.length * (Math.floor(f * 10) / 10));
+    for (let i = 0; i < n; i++) {
+      g.fillStyle = i % 5 === 0 ? "rgba(255,255,255,.28)" : "rgba(0,0,0,.75)";
+      g.fillRect(CRACK[i][0], CRACK[i][1], 1, 1);
+    }
+  };
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  useEffect(() => {
+    if (!hint) return;
+    const t = setTimeout(() => setHint(false), 1600);
+    return () => clearTimeout(t);
+  }, [hint]);
+
+  const start = () => {
+    if (disabled || broken) return;
+    cancelAnimationFrame(raf.current);
+    const t0 = performance.now() - prog.current * HOLD_MS;
+    const tick = (t: number) => {
+      prog.current = Math.min(1, (t - t0) / HOLD_MS);
+      draw(prog.current);
+      if (prog.current < 1) {
+        raf.current = requestAnimationFrame(tick);
+        return;
+      }
+      const r = btn.current?.getBoundingClientRect();
+      if (r) burst(r.left + r.width / 2, r.top + r.height / 2, { count: 16, colors: ["#3a3a43", "#4a4a55", "#2d2d35", "#ff3b2f"], spread: 70, size: [3, 6] });
+      setBroken(true);
+      prog.current = 0;
+      draw(0);
+      onConfirm();
+      setTimeout(() => setBroken(false), 900);
+    };
+    raf.current = requestAnimationFrame(tick);
+  };
+  const release = () => {
+    cancelAnimationFrame(raf.current);
+    if (prog.current > 0 && prog.current < 0.12) setHint(true);
+    const back = () => {
+      prog.current = Math.max(0, prog.current - 0.08);
+      draw(prog.current);
+      if (prog.current > 0) raf.current = requestAnimationFrame(back);
+    };
+    raf.current = requestAnimationFrame(back);
+  };
+
+  return (
+    <button
+      ref={btn}
+      type="button"
+      disabled={disabled}
+      aria-label={typeof label === "string" ? `${label} (꾹 누르기)` : undefined}
+      title="꾹 누르고 있으면 실행돼요"
+      className={cx(BTN_BASE, VARIANT[variant], SIZE[size], "relative touch-none select-none", broken && "invisible", className)}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        start();
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onKeyDown={(e) => {
+        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+          e.preventDefault();
+          start();
+        }
+      }}
+      onKeyUp={(e) => (e.key === " " || e.key === "Enter") && release()}
+      onClick={(e) => e.preventDefault()}
+    >
+      {Icon && <Icon className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} />}
+      {hint ? "꾹 눌러 주세요" : label}
+      <canvas ref={canvas} width={48} height={14} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full [image-rendering:pixelated]" />
+    </button>
   );
 }
 
