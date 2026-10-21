@@ -25,10 +25,10 @@ export default function ConfigFiles() {
   }, [files, filter]);
 
   return (
-    <div className="flex h-[calc(100vh-7.5rem)] flex-col gap-5">
+    <div className="flex flex-col gap-5 md:h-[calc(100vh-7.5rem)]">
       <PageHeader icon={FileCode2} title="설정 파일" description="모드·플러그인 설정 파일을 직접 편집해요. 저장 전에 문법을 검사하고 원본은 .blockpilot-backup/ 에 보관돼요." />
-      <div className="flex min-h-0 flex-1 gap-4">
-        <Card padded={false} className="flex w-72 shrink-0 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
+        <Card padded={false} className="flex max-h-60 w-full shrink-0 flex-col md:max-h-none md:w-72">
           <div className="shadow-[inset_0_-2px_0_#08080a] p-2.5">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
@@ -66,7 +66,7 @@ export default function ConfigFiles() {
             )}
           </div>
         </Card>
-        <section className="min-w-0 flex-1">
+        <section className="min-h-[60vh] min-w-0 flex-1 md:min-h-0">
           {selected ? (
             <Editor key={selected} serverId={id} path={selected} />
           ) : (

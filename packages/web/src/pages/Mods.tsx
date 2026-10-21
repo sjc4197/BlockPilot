@@ -165,7 +165,7 @@ const ENV_DEPS = new Set(["minecraft", "java", "fabricloader", "fabric-loader"])
 
 function ModCard({ mod: m, locked, delay, onToggle, onDelete, update, onUpdate }: { mod: ModInfo; locked: boolean; delay: number; onToggle: (v: boolean) => void; onDelete: () => void; update?: ModUpdate; onUpdate: () => void }) {
   return (
-    <li className={cx("slab flex animate-slide-up gap-4 p-4", !m.enabled && "opacity-60 saturate-50")} style={{ animationDelay: `${delay}ms` }}>
+    <li className={cx("slab flex min-w-0 animate-slide-up gap-3 p-4 sm:gap-4", !m.enabled && "opacity-60 saturate-50")} style={{ animationDelay: `${delay}ms` }}>
       <div className="h-14 w-14 shrink-0 overflow-hidden well">
         {m.iconDataUrl ? <img src={m.iconDataUrl} alt="" className="h-full w-full object-cover" style={{ imageRendering: "pixelated" }} /> : <div className="grid h-full place-items-center text-slate-500"><Package className="h-6 w-6" /></div>}
       </div>
@@ -202,7 +202,7 @@ function ModCard({ mod: m, locked, delay, onToggle, onDelete, update, onUpdate }
             ))}
         </div>
         <div className="mt-3 flex items-center justify-between gap-3 shadow-[inset_0_2px_0_#08080a] pt-2.5">
-          <span className="truncate font-mono text-[11px] text-slate-500" title={m.file}>
+          <span className="min-w-0 truncate font-mono text-[11px] text-slate-500" title={m.file}>
             {m.file} · {fmtBytes(m.sizeBytes)}
           </span>
           <HoldButton icon={Trash2} label="삭제" disabled={locked} onConfirm={onDelete} />

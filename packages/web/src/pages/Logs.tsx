@@ -41,10 +41,10 @@ export default function Logs() {
   }, [log]);
 
   return (
-    <div className="flex h-[calc(100vh-7.5rem)] flex-col gap-5">
+    <div className="flex flex-col gap-5 md:h-[calc(100vh-7.5rem)]">
       <PageHeader icon={ScrollText} title="로그" description="logs/ 와 crash-reports/ 의 파일을 봐요. 압축(.gz)된 로그도 바로 열리고 latest.log 는 5초마다 갱신돼요." />
-      <div className="flex min-h-0 flex-1 gap-4">
-        <Card padded={false} className="w-64 shrink-0 overflow-y-auto p-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
+        <Card padded={false} className="max-h-48 w-full shrink-0 overflow-y-auto p-2 md:max-h-none md:w-64">
           {isLoading ? (
             <Spinner className="m-3" />
           ) : !files?.length ? (
@@ -70,7 +70,7 @@ export default function Logs() {
             })
           )}
         </Card>
-        <Card padded={false} className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <Card padded={false} className="flex min-h-[60vh] min-w-0 flex-1 flex-col overflow-hidden md:min-h-0">
           <div className="flex flex-wrap items-center gap-2 shadow-[inset_0_-2px_0_#08080a] px-3 py-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { NavLink, Navigate, Outlet, Route, Routes, useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Archive, Boxes, ChevronRight, FileCode2, LayoutDashboard, ScrollText, Settings2, SquareTerminal, Trophy, Users } from "lucide-react";
+import { ArrowLeft, Archive, Boxes, ChevronRight, FileCode2, LayoutDashboard, Menu, ScrollText, Settings2, SquareTerminal, Trophy, Users, X } from "lucide-react";
 import { useAuthInfo, useServer } from "./api/hooks";
 import { getToken, setToken, setUnauthorizedHandler } from "./api/client";
 import { StatusBadge, cx } from "./lib/ui";
@@ -125,6 +125,9 @@ function ServerLayout() {
   const { data: server, error } = useServer(id);
   const location = useLocation();
   const current = NAV.find((n) => (n.to === "" ? location.pathname === `/s/${id}` : location.pathname.endsWith(`/${n.to}`)));
+  // 휴대폰: 왼쪽 메뉴를 서랍처럼 열고 닫는다 (메뉴를 고르면 닫힘)
+  const [drawer, setDrawer] = useState(false);
+  useEffect(() => setDrawer(false), [location.pathname]);
 
   if (error) {
     return (
@@ -140,11 +143,20 @@ function ServerLayout() {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-[232px] shrink-0 flex-col bg-ink-1 shadow-[inset_-2px_0_0_#08080a]">
-        <div className="px-4 pb-3 pt-4">
+      {drawer && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setDrawer(false)} aria-hidden />}
+      <aside
+        className={cx(
+          "fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-[232px] shrink-0 flex-col bg-ink-1 shadow-[inset_-2px_0_0_#08080a] transition-transform duration-150 md:sticky md:top-0 md:h-screen md:translate-x-0",
+          drawer ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="flex items-start justify-between px-4 pb-3 pt-4">
           <Link to="/" className="focus-ring">
             <Logo />
           </Link>
+          <button type="button" className="focus-ring -mr-1 p-1 text-slate-400 md:hidden" onClick={() => setDrawer(false)} aria-label="메뉴 닫기">
+            <X className="h-5 w-5" />
+          </button>
         </div>
         <div className="slab mx-3 mb-3 px-3 py-2.5">
           <div className="truncate text-sm font-medium text-white" title={server?.path}>
@@ -162,15 +174,18 @@ function ServerLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 bg-ink-0/90 px-6 shadow-[inset_0_-2px_0_#08080a] backdrop-blur-sm">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 bg-ink-0/90 px-3 shadow-[inset_0_-2px_0_#08080a] backdrop-blur-sm md:px-6">
           <div className="flex min-w-0 items-center gap-1.5 font-block text-[12px] text-slate-500">
-            <span className="truncate">{server?.name}</span>
-            <ChevronRight className="h-3.5 w-3.5 text-slate-600" />
+            <button type="button" className="focus-ring -ml-1 mr-1 p-2 text-slate-300 md:hidden" onClick={() => setDrawer(true)} aria-label="메뉴 열기">
+              <Menu className="h-5 w-5" />
+            </button>
+            <span className="hidden truncate sm:inline">{server?.name}</span>
+            <ChevronRight className="hidden h-3.5 w-3.5 text-slate-600 sm:inline" />
             <span className="truncate text-slate-200">{current?.label ?? ""}</span>
           </div>
           {server && <ProcessControls serverId={id} status={server.process} size="sm" />}
         </header>
-        <main className="flex-1 px-6 py-6">
+        <main className="flex-1 px-3 py-4 sm:px-6 sm:py-6">
           <div key={location.pathname} className="mx-auto max-w-6xl animate-fade-in">
             {server ? <Outlet /> : <FullscreenLoader inline />}
           </div>

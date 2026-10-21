@@ -357,6 +357,8 @@ export function HoldButton({ label, onConfirm, icon: Icon, size = "sm", variant 
       }}
       onKeyUp={(e) => (e.key === " " || e.key === "Enter") && release()}
       onClick={(e) => e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ WebkitTouchCallout: "none" }}
     >
       {Icon && <Icon className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} />}
       {hint ? "꾹 눌러 주세요" : label}

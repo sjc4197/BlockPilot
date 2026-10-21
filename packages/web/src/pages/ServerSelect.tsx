@@ -34,9 +34,11 @@ export default function ServerSelect() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16 animate-slide-up">
+    <div className="mx-auto max-w-3xl px-4 py-10 animate-slide-up sm:px-6 sm:py-16">
       <header className="mb-10 text-center">
-        <Logo size="lg" />
+        <div className="origin-top scale-[0.8] sm:scale-100">
+          <Logo size="lg" />
+        </div>
         <p className="mx-auto mt-4 max-w-lg text-balance text-slate-400">마인크래프트 서버 폴더를 등록하면 설정 · 모드 · 플레이어 · 콘솔 · 백업을 한 곳에서 관리할 수 있어요.</p>
       </header>
 
@@ -87,11 +89,11 @@ export default function ServerSelect() {
         ) : (
           <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
             {servers.map((s, i) => (
-              <li key={s.id} className={cx("slab group relative flex items-center gap-4 p-4", place && "place-in")} style={{ "--k": i } as CSSProperties}>
+              <li key={s.id} className={cx("slab group relative flex flex-wrap items-center gap-x-4 gap-y-3 p-4", place && "place-in")} style={{ "--k": i } as CSSProperties}>
                 <div className="well grid h-11 w-11 shrink-0 place-items-center text-redstone">
                   <Server className="h-5 w-5" />
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-[calc(100%-4.5rem)] sm:basis-0">
                   <Link to={`/s/${s.id}`} className="font-medium text-white hover:text-red-300">
                     {s.name}
                   </Link>

@@ -140,7 +140,7 @@ export default function Settings() {
 function FieldRow({ meta, value, dirty, live, onChange }: { meta: PropertyMeta; value: string; dirty: boolean; live: boolean; onChange: (v: string) => void }) {
   const canLive = !!meta.liveCommand;
   return (
-    <div className={cx("flex items-center gap-6 px-5 py-3.5 transition", dirty && "bg-redstone/[.06]")}>
+    <div className={cx("flex gap-3 px-4 py-3.5 transition sm:flex-row sm:items-center sm:gap-6 sm:px-5", meta.type === "boolean" ? "flex-row items-center" : "flex-col", dirty && "bg-redstone/[.06]")}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-slate-100">{meta.label}</span>
@@ -150,7 +150,7 @@ function FieldRow({ meta, value, dirty, live, onChange }: { meta: PropertyMeta; 
         </div>
         {meta.description && <p className="mt-0.5 text-xs text-slate-500">{meta.description}</p>}
       </div>
-      <div className="w-60 shrink-0">
+      <div className={cx("shrink-0 sm:w-60", meta.type === "boolean" ? "w-auto" : "w-full")}>
         {meta.type === "boolean" ? (
           <div className="flex justify-end">
             <Toggle checked={value === "true"} onChange={(v) => onChange(v ? "true" : "false")} />
