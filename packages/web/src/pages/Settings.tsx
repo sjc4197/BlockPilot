@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { Gauge, Globe, Layers, ListTree, Settings2, Swords, Users, Zap, type LucideIcon } from "lucide-react";
 import { PROPERTY_GROUPS, PROPERTY_META, PROPERTY_META_BY_KEY, type PropertyMeta, type PropertyGroup } from "@blockpilot/shared";
 import { useProperties, useServer, useUpdateProperties } from "../api/hooks";
+import { ServerDanger } from "../components/ServerDanger";
 import { Badge, Button, Card, Input, PageHeader, Select, Spinner, Toggle, cx, useToast } from "../lib/ui";
 
 type Tab = PropertyGroup | "advanced";
@@ -108,6 +109,8 @@ export default function Settings() {
           </Card>
         )}
       </div>
+
+      {server && <ServerDanger server={server} />}
 
       {dirtyCount > 0 && (
         <div className="glass fixed inset-x-0 bottom-5 z-30 mx-auto flex w-[min(720px,calc(100%-3rem))] animate-slide-up items-center justify-between px-5 py-3">

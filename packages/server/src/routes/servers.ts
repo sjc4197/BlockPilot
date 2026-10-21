@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { RegisterServerInput, type ServerSummary } from "@blockpilot/shared";
+import { DeleteServerInput, RegisterServerInput, type DeleteServerResult, type ServerSummary } from "@blockpilot/shared";
 import { addServer, listServers, removeServer } from "../config/store.js";
 import { detectServer, getServerJavaVersion, validateServerDir } from "../services/serverInfo.js";
 import { readPropertiesFile, toRecord } from "../services/properties.js";
 import { modsDirName } from "../services/mods.js";
+import { deleteServerFolder } from "../services/serverDelete.js";
 import { loadContext } from "../lib/context.js";
 import { conflict } from "../lib/errors.js";
 
@@ -26,6 +27,16 @@ export async function serversRoutes(app: FastifyInstance) {
     if (managed.isManaged()) throw conflict("실행 중인 서버는 먼저 중지해야 합니다.");
     await removeServer(id);
     return { ok: true };
+  });
+
+  /** 서버 폴더를 디스크에서 완전히 지운다 (등록 해제와 다름, 되돌릴 수 없음) */
+  app.post("/api/servers/:id/delete", async (req): Promise<DeleteServerResult> => {
+    const { id } = req.params as { id: string };
+    const { confirmName } = DeleteServerInput.parse(req.body ?? {});
+    const { server, managed } = await loadContext(id);
+    const result = await deleteServerFolder(server, managed, confirmName);
+    req.log.warn({ server: server.name, deleted: result.deletedPath }, "서버 폴더를 삭제했어요");
+    return result;
   });
 
   app.get("/api/servers/:id", async (req): Promise<ServerSummary> => {

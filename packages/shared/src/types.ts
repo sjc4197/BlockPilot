@@ -353,3 +353,18 @@ export interface ApiError {
   error: string;
   message: string;
 }
+
+// ---------- 서버 삭제 ----------
+
+export const DeleteServerInput = z.object({
+  /** 실수 방지: 서버 이름을 그대로 입력해야 지운다 */
+  confirmName: z.string(),
+});
+export type DeleteServerInput = z.infer<typeof DeleteServerInput>;
+
+export interface DeleteServerResult {
+  /** 실제로 지운 폴더 (심볼릭 링크로 등록됐다면 링크가 가리키던 폴더) */
+  deletedPath: string;
+  /** 등록 경로가 심볼릭 링크였다면 그 링크도 지움 */
+  removedLink?: string;
+}

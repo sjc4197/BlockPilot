@@ -23,6 +23,7 @@ import type {
   CreateServerInput,
   CreateJobStatus,
   FsListing,
+  DeleteServerResult,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -278,4 +279,17 @@ export const useCreateJob = (id: string | null) =>
 
 export function useCancelCreate() {
   return useMutation({ mutationFn: (id: string) => api<{ cancelled: boolean }>(`/api/create/jobs/${id}/cancel`, { method: "POST" }) });
+}
+
+// ---------- 서버 삭제 (폴더째) ----------
+
+export function useDeleteServer(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (confirmName: string) => api<DeleteServerResult>(`/api/servers/${id}/delete`, { method: "POST", json: { confirmName } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.servers });
+      qc.removeQueries({ queryKey: keys.server(id) });
+    },
+  });
 }

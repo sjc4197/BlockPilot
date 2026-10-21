@@ -347,3 +347,8 @@ export function allManaged() {
 export async function shutdownAll() {
   await Promise.all([...registry.values()].filter((m) => m.isManaged()).map((m) => m.stop().catch(() => {})));
 }
+
+/** 서버를 지운 뒤 프로세스 관리 객체도 잊는다 */
+export function forgetManaged(id: string) {
+  registry.delete(id);
+}

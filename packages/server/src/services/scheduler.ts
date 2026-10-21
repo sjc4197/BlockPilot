@@ -79,3 +79,7 @@ export async function runScheduledBackup(serverId: string, dir: string, keep: nu
     s.running = false;
   }
 }
+
+export function isBackupRunning(serverId: string) {
+  return state.get(serverId)?.running ?? false;
+}
