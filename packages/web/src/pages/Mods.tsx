@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Boxes, ClipboardList, Download, Package, Plus, Search, Trash2 } from "lucide-react";
-import type { ModInfo } from "@blockpilot/shared";
-import { useDeleteMod, useMods, useServer, useToggleMod, useUploadMods } from "../api/hooks";
+import { ArrowUpCircle, Boxes, ClipboardList, Compass, Download, Package, Plus, Search, Trash2 } from "lucide-react";
+import type { ModInfo, ModUpdate } from "@blockpilot/shared";
+import { useApplyModUpdates, useDeleteMod, useModUpdates, useMods, useServer, useToggleMod, useUploadMods } from "../api/hooks";
+import { ModrinthSearch } from "../components/ModrinthSearch";
 import { withToken } from "../api/client";
-import { Badge, Button, Callout, EmptyState, HoldButton, Input, LinkButton, PageHeader, Spinner, Toggle, cx, fmtBytes, useToast } from "../lib/ui";
+import { Badge, Button, Callout, EmptyState, HoldButton, Input, LinkButton, PageHeader, Spinner, Tabs, Toggle, cx, fmtBytes, useToast } from "../lib/ui";
 
 export default function Mods() {
   const { id = "" } = useParams();
@@ -16,6 +17,15 @@ export default function Mods() {
   const toast = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
+  const [tab, setTab] = useState<"installed" | "modrinth">("installed");
+  const { data: updates } = useModUpdates(id);
+  const applyUpdates = useApplyModUpdates(id);
+  const updateOf = useMemo(() => new Map((updates ?? []).map((u) => [u.file, u])), [updates]);
+  const runUpdates = (files: string[]) =>
+    applyUpdates.mutate(files, {
+      onSuccess: (r) => toast("ok", `${r.updated.length}개 업데이트했어요. 이전 파일은 ${r.backupDir} 에 있어요.`, { icon: "chest" }),
+      onError: (e) => toast("err", (e as Error).message),
+    });
   const locked = server ? server.process.state !== "stopped" : true;
   const onErr = (err: unknown) => toast("err", (err as Error).message);
 
@@ -81,6 +91,31 @@ export default function Mods() {
         }
       />
 
+      <Tabs
+        tabs={[
+          { id: "installed" as const, label: "설치된 " + (isPaper ? "플러그인" : "모드"), count: mods?.length ?? 0 },
+          { id: "modrinth" as const, label: "Modrinth 에서 찾기", icon: Compass },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+
+      {tab === "modrinth" ? (
+        <ModrinthSearch serverId={id} locked={locked} plugin={isPaper} />
+      ) : (
+      <>
+      {(updates?.length ?? 0) > 0 && (
+        <Callout tone="lamp" icon={ArrowUpCircle} title={`업데이트 ${updates!.length}개`}>
+          Modrinth 에 새 버전이 있어요. 이전 jar 는 .blockpilot-backup/ 에 보관돼서 되돌릴 수 있어요.
+          <div className="mt-2">
+            <Button size="sm" variant="primary" disabled={locked} loading={applyUpdates.isPending} onClick={() => runUpdates(updates!.map((u) => u.file))}>
+              모두 업데이트
+            </Button>
+            {locked && <span className="ml-2 text-[12px] text-amber-300">서버를 끈 뒤에 할 수 있어요</span>}
+          </div>
+        </Callout>
+      )}
+
       {problems.length > 0 && (
         <Callout tone="danger" title="의존성 문제 — 이대로는 서버가 시작되지 않을 수 있어요">
           {problems.map((m) => (
@@ -114,9 +149,13 @@ export default function Mods() {
               delay={i * 30}
               onToggle={(v) => toggle.mutate({ file: m.file, enabled: v }, { onError: onErr })}
               onDelete={() => del.mutate(m.file, { onSuccess: () => toast("info", `${m.file} 삭제`), onError: onErr })}
+              update={updateOf.get(m.file)}
+              onUpdate={() => runUpdates([m.file])}
             />
           ))}
         </ul>
+      )}
+      </>
       )}
     </div>
   );
@@ -124,7 +163,7 @@ export default function Mods() {
 
 const ENV_DEPS = new Set(["minecraft", "java", "fabricloader", "fabric-loader"]);
 
-function ModCard({ mod: m, locked, delay, onToggle, onDelete }: { mod: ModInfo; locked: boolean; delay: number; onToggle: (v: boolean) => void; onDelete: () => void }) {
+function ModCard({ mod: m, locked, delay, onToggle, onDelete, update, onUpdate }: { mod: ModInfo; locked: boolean; delay: number; onToggle: (v: boolean) => void; onDelete: () => void; update?: ModUpdate; onUpdate: () => void }) {
   return (
     <li className={cx("slab flex animate-slide-up gap-4 p-4", !m.enabled && "opacity-60 saturate-50")} style={{ animationDelay: `${delay}ms` }}>
       <div className="h-14 w-14 shrink-0 overflow-hidden well">
@@ -137,6 +176,13 @@ function ModCard({ mod: m, locked, delay, onToggle, onDelete }: { mod: ModInfo; 
               <span className="truncate font-block text-[12px] text-white">{m.name ?? m.file}</span>
               {m.version && <Badge mono>{m.version}</Badge>}
               {!m.enabled && <Badge tone="warning">비활성</Badge>}
+              {update && (
+                <button type="button" className="focus-ring disabled:cursor-not-allowed" disabled={locked} onClick={onUpdate} title={locked ? "서버를 끈 뒤에 업데이트할 수 있어요" : `${update.latest} 로 업데이트`}>
+                  <Badge tone="lamp">
+                    <ArrowUpCircle className="h-3 w-3" /> {update.latest}
+                  </Badge>
+                </button>
+              )}
             </div>
             {m.authors.length > 0 && <div className="mt-0.5 truncate text-xs text-slate-500">{m.authors.join(", ")}</div>}
           </div>

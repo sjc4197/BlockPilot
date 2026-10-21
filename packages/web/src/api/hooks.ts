@@ -32,6 +32,9 @@ import type {
   ReachabilityResult,
   PerfInfo,
   StatsResponse,
+  ModrinthSearchResult,
+  ModrinthInstallResult,
+  ModUpdate,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -354,3 +357,33 @@ export const useReachCheck = (id: string) => useMutation({ mutationFn: (ip: stri
 export const usePerf = (id: string) => useQuery({ queryKey: ["server", id, "perf"], queryFn: () => api<PerfInfo>(`/api/servers/${id}/perf`), refetchInterval: 5000 });
 
 export const useStats = (id: string) => useQuery({ queryKey: ["server", id, "stats"], queryFn: () => api<StatsResponse>(`/api/servers/${id}/stats`), refetchInterval: 60_000 });
+
+// ---------- Modrinth ----------
+
+export const useModrinthSearch = (id: string, q: string, enabled: boolean) =>
+  useQuery({ queryKey: ["server", id, "modrinth", "search", q], queryFn: () => api<ModrinthSearchResult>(`/api/servers/${id}/modrinth/search?q=${encodeURIComponent(q)}`), enabled, staleTime: 5 * 60_000 });
+
+export const useModUpdates = (id: string) => useQuery({ queryKey: ["server", id, "modrinth", "updates"], queryFn: () => api<ModUpdate[]>(`/api/servers/${id}/modrinth/updates`), staleTime: 10 * 60_000, retry: false });
+
+export function useModrinthInstall(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { projectId: string; allowClientOnly?: boolean }) => api<ModrinthInstallResult>(`/api/servers/${id}/modrinth/install`, { method: "POST", json: v }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.mods(id) });
+      qc.invalidateQueries({ queryKey: ["server", id, "modrinth"] });
+      qc.invalidateQueries({ queryKey: keys.server(id) });
+    },
+  });
+}
+
+export function useApplyModUpdates(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (files: string[]) => api<{ updated: { file: string; to: string }[]; backupDir: string }>(`/api/servers/${id}/modrinth/update`, { method: "POST", json: { files } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys.mods(id) });
+      qc.invalidateQueries({ queryKey: ["server", id, "modrinth"] });
+    },
+  });
+}

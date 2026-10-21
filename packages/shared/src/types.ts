@@ -571,3 +571,44 @@ export interface StatsResponse {
   /** BlockPilot 이 지켜본 최근 7일 접속 시간 (분) */
   week: { name: string; minutes: number }[];
 }
+
+// ---------- Modrinth ----------
+
+export interface ModrinthHit {
+  projectId: string;
+  slug: string;
+  title: string;
+  description: string;
+  author: string;
+  iconUrl?: string;
+  downloads: number;
+  /** "required" | "optional" | "unsupported" */
+  serverSide: string;
+  clientSide: string;
+  /** 이 서버에 이미 깔려 있는지 */
+  installed: boolean;
+}
+
+export interface ModrinthSearchResult {
+  /** 이 서버에서 Modrinth 를 쓸 수 있는지 (바닐라·알 수 없는 로더면 false) */
+  supported: boolean;
+  reason?: string;
+  loader?: string;
+  mcVersion?: string;
+  hits: ModrinthHit[];
+  total: number;
+}
+
+export interface ModrinthInstallResult {
+  installed: { title: string; file: string; version: string; dependency: boolean }[];
+  skipped: { title: string; reason: string }[];
+}
+
+export interface ModUpdate {
+  file: string;
+  projectId: string;
+  title: string;
+  current: string;
+  latest: string;
+  latestVersionId: string;
+}

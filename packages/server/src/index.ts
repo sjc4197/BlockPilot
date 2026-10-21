@@ -24,6 +24,7 @@ import { fsRoutes } from "./routes/fs.js";
 import { automationRoutes } from "./routes/automation.js";
 import { networkRoutes } from "./routes/network.js";
 import { statsRoutes } from "./routes/stats.js";
+import { modrinthRoutes } from "./routes/modrinth.js";
 import { startPlaytimeTracker } from "./services/stats.js";
 import { startDiscordNotifier } from "./services/discord.js";
 import { startAutoRestart } from "./services/autoRestart.js";
@@ -77,6 +78,7 @@ await app.register(fsRoutes);
 await app.register(automationRoutes);
 await app.register(networkRoutes);
 await app.register(statsRoutes);
+await app.register(modrinthRoutes);
 
 // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist)
 const here = path.dirname(fileURLToPath(import.meta.url));

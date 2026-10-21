@@ -7,7 +7,7 @@ import { pipeline } from "node:stream/promises";
 import { CreateError, toCreateError } from "./errors.js";
 import { retryFs } from "../../lib/retry.js";
 
-export type HashAlgo = "sha1" | "sha256";
+export type HashAlgo = "sha1" | "sha256" | "sha512";
 
 export interface DownloadOptions {
   url: string;
