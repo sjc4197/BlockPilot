@@ -1,9 +1,11 @@
+import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Activity, Boxes, Coffee, Copy, Gamepad2, Globe, Layers, Swords, Users, type LucideIcon } from "lucide-react";
 import { useSendCommand, useServer } from "../api/hooks";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
 import { Lamp, SignalBar, type LampState } from "../lib/pixel";
+import { JoinFeed, PlayerHearts, RedstoneParticles } from "../lib/fx";
 import { ProcessControls } from "../components/ProcessControls";
 import { Avatar, Badge, Callout, Card, ConfirmButton, SectionTitle, StatusBadge, cx, fmtAgo, useToast } from "../lib/ui";
 
@@ -23,40 +25,13 @@ export default function Dashboard() {
   const maxPlayers = Math.max(1, s.properties.maxPlayers);
   // 비교기처럼 0~15 로 환산 (한 명이라도 있으면 최소 1칸)
   const signal = players.length === 0 ? 0 : Math.max(1, Math.round((players.length / maxPlayers) * 15));
+  // 전원 회로: 켜지면 신호가 가루를 타고 흘러 카드 윗변이 차례로 켜진다
+  const power = state === "running" || state === "external" ? "on" : state === "starting" || state === "stopping" ? state : "off";
   const cmd = (c: string, okMsg: string) => sendCmd.mutate(c, { onSuccess: () => toast("ok", okMsg), onError: (e) => toast("err", (e as Error).message) });
   const copyPath = () => navigator.clipboard?.writeText(s.path).then(() => toast("info", "경로를 복사했습니다."));
 
   return (
     <div className="space-y-5">
-      {/* 히어로 */}
-      <section className="slab p-6">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="truncate font-block text-[24px] leading-tight text-white [text-shadow:2px_2px_0_#08080a]">{s.name}</h1>
-              <StatusBadge state={state} />
-              {state === "running" && startedAt && <span className="font-block text-[12px] text-slate-500 tnum">{fmtAgo(startedAt)} 전 시작</span>}
-            </div>
-            <button onClick={copyPath} className="group mt-1.5 inline-flex max-w-full items-center gap-1.5 font-mono text-[12px] text-slate-500 hover:text-slate-300" title="경로 복사">
-              <span className="truncate">{s.path}</span>
-              <Copy className="h-3 w-3 shrink-0 opacity-0 transition group-hover:opacity-100" />
-            </button>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <Badge tone="brand">
-                {loaderLabel(s.loader)} {s.loaderVersion}
-              </Badge>
-              <Badge>Minecraft {s.mcVersion ?? "?"}</Badge>
-              <Badge>
-                <Coffee className="h-3 w-3" /> Java {s.javaVersion ?? "없음"}
-              </Badge>
-              <Badge>{s.startScript ?? "java 직접 실행"}</Badge>
-              {s.foreignScript && <Badge tone="warning">{s.foreignScript} 는 다른 OS 용이라 쓰지 않음</Badge>}
-            </div>
-          </div>
-          <ProcessControls serverId={id} status={{ ...s.process, state, onlinePlayers: players }} size="lg" />
-        </div>
-      </section>
-
       {!s.eulaAccepted && (
         <Callout tone="warning" title="EULA 미동의">
           <code className="font-mono">eula.txt</code> 에 <code className="font-mono">eula=true</code> 가 없어 서버를 시작할 수 없습니다.
@@ -73,27 +48,71 @@ export default function Dashboard() {
         </Callout>
       )}
 
-      {/* 통계 */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat icon={Users} label="접속자" value={`${players.length}`} sub={`/ ${s.properties.maxPlayers}명`} accent>
-          <div className="mt-2.5 flex items-center gap-2">
-            <SignalBar value={signal} className="flex-1" />
-            <span className="font-block text-[11px] text-slate-500 tnum">{signal}</span>
+      <div className="power" data-power={power}>
+        {/* 히어로 */}
+        <section className="slab relative overflow-hidden p-6">
+          <RedstoneParticles active={power === "on"} />
+          <div className="relative flex flex-wrap items-start justify-between gap-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="truncate font-block text-[24px] leading-tight text-white [text-shadow:2px_2px_0_#08080a]">{s.name}</h1>
+                <StatusBadge state={state} />
+                {state === "running" && startedAt && <span className="font-block text-[12px] text-slate-500 tnum">{fmtAgo(startedAt)} 전 시작</span>}
+              </div>
+              <button onClick={copyPath} className="group mt-1.5 inline-flex max-w-full items-center gap-1.5 font-mono text-[12px] text-slate-500 hover:text-slate-300" title="경로 복사">
+                <span className="truncate">{s.path}</span>
+                <Copy className="h-3 w-3 shrink-0 opacity-0 transition group-hover:opacity-100" />
+              </button>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <Badge tone="brand">
+                  {loaderLabel(s.loader)} {s.loaderVersion}
+                </Badge>
+                <Badge>Minecraft {s.mcVersion ?? "?"}</Badge>
+                <Badge>
+                  <Coffee className="h-3 w-3" /> Java {s.javaVersion ?? "없음"}
+                </Badge>
+                <Badge>{s.startScript ?? "java 직접 실행"}</Badge>
+                {s.foreignScript && <Badge tone="warning">{s.foreignScript} 는 다른 OS 용이라 쓰지 않음</Badge>}
+              </div>
+            </div>
+            <ProcessControls serverId={id} status={{ ...s.process, state, onlinePlayers: players }} size="lg" />
           </div>
-        </Stat>
-        <Stat icon={Boxes} label={s.loader === "paper" ? "플러그인" : "모드"} value={`${s.modCount}`} sub="개 설치됨" to={`/s/${id}/mods`} />
-        <Stat icon={Swords} label="난이도" value={difficultyLabel(s.properties.difficulty)} to={`/s/${id}/settings`} />
-        <Stat icon={Gamepad2} label="게임모드" value={gamemodeLabel(s.properties.gamemode)} to={`/s/${id}/settings`} />
-        <Stat lamp={s.properties.whitelist ? "on" : "off"} label="화이트리스트" value={s.properties.whitelist ? "켜짐" : "꺼짐"} to={`/s/${id}/players`} />
-        <Stat icon={Globe} label="포트" value={String(s.properties.port)} />
-        <Stat icon={Layers} label="월드" value={s.levelName} to={`/s/${id}/backups`} />
-        <Stat icon={Activity} label="MOTD" value={s.properties.motd || "(없음)"} small />
-      </section>
+        </section>
+
+        <div className="power-wire" aria-hidden>
+          {Array.from({ length: 40 }, (_, i) => (
+            <span key={i} className="dust" style={{ "--i": i } as CSSProperties} />
+          ))}
+        </div>
+        {/* 통계 */}
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Stat k={0} icon={Users} label="접속자" value={`${players.length}`} sub={`/ ${s.properties.maxPlayers}명`} accent>
+            {s.properties.maxPlayers <= 20 ? (
+              <div className="mt-2.5">
+                <PlayerHearts count={players.length} max={s.properties.maxPlayers} />
+              </div>
+            ) : (
+              <div className="mt-2.5 flex items-center gap-2">
+                <SignalBar value={signal} className="flex-1" />
+                <span className="font-block text-[11px] text-slate-500 tnum">{signal}</span>
+              </div>
+            )}
+          </Stat>
+          <Stat k={1} icon={Boxes} label={s.loader === "paper" ? "플러그인" : "모드"} value={`${s.modCount}`} sub="개 설치됨" to={`/s/${id}/mods`} />
+          <Stat k={2} icon={Swords} label="난이도" value={difficultyLabel(s.properties.difficulty)} to={`/s/${id}/settings`} />
+          <Stat k={3} icon={Gamepad2} label="게임모드" value={gamemodeLabel(s.properties.gamemode)} to={`/s/${id}/settings`} />
+          <Stat k={4} lamp={s.properties.whitelist ? "on" : "off"} label="화이트리스트" value={s.properties.whitelist ? "켜짐" : "꺼짐"} to={`/s/${id}/players`} />
+          <Stat k={5} icon={Globe} label="포트" value={String(s.properties.port)} />
+          <Stat k={6} icon={Layers} label="월드" value={s.levelName} to={`/s/${id}/backups`} />
+          <Stat k={7} icon={Activity} label="MOTD" value={s.properties.motd || "(없음)"} small />
+        </section>
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-5">
         {/* 접속자 */}
         <Card className="lg:col-span-2">
           <SectionTitle right={<Badge tone={players.length ? "lamp" : "neutral"}>{players.length}명</Badge>}>접속 중인 플레이어</SectionTitle>
+          <JoinFeed players={players} />
           {players.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-500">{canCommand ? "아무도 접속해 있지 않아요." : "서버가 실행 중일 때 표시됩니다."}</p>
           ) : (
@@ -137,6 +156,7 @@ export default function Dashboard() {
 }
 
 function Stat({
+  k = 0,
   icon: Icon,
   lamp,
   label,
@@ -147,6 +167,8 @@ function Stat({
   small,
   children,
 }: {
+  /** 전원 회로에서 몇 번째로 켜지는 카드인지 */
+  k?: number;
   icon?: LucideIcon;
   lamp?: LampState;
   label: string;
@@ -176,12 +198,15 @@ function Stat({
       {children}
     </>
   );
+  const style = { "--k": k } as CSSProperties;
   return to ? (
-    <Link to={to} className="slab block p-4 transition-colors hover:bg-ink-3 active:shadow-pressed">
+    <Link to={to} style={style} className="stat-power slab relative block p-4 transition-colors hover:bg-ink-3 active:shadow-pressed">
       {inner}
     </Link>
   ) : (
-    <div className="slab p-4">{inner}</div>
+    <div style={style} className="stat-power slab relative p-4">
+      {inner}
+    </div>
   );
 }
 

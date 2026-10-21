@@ -310,7 +310,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="pointer-events-none fixed right-4 top-[4.25rem] z-50 flex w-[22rem] max-w-[calc(100vw-2rem)] flex-col items-end gap-2" aria-live="polite">
+      {/* 오른쪽 아래: 위쪽에는 전원 레버가 있어서 가리지 않게 */}
+      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[22rem] max-w-[calc(100vw-2rem)] flex-col items-end gap-2" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} role={t.kind === "err" ? "alert" : "status"} className={cx("adv pointer-events-auto", t.leaving && "adv-out")}>
             <span className="adv-icon">{t.icon ? <ItemIcon item={t.icon} className="h-6 w-6" /> : <Info className="h-5 w-5 text-sky-300" />}</span>
