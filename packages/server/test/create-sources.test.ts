@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { intersectReleases, mavenPath } from "../src/services/create/sources.js";
+import { mavenPath } from "../src/services/create/sources.js";
+import { intersectReleases } from "../src/services/create/loaders/fabric.js";
+import { releasesOf } from "../src/services/create/loaders/mojang.js";
 import { parseJavaVersion } from "../src/services/create/java.js";
 import { toCreateError } from "../src/services/create/errors.js";
 
@@ -19,7 +21,7 @@ describe("intersectReleases", () => {
       { version: "26.3", stable: true },
       { version: "1.21.1", stable: true },
     ];
-    expect(intersectReleases(manifest, fabric).map((r) => r.id)).toEqual(["26.3", "1.21.1"]);
+    expect(intersectReleases(releasesOf(manifest), fabric).map((r) => r.id)).toEqual(["26.3", "1.21.1"]);
   });
 });
 

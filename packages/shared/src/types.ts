@@ -261,11 +261,42 @@ export interface AuthInfo {
 
 // ---------- 새 서버 만들기 ----------
 
+/** 새로 만들 수 있는 서버 종류. vanilla 는 로더 없이 Mojang server.jar 만 */
+export const CreateLoader = z.enum(["vanilla", "fabric", "paper", "forge", "neoforge"]);
+export type CreateLoader = z.infer<typeof CreateLoader>;
+
+export const CREATE_LOADER_LABEL: Record<CreateLoader, string> = { vanilla: "순정", fabric: "Fabric", paper: "Paper", forge: "Forge", neoforge: "NeoForge" };
+
+/**
+ * 화면에 보여 줄 로더 버전. 값 자체는 설치기 경로에 그대로 쓰이므로 바꾸지 않고 표시만 다듬는다.
+ * Forge "1.21.1-52.1.21" → "52.1.21" (Minecraft 칸에 이미 1.21.1 이 있음), Paper "133" → "빌드 133", 순정 "" → ""
+ */
+export function displayLoaderVersion(loader: CreateLoader, mc: string, version: string): string {
+  if (!version) return "";
+  const v = version.startsWith(`${mc}-`) ? version.slice(mc.length + 1) : version;
+  return loader === "paper" ? `빌드 ${v}` : v;
+}
+
+export interface CreateLoaderInfo {
+  id: CreateLoader;
+  label: string;
+  /** 한 줄 설명 (화면의 로더 고르기) */
+  summary: string;
+  /** 지원하는 가장 낮은 Minecraft 버전 (없으면 Mojang 정식 버전 전부) */
+  minMc?: string;
+  /** 로더 버전(또는 빌드)을 고르는 칸이 있는지. 순정은 없음 */
+  hasVersions: boolean;
+  /** 두 번째 선택 칸 이름: "Fabric 로더" / "Paper 빌드" / "Forge 버전" … */
+  versionLabel: string;
+}
+
 export const CreateServerInput = z.object({
   path: z.string().min(1),
   name: z.string().min(1).max(60),
+  loader: CreateLoader,
   mcVersion: z.string().min(1),
-  loaderVersion: z.string().min(1),
+  /** 로더 버전 (Paper 는 빌드 번호). 순정은 빈 문자열 */
+  loaderVersion: z.string(),
   memory: z
     .object({ minMb: z.number().int().min(512).max(65536), maxMb: z.number().int().min(1024).max(65536) })
     .refine((m) => m.minMb <= m.maxMb, { message: "최소 메모리는 최대 메모리보다 클 수 없어요." }),
@@ -281,7 +312,7 @@ export const CreateServerInput = z.object({
 });
 export type CreateServerInput = z.infer<typeof CreateServerInput>;
 
-export type CreateStepId = "preflight" | "versions" | "java" | "server-jar" | "fabric" | "config" | "first-run" | "register";
+export type CreateStepId = "preflight" | "versions" | "java" | "server-jar" | "loader" | "config" | "first-run" | "register";
 export type CreateStepState = "pending" | "running" | "done" | "failed" | "skipped";
 
 export interface CreateStep {
@@ -304,7 +335,7 @@ export interface CreateJobError {
 export interface CreateJobStatus {
   id: string;
   state: CreateJobState;
-  input: { path: string; name: string; mcVersion: string; loaderVersion: string };
+  input: { path: string; name: string; loader: CreateLoader; mcVersion: string; loaderVersion: string };
   steps: CreateStep[];
   log: string[];
   error?: CreateJobError;
@@ -322,20 +353,38 @@ export interface CreateOptions {
   platform: "macos" | "linux" | "windows" | "other";
   unsupportedMessage?: string;
   totalMemMb: number;
-  /** Mojang 정식 릴리스 ∩ Fabric 안정 지원 (최신순) */
-  releases: { id: string; releaseTime: string }[];
+  /** 만들 수 있는 서버 종류 (화면에 보여 줄 순서) */
+  loaders: CreateLoaderInfo[];
+  /** Fabric 이 지원하는 Mojang 정식 릴리스 (최신순). 다른 로더는 GET /api/create/releases?loader= */
+  releases: CreateRelease[];
   defaults: { parentDir: string; memory: { minMb: number; maxMb: number } };
   /** BlockPilot 이 도중에 꺼져서 다음 시작 때 정리한 작업 */
   recovered: { target: string; cleaned: string[]; at: string }[];
   activeJobId?: string;
 }
 
+export interface CreateRelease {
+  id: string;
+  releaseTime: string;
+}
+
+export interface CreateLoaderVersion {
+  version: string;
+  /** 안정 빌드인지. 아니면 화면에 "(베타)" */
+  stable: boolean;
+}
+
 export interface CreateVersionInfo {
+  loader: CreateLoader;
   mcVersion: string;
   javaMajor: number;
   java: { source: "system" | "cached" | "download"; version?: string; downloadMb?: number };
-  serverJarMb: number;
-  loaders: { version: string; stable: boolean }[];
+  /** 받을 파일 크기 (MB): 순정·Fabric 은 server.jar, Paper 는 Paper jar, Forge·NeoForge 는 설치기 */
+  downloadMb: number;
+  /** 받는 것에 대한 짧은 설명 (예: "설치기가 라이브러리를 더 받아요") */
+  downloadNote?: string;
+  /** 로더 버전 목록 (최신순). 순정은 빈 배열 */
+  loaders: CreateLoaderVersion[];
   recommendedLoader?: string;
 }
 

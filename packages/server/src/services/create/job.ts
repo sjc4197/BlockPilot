@@ -2,7 +2,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
-import type { CreateJobState, CreateJobStatus, CreateServerInput, CreateStep, CreateStepId } from "@blockpilot/shared";
+import { CREATE_LOADER_LABEL, type CreateJobState, type CreateJobStatus, type CreateLoader, type CreateServerInput, type CreateStep, type CreateStepId } from "@blockpilot/shared";
 import { BLOCKPILOT_HOME } from "../../config/store.js";
 import { CreateError, toCreateError } from "./errors.js";
 import { cleanupTarget, removeTempPath } from "./target.js";
@@ -18,17 +18,21 @@ import { platform } from "../platform/index.js";
 export const JOBS_DIR = path.join(BLOCKPILOT_HOME, "jobs");
 const LOG_LIMIT = 400;
 
-export const STEP_LABELS: Record<CreateStepId, string> = {
-  preflight: "사전 점검",
-  versions: "버전 정보 확인",
-  java: "Java 준비",
-  "server-jar": "Minecraft 서버 받기",
-  fabric: "Fabric 설치",
-  config: "설정 파일 작성",
-  "first-run": "최초 실행",
-  register: "서버 목록에 등록",
-};
-const STEP_ORDER = Object.keys(STEP_LABELS) as CreateStepId[];
+/** 단계 이름. "loader" 는 서버 종류에 따라 다르다 */
+export function stepLabels(loader: CreateLoader): Record<CreateStepId, string> {
+  const name = CREATE_LOADER_LABEL[loader];
+  return {
+    preflight: "사전 점검",
+    versions: "버전 정보 확인",
+    java: "Java 준비",
+    "server-jar": "Minecraft 서버 받기",
+    loader: loader === "paper" ? "Paper 받기" : loader === "vanilla" ? "로더 설치" : `${name} 설치`,
+    config: "설정 파일 작성",
+    "first-run": "최초 실행",
+    register: "서버 목록에 등록",
+  };
+}
+const STEP_ORDER: CreateStepId[] = ["preflight", "versions", "java", "server-jar", "loader", "config", "first-run", "register"];
 
 export interface Journal {
   id: string;
@@ -46,7 +50,7 @@ export interface Journal {
 export class CreateJob {
   readonly id = randomUUID().slice(0, 8);
   state: CreateJobState = "running";
-  readonly steps: CreateStep[] = STEP_ORDER.map((id) => ({ id, label: STEP_LABELS[id], state: "pending" }));
+  readonly steps: CreateStep[];
   readonly log: string[] = [];
   error?: CreateError;
   cleaned?: string[];
@@ -59,7 +63,10 @@ export class CreateJob {
   private ctrl = new AbortController();
   private children = new Set<ChildProcess>();
 
-  constructor(readonly input: CreateServerInput) {}
+  constructor(readonly input: CreateServerInput) {
+    const labels = stepLabels(input.loader);
+    this.steps = STEP_ORDER.map((id) => ({ id, label: labels[id], state: "pending" }));
+  }
 
   get signal() {
     return this.ctrl.signal;
@@ -71,11 +78,11 @@ export class CreateJob {
   }
 
   status(): CreateJobStatus {
-    const { path: p, name, mcVersion, loaderVersion } = this.input;
+    const { path: p, name, loader, mcVersion, loaderVersion } = this.input;
     return {
       id: this.id,
       state: this.state,
-      input: { path: this.journal?.target ?? p, name, mcVersion, loaderVersion },
+      input: { path: this.journal?.target ?? p, name, loader, mcVersion, loaderVersion },
       steps: this.steps.map((s) => ({ ...s, progress: s.progress && { ...s.progress } })),
       log: [...this.log],
       error: this.error?.toJSON(),
@@ -112,6 +119,10 @@ export class CreateJob {
   note(id: CreateStepId, note: string) {
     this.stepOf(id).note = note;
   }
+  /** 내려받기 진행률 표시를 지운다 (다음 작업은 진행률을 알 수 없을 때) */
+  clearProgress(id: CreateStepId) {
+    this.stepOf(id).progress = undefined;
+  }
   finishStep(id: CreateStepId, note?: string) {
     const s = this.stepOf(id);
     s.state = "done";
@@ -127,6 +138,8 @@ export class CreateJob {
   trackChild(child: ChildProcess) {
     this.children.add(child);
     child.once("exit", () => this.children.delete(child));
+    // 취소 직후에 띄워진 프로세스(설치기 등)가 끝까지 도는 일이 없게
+    if (this.ctrl.signal.aborted) platform.killTree(child, true);
   }
 
   cancel() {

@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import fsp from "node:fs/promises";
+import type { LaunchSpec } from "./types.js";
 
 /** macOS·Linux 가 함께 쓰는 부분 */
 
@@ -29,7 +30,17 @@ export function posixPinnedJava(body: string) {
   return body.match(/^\s*exec\s+"(\/[^"]+\/bin\/java)"/m)?.[1];
 }
 
-export function posixStartScript(javaPath: string, minMb: number, maxMb: number) {
+/** 시작 스크립트의 java 뒤에 붙는 인자. 설치기 인자 파일은 POSIX 경로 그대로 */
+export function posixLaunchArgs(launch: LaunchSpec): string {
+  return launch.kind === "jar" ? `-jar ${shellQuote(launch.jar)} nogui` : `@${shellQuote(`${launch.dir}/unix_args.txt`)} nogui`;
+}
+
+/** 공백·특수문자가 없으면 그대로, 있으면 큰따옴표로 감싼다 */
+function shellQuote(s: string) {
+  return /^[A-Za-z0-9_./@+:=-]+$/.test(s) ? s : `"${s.replace(/(["\\$`])/g, "\\$1")}"`;
+}
+
+export function posixStartScript(javaPath: string, minMb: number, maxMb: number, launch: LaunchSpec) {
   const q = javaPath.replace(/(["\\$`])/g, "\\$1");
   return {
     name: "start.sh",
@@ -38,8 +49,9 @@ export function posixStartScript(javaPath: string, minMb: number, maxMb: number)
       "#!/bin/sh",
       "# BlockPilot 이 만든 시작 스크립트",
       "# 메모리를 바꾸려면 -Xms(시작 메모리)와 -Xmx(최대 메모리) 값을 고치세요.",
+      ...(launch.kind === "argsFile" ? ["# 설치기가 만든 run.sh 와 user_jvm_args.txt 는 쓰지 않아요. BlockPilot 은 이 파일로 켜요."] : []),
       'cd "$(dirname "$0")"',
-      `exec "${q}" -Xms${minMb}M -Xmx${maxMb}M -jar fabric-server-launch.jar nogui`,
+      `exec "${q}" -Xms${minMb}M -Xmx${maxMb}M ${posixLaunchArgs(launch)}`,
       "",
     ].join("\n"),
   };

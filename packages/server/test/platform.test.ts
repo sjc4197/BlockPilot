@@ -20,16 +20,31 @@ describe("detectOs", () => {
 
 describe("start scripts", () => {
   it("POSIX start.sh pins java and round-trips", () => {
-    const s = platforms.linux.startScriptFor("/opt/jdk 21/bin/java", 1024, 2048);
+    const s = platforms.linux.startScriptFor("/opt/jdk 21/bin/java", 1024, 2048, { kind: "jar", jar: "fabric-server-launch.jar" });
     expect(s.name).toBe("start.sh");
     expect(s.mode).toBe(0o755);
     expect(s.body).toContain('exec "/opt/jdk 21/bin/java" -Xms1024M -Xmx2048M -jar fabric-server-launch.jar nogui');
     expect(platforms.macos.pinnedJava(s.body)).toBe("/opt/jdk 21/bin/java");
   });
 
+  it("POSIX start.sh can launch through an installer args file (Forge·NeoForge)", () => {
+    const s = platforms.macos.startScriptFor("/opt/jdk/bin/java", 1024, 2048, { kind: "argsFile", dir: "libraries/net/neoforged/neoforge/21.1.265" });
+    expect(s.body).toContain('exec "/opt/jdk/bin/java" -Xms1024M -Xmx2048M @libraries/net/neoforged/neoforge/21.1.265/unix_args.txt nogui');
+    expect(platforms.macos.pinnedJava(s.body)).toBe("/opt/jdk/bin/java");
+  });
+
+  it("Windows start.bat uses win_args.txt with backslashes for an args file, and quotes jar names", () => {
+    const java = "C:\\Java\\bin\\java.exe";
+    const a = platforms.windows.startScriptFor(java, 1024, 2048, { kind: "argsFile", dir: "libraries/net/minecraftforge/forge/1.21.1-52.1.21" });
+    expect(a.body).toContain('"C:\\Java\\bin\\java.exe" -Xms1024M -Xmx2048M @"libraries\\net\\minecraftforge\\forge\\1.21.1-52.1.21\\win_args.txt" nogui');
+    expect(platforms.windows.pinnedJava(a.body)).toBe(java);
+    const j = platforms.windows.startScriptFor(java, 1024, 2048, { kind: "jar", jar: "paper-1.21.1-133.jar" });
+    expect(j.body).toContain('-jar "paper-1.21.1-133.jar" nogui');
+  });
+
   it("Windows start.bat uses CRLF, UTF-8 code page, no pause under BlockPilot, and round-trips", () => {
     const java = "C:\\Users\\서준\\.blockpilot\\runtimes\\temurin-21\\bin\\java.exe";
-    const s = platforms.windows.startScriptFor(java, 2048, 4096);
+    const s = platforms.windows.startScriptFor(java, 2048, 4096, { kind: "jar", jar: "fabric-server-launch.jar" });
     expect(s.name).toBe("start.bat");
     expect(s.body.split("\r\n").length).toBeGreaterThan(5);
     expect(s.body).not.toMatch(/[^\r]\n/);
@@ -148,7 +163,7 @@ describe("BlockPilot's own start script reaches the java line and its output com
     const { platform } = await import("../src/services/platform/index.js");
     const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "bp-java-line 서버-"));
     try {
-      const script = platform.startScriptFor(process.execPath, 512, 1024);
+      const script = platform.startScriptFor(process.execPath, 512, 1024, { kind: "jar", jar: "fabric-server-launch.jar" });
       await fsp.writeFile(path.join(dir, script.name), script.body, script.mode ? { mode: script.mode } : undefined);
       const { cmd, args, verbatim } = platform.scriptCommand(script.name);
       const child = spawn(cmd, args, { cwd: dir, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...platform.childEnv() }, ...platform.spawnOptions(), windowsVerbatimArguments: verbatim });

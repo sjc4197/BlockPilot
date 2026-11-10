@@ -29,6 +29,13 @@ export interface Shortcut {
   kind: "home" | "folder" | "drive";
 }
 
+/**
+ * 서버를 어떻게 띄우는지.
+ * - jar: `java … -jar <jar> nogui` (순정 server.jar, fabric-server-launch.jar, paper-*.jar)
+ * - argsFile: `java … @<dir>/unix_args.txt nogui` (Forge·NeoForge 설치기가 만든 인자 파일. Windows 는 win_args.txt)
+ */
+export type LaunchSpec = { kind: "jar"; jar: string } | { kind: "argsFile"; dir: string };
+
 export interface StartScript {
   name: string;
   body: string;
@@ -62,7 +69,7 @@ export interface Platform {
   jdk(): { os: string; archive: "tar.gz" | "zip"; javaRel: string[] };
 
   // ---------- 새 서버의 시작 스크립트 ----------
-  startScriptFor(javaPath: string, minMb: number, maxMb: number): StartScript;
+  startScriptFor(javaPath: string, minMb: number, maxMb: number, launch: LaunchSpec): StartScript;
   /** 시작 스크립트에 고정된 java 절대 경로 (BlockPilot 이 만든 스크립트) */
   pinnedJava(scriptBody: string): string | undefined;
 

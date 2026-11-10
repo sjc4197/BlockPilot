@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import type { ServerLoader } from "@blockpilot/shared";
 import { badRequest } from "../lib/errors.js";
 import { platform } from "./platform/index.js";
+import { sortVersionsDesc } from "../lib/version.js";
 
 export interface DetectedServer {
   loader: ServerLoader;
@@ -55,31 +56,39 @@ export async function detectServer(dir: string): Promise<DetectedServer> {
   let mcVersion: string | undefined;
   let launchJar: string | undefined;
 
+  const paper = files.find((f) => /^paper-.*\.jar$/.test(f));
+  const purpur = files.find((f) => /^purpur-.*\.jar$/.test(f));
+  // 로더 폴더는 "그 로더의 자기 라이브러리" 폴더로 본다. libraries/net/neoforged 만 보면 안 된다:
+  // Paper 도 첫 실행 때 리매핑 도구(net.neoforged.art)를 libraries/net/neoforged/ 에 받아 둔다.
+  const neoDir = path.join(dir, "libraries/net/neoforged/neoforge");
+  const forgeDir = path.join(dir, "libraries/net/minecraftforge/forge");
+
   if (has("fabric-server-launch.jar") || has(".fabric")) {
     loader = "fabric";
     launchJar = has("fabric-server-launch.jar") ? "fabric-server-launch.jar" : files.find((f) => /^fabric-server.*\.jar$/.test(f));
     // versions/<mc>/server-<mc>.jar
     const versions = await fs.readdir(path.join(dir, "versions")).catch(() => [] as string[]);
-    if (versions.length) mcVersion = versions.sort().at(-1);
+    if (versions.length) mcVersion = newest(versions);
     const loaderDir = await fs.readdir(path.join(dir, "libraries/net/fabricmc/fabric-loader")).catch(() => [] as string[]);
-    if (loaderDir.length) loaderVersion = loaderDir.sort().at(-1);
-  } else if (await exists(path.join(dir, "libraries/net/neoforged"))) {
+    if (loaderDir.length) loaderVersion = newest(loaderDir);
+  } else if (paper || purpur) {
+    loader = "paper";
+    launchJar = paper ?? purpur;
+    // paper-1.21.1-133.jar → Minecraft 1.21.1, 빌드 133
+    const m = launchJar!.match(/-(\d+\.\d+(?:\.\d+)?)(?:-(\d+))?\.jar$/);
+    mcVersion = m?.[1];
+    loaderVersion = m?.[2];
+  } else if (await exists(neoDir)) {
     loader = "neoforge";
-    const v = await fs.readdir(path.join(dir, "libraries/net/neoforged/neoforge")).catch(() => [] as string[]);
-    loaderVersion = v.sort().at(-1);
-  } else if (await exists(path.join(dir, "libraries/net/minecraftforge/forge"))) {
+    loaderVersion = newest(await fs.readdir(neoDir).catch(() => [] as string[]));
+    mcVersion = loaderVersion ? neoForgeToMc(loaderVersion) : undefined;
+  } else if (await exists(forgeDir)) {
     loader = "forge";
-    const v = await fs.readdir(path.join(dir, "libraries/net/minecraftforge/forge")).catch(() => [] as string[]);
-    loaderVersion = v.sort().at(-1);
+    loaderVersion = newest(await fs.readdir(forgeDir).catch(() => [] as string[]));
     mcVersion = loaderVersion?.split("-")[0];
   } else {
-    const paper = files.find((f) => /^paper-.*\.jar$/.test(f));
-    const purpur = files.find((f) => /^purpur-.*\.jar$/.test(f));
-    const anyJar = paper ?? purpur ?? files.find((f) => /^(server|minecraft_server.*)\.jar$/.test(f)) ?? files.find((f) => f.endsWith(".jar"));
-    if (paper || purpur) {
-      loader = "paper";
-      mcVersion = (paper ?? purpur)!.match(/-(\d+\.\d+(?:\.\d+)?)/)?.[1];
-    } else if (anyJar) {
+    const anyJar = files.find((f) => /^(server|minecraft_server.*)\.jar$/.test(f)) ?? files.find((f) => f.endsWith(".jar"));
+    if (anyJar) {
       loader = "vanilla";
       mcVersion = anyJar.match(/(\d+\.\d+(?:\.\d+)?)/)?.[1];
     }
@@ -112,6 +121,31 @@ export async function detectServer(dir: string): Promise<DetectedServer> {
     foreignScript: startScript ? undefined : platform.foreignScripts.map(findName).find(Boolean),
     eulaAccepted: /^\s*eula\s*=\s*true/im.test(eula),
   };
+}
+
+/** 폴더 이름 중 가장 높은 버전 (숫자 비교. "0.16.10" 이 "0.16.9" 뒤에 오게) */
+function newest(names: string[]): string | undefined {
+  const real = names.filter((n) => !n.startsWith("."));
+  return sortVersionsDesc(real, (n) => n)[0];
+}
+
+/**
+ * NeoForge 버전 → Minecraft 버전.
+ * 1.20.2 이후: "21.1.265" → 1.21.1, "21.0.167" → 1.21. 연도 버전: "26.3.0.102" → 26.3, "26.1.2.126" → 26.1.2
+ */
+export function neoForgeToMc(v: string): string | undefined {
+  const core = v.split("-")[0].split(".");
+  if (!core.every((p) => /^\d+$/.test(p))) return undefined;
+  if (core.length === 3) {
+    const [minor, patch] = core;
+    if (Number(minor) < 20) return undefined;
+    return patch === "0" ? `1.${minor}` : `1.${minor}.${patch}`;
+  }
+  if (core.length === 4) {
+    const [year, minor, patch] = core;
+    return patch === "0" ? `${year}.${minor}` : `${year}.${minor}.${patch}`;
+  }
+  return undefined;
 }
 
 let javaVersionCache: string | undefined | null = null;

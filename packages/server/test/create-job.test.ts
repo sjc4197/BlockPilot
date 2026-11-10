@@ -19,6 +19,7 @@ beforeEach(async () => {
 const input = (p: string): CreateServerInput => ({
   path: p,
   name: "test",
+  loader: "fabric",
   mcVersion: "1.21.1",
   loaderVersion: "0.19.5",
   memory: { minMb: 1024, maxMb: 2048 },

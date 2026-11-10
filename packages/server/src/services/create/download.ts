@@ -6,6 +6,7 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { CreateError, toCreateError } from "./errors.js";
 import { retryFs } from "../../lib/retry.js";
+import { APP_VERSION } from "../../lib/appInfo.js";
 
 export type HashAlgo = "sha1" | "sha256" | "sha512";
 
@@ -21,7 +22,12 @@ export interface DownloadOptions {
   retries?: number;
   /** 이 시간 동안 데이터가 한 바이트도 안 오면 끊는다 */
   idleTimeoutMs?: number;
+  /** 요청 헤더 (Paper 처럼 User-Agent 를 요구하는 배포처) */
+  headers?: Record<string, string>;
 }
+
+/** 배포처에 보내는 User-Agent. Paper 는 소프트웨어 이름과 연락처가 든 UA 를 요구한다 */
+export const USER_AGENT = `BlockPilot/${APP_VERSION} (+https://github.com/sjc4197/BlockPilot)`;
 
 const DEFAULT_IDLE_MS = 30_000;
 
@@ -61,7 +67,7 @@ async function downloadOnce(o: DownloadOptions) {
 
   try {
     resetIdle();
-    const res = await fetch(o.url, { signal: ctrl.signal, redirect: "follow" });
+    const res = await fetch(o.url, { signal: ctrl.signal, redirect: "follow", headers: { "user-agent": USER_AGENT, ...o.headers } });
     if (res.status === 404) {
       throw new CreateError("not_found", "받아야 할 파일이 서버에 없어요.", "선택한 버전이 더 이상 배포되지 않을 수 있어요. 다른 버전을 골라 주세요.", o.url);
     }
@@ -106,7 +112,7 @@ async function downloadOnce(o: DownloadOptions) {
 }
 
 /** JSON 을 받는다. sha1 을 주면 원문 바이트의 sha1 을 확인한다 (Mojang 버전 JSON) */
-export async function fetchJson<T>(url: string, opts: { sha1?: string; signal?: AbortSignal; retries?: number } = {}): Promise<T> {
+export async function fetchJson<T>(url: string, opts: { sha1?: string; signal?: AbortSignal; retries?: number; headers?: Record<string, string> } = {}): Promise<T> {
   const buf = await fetchBuffer(url, opts);
   if (opts.sha1) {
     const digest = createHash("sha1").update(buf).digest("hex");
@@ -121,11 +127,11 @@ export async function fetchJson<T>(url: string, opts: { sha1?: string; signal?: 
   }
 }
 
-export async function fetchText(url: string, opts: { signal?: AbortSignal; retries?: number } = {}): Promise<string> {
+export async function fetchText(url: string, opts: { signal?: AbortSignal; retries?: number; headers?: Record<string, string> } = {}): Promise<string> {
   return (await fetchBuffer(url, opts)).toString("utf8");
 }
 
-async function fetchBuffer(url: string, opts: { signal?: AbortSignal; retries?: number }): Promise<Buffer> {
+async function fetchBuffer(url: string, opts: { signal?: AbortSignal; retries?: number; headers?: Record<string, string> }): Promise<Buffer> {
   const retries = opts.retries ?? 2;
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -134,7 +140,7 @@ async function fetchBuffer(url: string, opts: { signal?: AbortSignal; retries?: 
     const onAbort = () => ctrl.abort();
     opts.signal?.addEventListener("abort", onAbort, { once: true });
     try {
-      const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
+      const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "user-agent": USER_AGENT, ...opts.headers } });
       if (res.status === 404) throw new CreateError("not_found", "요청한 정보를 찾을 수 없어요.", "선택한 버전이 더 이상 배포되지 않을 수 있어요.", url);
       if (!res.ok) throw new CreateError("http_error", `정보를 받지 못했어요 (HTTP ${res.status}).`, "잠시 후 다시 시도해 주세요.", url);
       return Buffer.from(await res.arrayBuffer());
@@ -150,6 +156,24 @@ async function fetchBuffer(url: string, opts: { signal?: AbortSignal; retries?: 
     }
   }
   throw lastErr;
+}
+
+/** 파일 크기만 미리 본다 (HEAD). 못 알아내면 undefined */
+export async function headSize(url: string, opts: { signal?: AbortSignal; headers?: Record<string, string> } = {}): Promise<number | undefined> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  const onAbort = () => ctrl.abort();
+  opts.signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const res = await fetch(url, { method: "HEAD", signal: ctrl.signal, redirect: "follow", headers: { "user-agent": USER_AGENT, ...opts.headers } });
+    const n = Number(res.headers.get("content-length"));
+    return res.ok && n > 0 ? n : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener("abort", onAbort);
+  }
 }
 
 /** 이미 디스크에 있는 파일의 해시 */

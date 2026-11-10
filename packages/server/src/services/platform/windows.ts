@@ -90,7 +90,9 @@ export const windows: Platform = {
   },
   jdk: () => ({ os: "windows", archive: "zip", javaRel: ["bin/java.exe"] }),
 
-  startScriptFor(javaPath, minMb, maxMb) {
+  startScriptFor(javaPath, minMb, maxMb, launch) {
+    // 설치기 인자 파일은 Windows 용 win_args.txt, 경로 구분자는 역슬래시
+    const launchArgs = launch.kind === "jar" ? `-jar "${launch.jar}" nogui` : `@"${launch.dir.replace(/\//g, "\\")}\\win_args.txt" nogui`;
     return {
       name: "start.bat",
       // cmd 는 CRLF 를 기대한다. chcp 65001 로 이후 줄을 UTF-8 로 읽게 해서 한글 사용자 폴더 경로가 깨지지 않게
@@ -98,8 +100,9 @@ export const windows: Platform = {
         "@echo off",
         "chcp 65001 >nul",
         "rem Created by BlockPilot. Change -Xms (start) and -Xmx (max) to adjust memory.",
+        ...(launch.kind === "argsFile" ? ["rem run.bat and user_jvm_args.txt from the installer are not used; BlockPilot starts the server with this file."] : []),
         'cd /d "%~dp0"',
-        `"${javaPath}" -Xms${minMb}M -Xmx${maxMb}M -jar fabric-server-launch.jar nogui`,
+        `"${javaPath}" -Xms${minMb}M -Xmx${maxMb}M ${launchArgs}`,
         "set BP_EXIT=%ERRORLEVEL%",
         "rem When started by double-click, keep the window open if the server stopped with an error.",
         'if not defined BLOCKPILOT if not "%BP_EXIT%"=="0" pause',

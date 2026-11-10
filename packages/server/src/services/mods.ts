@@ -1,3 +1,4 @@
+import { parseVersion, compareVersions, type Version } from "../lib/version.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import yazl from "yazl";
@@ -364,52 +365,4 @@ function satisfiesOne(v: Version, c: string): boolean | null {
   return null;
 }
 
-export interface Version {
-  core: number[];
-  /** 프리릴리즈 식별자. "1.21.1-Fabric-5.1.3" → ["Fabric-5","1","3"]. 없으면 null */
-  pre: string[] | null;
-}
-
-/**
- * "1.21.1" → core [1,21,1], "0.116.15+1.21.1" → 빌드 메타데이터 제거,
- * "1.21.1-Fabric-5.1.3" → core [1,21,1] + pre ["Fabric-5","1","3"]
- * YUNG 계열처럼 core 가 전부 같고 '-' 뒤에만 실제 버전이 있는 모드가 있어서 프리릴리즈를 버리면 안 된다.
- */
-export function parseVersion(s: string): Version | null {
-  const noBuild = s.trim().replace(/^v/i, "").split("+")[0];
-  const dash = noBuild.indexOf("-");
-  const coreStr = dash < 0 ? noBuild : noBuild.slice(0, dash);
-  if (!/^\d+(\.\d+)*$/.test(coreStr)) return null;
-  const preStr = dash < 0 ? "" : noBuild.slice(dash + 1);
-  return { core: coreStr.split(".").map(Number), pre: preStr ? preStr.split(".") : null };
-}
-
-/** semver 규칙: core 비교 → 프리릴리즈 없는 쪽이 큼 → 식별자별로 숫자는 수치, 그 외는 문자열 비교 */
-export function compareVersions(a: Version, b: Version): number {
-  const len = Math.max(a.core.length, b.core.length);
-  for (let i = 0; i < len; i++) {
-    const x = a.core[i] ?? 0;
-    const y = b.core[i] ?? 0;
-    if (x !== y) return x < y ? -1 : 1;
-  }
-  if (!a.pre && !b.pre) return 0;
-  if (!a.pre) return 1;
-  if (!b.pre) return -1;
-  const n = Math.max(a.pre.length, b.pre.length);
-  for (let i = 0; i < n; i++) {
-    const x = a.pre[i];
-    const y = b.pre[i];
-    if (x === undefined) return -1;
-    if (y === undefined) return 1;
-    const xn = /^\d+$/.test(x);
-    const yn = /^\d+$/.test(y);
-    if (xn && yn) {
-      if (Number(x) !== Number(y)) return Number(x) < Number(y) ? -1 : 1;
-    } else if (xn !== yn) {
-      return xn ? -1 : 1;
-    } else if (x !== y) {
-      return x < y ? -1 : 1;
-    }
-  }
-  return 0;
-}
+export { parseVersion, compareVersions, type Version } from "../lib/version.js";
