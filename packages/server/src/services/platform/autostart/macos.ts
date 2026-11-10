@@ -22,7 +22,8 @@ export function plistFor(spec: AutostartSpec): string {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `      <key>${xml(k)}</key>\n      <string>${xml(v)}</string>`)
     .join("\n");
-  const log = path.join(spec.home, "logs", "autostart.log");
+  // plist 안 경로는 항상 POSIX (테스트가 Windows 러너에서도 돈다)
+  const log = path.posix.join(spec.home.split(path.sep).join("/"), "logs", "autostart.log");
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
