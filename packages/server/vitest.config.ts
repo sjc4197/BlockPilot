@@ -4,7 +4,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    // 테스트가 실제 ~/.blockpilot (등록된 서버, 받아 둔 JDK) 을 건드리지 않도록
+    // 테스트가 실제 ~/.blockpilot (등록된 서버, 받아 둔 JDK) 을 건드리지 않도록. 워커별 폴더는 test/setup.ts 에서
     env: { BLOCKPILOT_HOME: path.join(os.tmpdir(), `bp-test-home-${process.pid}`) },
+    setupFiles: ["test/setup.ts"],
   },
 });

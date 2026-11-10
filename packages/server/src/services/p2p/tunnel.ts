@@ -340,6 +340,8 @@ export class JoinTunnel extends EventEmitter<JoinEvents> {
   state: JoinState = "connecting";
   detail?: string;
   localPort?: number;
+  /** 실패 원인 (진단용): 원본 오류 또는 호스트 상태 코드 */
+  failure?: { error?: unknown; status?: "rejected" | "timeout_approval" | "full" | "bad_secret" };
   private control: SecretStream | null = null;
   private listener: net.Server | null = null;
   private clients = new Set<net.Socket>();
@@ -374,17 +376,18 @@ export class JoinTunnel extends EventEmitter<JoinEvents> {
       reader.release();
       this.control.resume();
     } catch (e) {
+      this.failure = { error: e };
       this.fail(explainJoinError(e));
       return;
     }
-    if (status === STATUS.REJECTED) return this.fail("호스트가 접속을 거절했어요.");
-    if (status === STATUS.TIMEOUT) return this.fail("호스트가 제때 승인하지 않았어요. 호스트에게 알린 뒤 다시 시도해 주세요.");
-    if (status === STATUS.FULL) return this.fail("호스트 서버에 자리가 없어요. 잠시 후 다시 시도해 주세요.");
-    if (status === STATUS.BAD_SECRET) return this.fail("초대코드가 맞지 않아요. 호스트에게 지금 초대코드를 다시 받아 주세요.");
+    if (status === STATUS.REJECTED) return this.fail("호스트가 접속을 거절했어요.", { status: "rejected" });
+    if (status === STATUS.TIMEOUT) return this.fail("호스트가 제때 승인하지 않았어요. 호스트에게 알린 뒤 다시 시도해 주세요.", { status: "timeout_approval" });
+    if (status === STATUS.FULL) return this.fail("호스트 서버에 자리가 없어요. 잠시 후 다시 시도해 주세요.", { status: "full" });
+    if (status === STATUS.BAD_SECRET) return this.fail("초대코드가 맞지 않아요. 호스트에게 지금 초대코드를 다시 받아 주세요.", { status: "bad_secret" });
     if (status !== STATUS.GO) return this.fail("호스트가 예상과 다른 응답을 보냈어요.");
 
     this.control.on("close", () => {
-      if (!this.stopping && this.state === "connected") this.fail("호스트가 초대를 끝냈거나 연결이 끊겼어요.");
+      if (!this.stopping && this.state === "connected") this.fail("호스트가 초대를 끝냈거나 연결이 끊겼어요.", { error: new ProtocolError("closed", "closed") });
     });
     try {
       this.localPort = await this.listen();
@@ -411,8 +414,9 @@ export class JoinTunnel extends EventEmitter<JoinEvents> {
     this.control = null;
   }
 
-  private fail(message: string) {
+  private fail(message: string, failure?: JoinTunnel["failure"]) {
     if (this.stopping) return;
+    if (failure) this.failure = failure;
     this.teardown();
     this.setState("failed", message);
   }
@@ -421,12 +425,19 @@ export class JoinTunnel extends EventEmitter<JoinEvents> {
     return new Promise((resolve, reject) => {
       const sock = this.o.dht.connect(this.o.invite.publicKey, { keyPair: this.o.keyPair });
       this.streams.add(sock);
-      sock.once("close", () => this.streams.delete(sock));
+      let opened = false;
       const timer = setTimeout(() => {
         sock.destroy();
         reject(new ProtocolError("호스트와 연결되지 않았어요 (시간 초과).", "timeout"));
       }, this.o.connectTimeoutMs ?? 30_000);
-      let opened = false;
+      sock.once("close", () => {
+        this.streams.delete(sock);
+        // stop() 으로 열리기 전에 닫히면 30초 타이머를 기다리지 않는다
+        if (!opened) {
+          clearTimeout(timer);
+          reject(new ProtocolError("연결이 닫혔어요.", "closed"));
+        }
+      });
       sock.once("open", () => {
         opened = true;
         clearTimeout(timer);

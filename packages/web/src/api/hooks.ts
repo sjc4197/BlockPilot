@@ -19,6 +19,8 @@ import type {
   BackupSettings,
   AuthInfo,
   AutostartInfo,
+  P2pHostInfo,
+  P2pJoinInfo,
   CreateLoader,
   CreateOptions,
   CreateRelease,
@@ -409,6 +411,47 @@ export interface UpdateCheck {
   url: string;
   note?: string;
 }
+/** 포트포워딩 없는 친구 초대 (P2P) — 호스트 쪽. 켜져 있으면 2초마다 승인 대기·접속자를 갱신 */
+export const useP2pHost = (id: string) =>
+  useQuery({
+    queryKey: ["server", id, "p2p"],
+    queryFn: () => api<P2pHostInfo>(`/api/servers/${id}/p2p`),
+    refetchInterval: (q) => (q.state.data?.enabled ? 2000 : 10_000),
+  });
+export function useP2pHostUpdate(id: string) {
+  const qc = useQueryClient();
+  const set = (info: P2pHostInfo) => qc.setQueryData(["server", id, "p2p"], info);
+  return {
+    setEnabled: useMutation({ mutationFn: (enabled: boolean) => api<P2pHostInfo>(`/api/servers/${id}/p2p`, { method: "PUT", json: { enabled } }), onSuccess: set }),
+    rotate: useMutation({ mutationFn: () => api<P2pHostInfo>(`/api/servers/${id}/p2p/invite/rotate`, { method: "POST" }), onSuccess: set }),
+    peer: useMutation({
+      mutationFn: ({ key, action, name }: { key: string; action: "approve" | "reject" | "block" | "unblock" | "kick" | "forget"; name?: string }) =>
+        api<P2pHostInfo>(`/api/servers/${id}/p2p/peers/${key}/${action}`, { method: "POST", json: name ? { name } : {} }),
+      onSuccess: set,
+    }),
+  };
+}
+
+/** 이 컴퓨터에서 P2P 초대를 쓸 수 있는지 (네이티브 모듈) */
+export const useP2pSupport = () => useQuery({ queryKey: ["p2p", "support"], queryFn: () => api<{ supported: boolean; reason?: string }>("/api/p2p/support"), staleTime: Infinity });
+
+/** 친구 서버에 접속 (참가 모드). 연결 중·대기 중엔 1초, 아니면 5초마다 */
+export const useP2pJoin = () =>
+  useQuery({
+    queryKey: ["join"],
+    queryFn: () => api<P2pJoinInfo>("/api/join"),
+    refetchInterval: (q) => (q.state.data && (q.state.data.state === "connecting" || q.state.data.state === "pending") ? 1000 : 5000),
+  });
+export function useP2pJoinActions() {
+  const qc = useQueryClient();
+  const set = (info: P2pJoinInfo) => qc.setQueryData(["join"], info);
+  return {
+    start: useMutation({ mutationFn: (input: { inviteCode: string; name?: string }) => api<P2pJoinInfo>("/api/join", { method: "POST", json: input }), onSuccess: set }),
+    stop: useMutation({ mutationFn: () => api<P2pJoinInfo>("/api/join/stop", { method: "POST" }), onSuccess: set }),
+    forget: useMutation({ mutationFn: () => api<P2pJoinInfo>("/api/join/remembered", { method: "DELETE" }), onSuccess: set }),
+  };
+}
+
 /** 로그인 때 BlockPilot 자동 실행 (이 컴퓨터의 로그인 항목) */
 export const useAutostart = () => useQuery({ queryKey: ["autostart"], queryFn: () => api<AutostartInfo>("/api/autostart"), staleTime: 60_000 });
 export function useSetAutostart() {

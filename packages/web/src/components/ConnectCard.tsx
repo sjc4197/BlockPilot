@@ -1,4 +1,4 @@
-import { Copy, Globe, Radar, Wifi } from "lucide-react";
+import { Copy, Globe, Radar, Users, Wifi } from "lucide-react";
 import type { ProcessState } from "@blockpilot/shared";
 import { useNetwork, usePublicIp, useReachCheck, useSystem } from "../api/hooks";
 import { Badge, Button, Card, SectionTitle, useToast } from "../lib/ui";
@@ -23,7 +23,11 @@ export function ConnectCard({ serverId, state }: { serverId: string; state: Proc
 
   return (
     <Card className="space-y-4">
-      <SectionTitle right={<Badge mono>포트 {port}</Badge>}>친구 접속</SectionTitle>
+      <SectionTitle right={<Badge mono>포트 {port}</Badge>}>
+        <span className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-redstone" /> 친구 접속
+        </span>
+      </SectionTitle>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <div className="flex items-center gap-2 font-block text-[12px] text-slate-400">

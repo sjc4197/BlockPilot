@@ -5,6 +5,7 @@ import { useAutomation, useSendCommand, useServer, useSkipScheduledRestart } fro
 import { fmtSchedule } from "../components/AutomationPanel";
 import { CrashBanner } from "../components/CrashBanner";
 import { ConnectCard } from "../components/ConnectCard";
+import { InviteCard } from "../components/InviteCard";
 import { PerfCard } from "../components/PerfCard";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
@@ -138,6 +139,10 @@ export default function Dashboard() {
       <div className="grid gap-5 lg:grid-cols-2">
         <PerfCard serverId={id} />
         <ConnectCard serverId={id} state={state} />
+        {/* 초대코드·목록이 길어서 두 열을 다 쓴다 */}
+        <div className="lg:col-span-2">
+          <InviteCard serverId={id} state={state} />
+        </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-5">

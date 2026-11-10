@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { DeleteServerInput, RegisterServerInput, type DeleteServerResult, type ServerSummary } from "@blockpilot/shared";
 import { addServer, listServers, removeServer } from "../config/store.js";
 import { forgetPlaytime } from "../services/stats.js";
+import { forgetP2pHost } from "../services/p2p/host.js";
 import { detectServer, getServerJavaVersion, validateServerDir } from "../services/serverInfo.js";
 import { readPropertiesFile, toRecord } from "../services/properties.js";
 import { modsDirName } from "../services/mods.js";
@@ -26,6 +27,7 @@ export async function serversRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { managed } = await loadContext(id);
     if (managed.isManaged()) throw conflict("실행 중인 서버는 먼저 중지해야 합니다.");
+    await forgetP2pHost(id);
     await removeServer(id);
     await forgetPlaytime(id);
     return { ok: true };
@@ -37,6 +39,7 @@ export async function serversRoutes(app: FastifyInstance) {
     const { confirmName } = DeleteServerInput.parse(req.body ?? {});
     const { server, managed } = await loadContext(id);
     const result = await deleteServerFolder(server, managed, confirmName);
+    await forgetP2pHost(id);
     req.log.warn({ server: server.name, deleted: result.deletedPath }, "서버 폴더를 삭제했어요");
     return result;
   });

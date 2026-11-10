@@ -36,6 +36,9 @@ import { cancelAllJobs, recoverInterruptedJobs } from "./services/create/job.js"
 import { updateRoutes } from "./routes/update.js";
 import { autostartRoutes } from "./routes/autostart.js";
 import { p2pRoutes } from "./routes/p2p.js";
+import { startP2pHostLifecycle, stopAllP2pHosts } from "./services/p2p/host.js";
+import { joinRoutes } from "./routes/join.js";
+import { stopJoin } from "./services/p2p/join.js";
 import { isAutostarted } from "./services/platform/autostart/index.js";
 import { APP_VERSION, isSingleExecutable, webRoot } from "./lib/appInfo.js";
 import { alreadyRunning, openBrowser } from "./lib/launch.js";
@@ -100,6 +103,7 @@ async function main() {
   await app.register(updateRoutes);
   await app.register(autostartRoutes);
   await app.register(p2pRoutes);
+  await app.register(joinRoutes);
 
   // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist, 단일 실행 파일은 안에 든 파일을 풀어서)
   const webDist = await webRoot(path.dirname(fileURLToPath(import.meta.url)));
@@ -119,6 +123,7 @@ async function main() {
   startScheduledRestarts();
   startPerfSampler();
   startPlaytimeTracker();
+  startP2pHostLifecycle();
   // 지난번에 만들기 도중 꺼졌다면 그때 만들던 파일을 정리
   await recoverInterruptedJobs(app.log);
 
@@ -129,6 +134,8 @@ async function main() {
     stopPerfSampler();
     // 만들던 서버가 있으면 취소하고 이번에 만든 파일을 지운 뒤 끈다
     await cancelAllJobs();
+    await stopAllP2pHosts();
+    await stopJoin();
     await shutdownAll();
     await app.close();
     process.exit(0);

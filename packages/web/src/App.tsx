@@ -19,6 +19,7 @@ import Backups from "./pages/Backups";
 import Stats from "./pages/Stats";
 import Login from "./pages/Login";
 import NewServer from "./pages/NewServer";
+import Join from "./pages/Join";
 
 export default function App() {
   const qc = useQueryClient();
@@ -49,6 +50,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<ServerSelect />} />
       <Route path="/new" element={<NewServer />} />
+      <Route path="/join" element={<Join />} />
       <Route path="/s/:id" element={<ServerLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="settings" element={<Settings />} />

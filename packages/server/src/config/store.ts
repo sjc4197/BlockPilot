@@ -2,19 +2,41 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { DEFAULT_AUTOMATION, DEFAULT_BACKUP_SETTINGS, type AutomationSettings, type BackupSettings, type RegisteredServer } from "@blockpilot/shared";
+import { DEFAULT_AUTOMATION, DEFAULT_BACKUP_SETTINGS, type AutomationSettings, type BackupSettings, type P2pApprovedPeer, type P2pBlockedPeer, type RegisteredServer } from "@blockpilot/shared";
 import { notFound } from "../lib/errors.js";
 
 interface ServerSettings {
   backup?: BackupSettings;
   /** 디스코드 알림·자동 재시작·예약 재시작. 웹훅 주소가 들어 있어 이 파일은 나만 읽기(600) */
   automation?: Partial<AutomationSettings>;
+  /** 포트포워딩 없는 친구 초대. 호스트 키페어·시크릿이 들어 있다 (비밀) */
+  p2p?: P2pSettings;
 }
+
+export interface P2pSettings {
+  enabled: boolean;
+  /** hex */
+  keyPair?: { publicKey: string; secretKey: string };
+  /** hex, 초대코드의 시크릿 */
+  secret?: string;
+  approved: P2pApprovedPeer[];
+  blocked: P2pBlockedPeer[];
+}
+
+export const DEFAULT_P2P: P2pSettings = { enabled: false, approved: [], blocked: [] };
 
 interface ConfigFile {
   servers: RegisteredServer[];
   settings?: Record<string, ServerSettings>;
   auth?: { token?: string };
+  /** 친구 서버에 접속(참가 모드): 내 키페어와 마지막 초대 (비밀) */
+  p2pJoin?: JoinSettings;
+}
+
+export interface JoinSettings {
+  /** hex. 호스트가 "같은 사람" 으로 알아보게 유지한다 */
+  keyPair?: { publicKey: string; secretKey: string };
+  remembered?: { name?: string; inviteCode: string; usedAt: string };
 }
 
 /** BlockPilot 이 쓰는 앱 폴더 (설정, 작업 일지, 받아 둔 JDK) */
@@ -102,6 +124,25 @@ export async function getAutomation(id: string): Promise<AutomationSettings> {
 export async function setAutomation(id: string, automation: AutomationSettings) {
   const cfg = await load();
   await save({ ...cfg, settings: { ...cfg.settings, [id]: { ...cfg.settings?.[id], automation } } });
+}
+
+export async function getP2p(id: string): Promise<P2pSettings> {
+  const p = (await load()).settings?.[id]?.p2p;
+  return { ...DEFAULT_P2P, ...p, approved: p?.approved ?? [], blocked: p?.blocked ?? [] };
+}
+
+export async function setP2p(id: string, p2p: P2pSettings) {
+  const cfg = await load();
+  await save({ ...cfg, settings: { ...cfg.settings, [id]: { ...cfg.settings?.[id], p2p } } });
+}
+
+export async function getJoinSettings(): Promise<JoinSettings> {
+  return (await load()).p2pJoin ?? {};
+}
+
+export async function setJoinSettings(p2pJoin: JoinSettings) {
+  const cfg = await load();
+  await save({ ...cfg, p2pJoin });
 }
 
 // ---------- 인증 ----------

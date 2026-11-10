@@ -459,6 +459,97 @@ export interface AutostartInfo {
 export const AutostartUpdate = z.object({ enabled: z.boolean() });
 export type AutostartUpdate = z.infer<typeof AutostartUpdate>;
 
+// ---------- 포트포워딩 없는 친구 초대 (P2P 터널) ----------
+
+export interface P2pPeerView {
+  publicKey: string;
+  /** 화면용 앞 8자 */
+  shortKey: string;
+  state: "pending" | "connected";
+  /** 상대 주소 (호스트에게만 보임) */
+  remote?: string;
+  since: string;
+  /** 마크 클라이언트 연결 수 */
+  connections: number;
+  /** 승인할 때 붙인 이름 */
+  name?: string;
+}
+
+export interface P2pApprovedPeer {
+  publicKey: string;
+  name?: string;
+  approvedAt: string;
+}
+
+export interface P2pBlockedPeer {
+  publicKey: string;
+  name?: string;
+  blockedAt: string;
+}
+
+export interface P2pHostInfo {
+  /** 이 컴퓨터에서 P2P 를 쓸 수 있는지 (네이티브 모듈) */
+  supported: boolean;
+  reason?: string;
+  /** 초대 켜짐 (서버가 켜져 있을 때 터널이 돈다) */
+  enabled: boolean;
+  state: "off" | "starting" | "listening" | "error";
+  error?: string;
+  /** 켜져 있을 때만 */
+  inviteCode?: string;
+  publicKey?: string;
+  mcPort: number;
+  maxPeers: number;
+  peers: P2pPeerView[];
+  approved: P2pApprovedPeer[];
+  blocked: P2pBlockedPeer[];
+  warnings: { serverStopped: boolean; whitelistOff: boolean; onlineModeOff: boolean };
+  /** 최근 10분 인증 실패 수 */
+  recentAuthFailures: number;
+}
+
+export const P2pHostUpdate = z.object({ enabled: z.boolean() });
+export type P2pHostUpdate = z.infer<typeof P2pHostUpdate>;
+
+export const P2pPeerKey = z.string().regex(/^[0-9a-f]{64}$/, "공개키 형식이 아니에요.");
+export const P2pApproveInput = z.object({ name: z.string().trim().max(32).optional() });
+export type P2pApproveInput = z.infer<typeof P2pApproveInput>;
+
+export type P2pJoinState = "idle" | "connecting" | "pending" | "connected" | "failed";
+
+/** 연결 실패 진단: 무슨 일 · 왜 · 해 볼 것 · 그래도 안 되면(대안 서비스, 안내만) */
+export interface P2pDiagnosis {
+  kind: "bad_code" | "host_off" | "rejected" | "timeout_approval" | "full" | "nat" | "network" | "unknown";
+  title: string;
+  cause: string;
+  hints: string[];
+  alternatives: { label: string; url: string; note: string }[];
+}
+
+export interface P2pJoinInfo {
+  supported: boolean;
+  reason?: string;
+  state: P2pJoinState;
+  /** 상태 설명 (실패 원인, 접속 안내) */
+  detail?: string;
+  /** 연결됐을 때 마크 클라이언트가 접속할 로컬 포트 */
+  localPort?: number;
+  /** 지금 연결 중인 호스트 공개키 앞 8자 */
+  hostShortKey?: string;
+  since?: string;
+  /** 실패했을 때 원인과 해 볼 것 */
+  diagnosis?: P2pDiagnosis;
+  /** 마지막으로 쓴 초대 (다시 접속용) */
+  remembered?: { name?: string; hostShortKey: string; inviteCode: string; usedAt: string };
+}
+
+export const P2pJoinInput = z.object({
+  inviteCode: z.string().trim().min(1, "초대코드를 입력해 주세요.").max(200),
+  /** 이 초대에 붙일 이름 (예: "철수네 서버"). 비우면("") 지난 이름을 지우고, 보내지 않으면 같은 호스트의 지난 이름을 물려받는다 */
+  name: z.string().trim().max(32).optional(),
+});
+export type P2pJoinInput = z.infer<typeof P2pJoinInput>;
+
 // ---------- 서버 삭제 ----------
 
 export const DeleteServerInput = z.object({

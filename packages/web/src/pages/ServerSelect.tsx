@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, FolderOpen, Hammer, Plus, Power, Server, Trash2 } from "lucide-react";
-import { useAutostart, useCreateOptions, useRegisterServer, useRemoveServer, useServers, useSetAutostart, useSystem, useUpdateCheck } from "../api/hooks";
+import { ArrowRight, FolderOpen, Hammer, Link2, Plus, Power, Server, Trash2 } from "lucide-react";
+import { useAutostart, useCreateOptions, useP2pSupport, useRegisterServer, useRemoveServer, useServers, useSetAutostart, useSystem, useUpdateCheck } from "../api/hooks";
 import { Logo } from "../App";
 import { Badge, Button, Callout, Card, ConfirmButton, EmptyState, Field, Input, Spinner, Toggle, cx, useToast } from "../lib/ui";
 import { usePlayOnce } from "../lib/fx";
@@ -13,6 +13,7 @@ export default function ServerSelect() {
   const toast = useToast();
   const navigate = useNavigate();
   const { data: createOpts } = useCreateOptions();
+  const { data: p2p } = useP2pSupport();
   const { data: sys } = useSystem();
   const update = useUpdateCheck();
   const [path, setPath] = useState("");
@@ -53,6 +54,19 @@ export default function ServerSelect() {
         </div>
         <Button variant="primary" icon={Hammer} disabled={!createOpts?.supported} onClick={() => navigate("/new")} title={createOpts?.unsupportedMessage}>
           새 서버 만들기
+        </Button>
+      </Card>
+
+      <Card className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 font-block text-[12px] text-slate-200">
+            <Link2 className="h-4 w-4 text-redstone" /> 친구 서버에 접속
+            {p2p && !p2p.supported && <Badge tone="warning">이 컴퓨터에선 사용 불가</Badge>}
+          </h2>
+          <p className="mt-1.5 text-sm text-slate-400">친구가 보낸 초대코드를 넣으면 포트포워딩 없이 친구 서버에 들어갈 수 있어요. 서버를 돌리지 않아도 돼요.</p>
+        </div>
+        <Button icon={Link2} disabled={p2p ? !p2p.supported : false} title={p2p?.reason} onClick={() => navigate("/join")}>
+          초대코드로 접속
         </Button>
       </Card>
 
