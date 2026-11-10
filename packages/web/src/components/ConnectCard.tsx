@@ -97,12 +97,12 @@ export function ConnectCard({ serverId, state }: { serverId: string; state: Proc
 
 function AddressRow({ text, note, onCopy }: { text: string; note: string; onCopy: (t: string) => void }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <code className="well px-2.5 py-1 font-mono text-[13px] text-white">{text}</code>
       <Button size="sm" variant="ghost" icon={Copy} onClick={() => onCopy(text)} aria-label={`${text} 복사`}>
         복사
       </Button>
-      <span className="text-[11px] text-slate-500">{note}</span>
+      <span className="whitespace-nowrap text-[11px] text-slate-500">{note}</span>
     </div>
   );
 }

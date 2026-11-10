@@ -29,7 +29,8 @@ export async function listLogs(serverDir: string): Promise<LogFileEntry[]> {
     }
   }
   // latest.log 먼저, 그 다음 최신순
-  return out.sort((a, b) => (a.name === "latest.log" ? -1 : b.name === "latest.log" ? 1 : b.mtime.localeCompare(a.mtime)));
+  // latest.log 가 맨 위, 그다음 수정 시각 최신순. 시각이 같으면(폴더를 복사한 경우 등) 파일명의 날짜·번호로
+  return out.sort((a, b) => (a.name === "latest.log" ? -1 : b.name === "latest.log" ? 1 : b.mtime.localeCompare(a.mtime) || b.name.localeCompare(a.name, undefined, { numeric: true })));
 }
 
 export async function readLog(serverDir: string, kind: "log" | "crash", name: string, tail = MAX_LINES): Promise<LogFileContent> {

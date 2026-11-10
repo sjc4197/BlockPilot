@@ -26,6 +26,8 @@ html {
 
 body {
   @apply text-slate-200 font-sans antialiased;
+  /* 사이드바 없는 짧은 페이지(/join 등)에서도 바닥 무늬가 화면 끝까지 */
+  min-height: 100vh;
   /* 딥슬레이트 바닥: 아주 옅은 16px 체크 무늬 + 레드스톤 불빛 */
   background:
     radial-gradient(800px 420px at 0% -10%, rgba(255, 59, 47, 0.08), transparent 60%),
