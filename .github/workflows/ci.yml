@@ -12,11 +12,14 @@ defaults:
 
 jobs:
   test:
-    name: ${{ matrix.os }}
+    name: ${{ matrix.os }} · ${{ matrix.loader }}
     strategy:
       fail-fast: false
+      # OS × 서버 종류. 실제 서버 만들기 E2E 는 종류마다 몇 분씩 걸려서 job 을 나눠 병렬로 돈다.
+      # 단위 테스트·타입 검사·빌드는 OS 당 한 번(fabric job)만.
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
+        loader: [fabric, paper, forge, neoforge, vanilla]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
@@ -31,14 +34,17 @@ jobs:
           cache: npm
       - run: npm ci
       - name: 타입 검사
+        if: matrix.loader == 'fabric'
         run: npm run typecheck
       - name: 단위 테스트
+        if: matrix.loader == 'fabric'
         run: |
           set -o pipefail
           npm test 2>&1 | tee test-output.log
       - name: 빌드
+        if: matrix.loader == 'fabric'
         run: npm run build
-      # 새 서버 만들기 → 켜기 → 끄기 → 삭제. 그 OS 에서 새 서버 만들기를 켠 단계부터 실제로 돈다 (아니면 건너뜀).
+      # 새 서버 만들기 → 켜기 → 끄기 → 삭제 (이 job 의 서버 종류만). 그 OS 에서 새 서버 만들기를 켠 단계부터 실제로 돈다 (아니면 건너뜀).
       # 테스트용 일회성 서버를 띄우려면 eula=true 가 필요해서, 이 저장소의 CI 를 돌리는 사람이 Minecraft EULA
       # (https://aka.ms/MinecraftEULA) 에 동의한다는 뜻으로 아래 값을 켠다. 앱의 실제 화면에서는 여전히 사용자가 직접 체크해야 한다.
       - name: 실제 서버 만들기 E2E
@@ -50,8 +56,9 @@ jobs:
         env:
           BLOCKPILOT_E2E: "1"
           BLOCKPILOT_E2E_ACCEPT_EULA: "1"
-          # Linux·Windows 에서는 JDK 를 앱 폴더에 받아 쓰는 경로도 한 번 더 확인
-          BLOCKPILOT_E2E_JDK_DOWNLOAD: ${{ matrix.os != 'macos-latest' && '1' || '' }}
+          BLOCKPILOT_E2E_LOADERS: ${{ matrix.loader }}
+          # Linux·Windows 에서는 JDK 를 앱 폴더에 받아 쓰는 경로도 한 번 더 확인 (fabric job 에서만)
+          BLOCKPILOT_E2E_JDK_DOWNLOAD: ${{ matrix.os != 'macos-latest' && matrix.loader == 'fabric' && '1' || '' }}
       # 실패하면 출력 마지막 부분을 주석(annotation)으로 남긴다 — 로그인 없이도 실패 원인을 볼 수 있게
       - name: 실패 내용 요약
         if: failure()
@@ -59,5 +66,5 @@ jobs:
           for f in test-output.log e2e-output.log; do
             [ -f "$f" ] || continue
             body=$(tail -n 80 "$f" | sed -e 's/%/%25/g' -e 's/\r//g' | awk '{printf "%s%%0A", $0}')
-            echo "::error title=${{ matrix.os }} ${f}::${body}"
+            echo "::error title=${{ matrix.os }} ${{ matrix.loader }} ${f}::${body}"
           done

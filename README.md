@@ -9,7 +9,7 @@
 
 <p align="center">
   친구들과 함께하는 마인크래프트 서버를 브라우저에서 관리하는 로컬 대시보드예요.<br>
-  이미 있는 서버 폴더를 등록하거나 빈 폴더에서 Fabric 서버를 새로 만들고,<br>
+  이미 있는 서버 폴더를 등록하거나 빈 폴더에서 Fabric · Paper · Forge · NeoForge · 순정 서버를 새로 만들고,<br>
   설정 · 모드 · 플레이어 · 콘솔 · 로그 · 백업 · 통계를 한 화면에서 다뤄요.
 </p>
 
@@ -42,7 +42,7 @@
 
 | 화면 | 할 수 있는 것 |
 |---|---|
-| **새 서버 만들기** | 빈 폴더만 고르면 Fabric 서버를 처음부터 구축. 정식 버전·로더 선택, 필요한 Java 를 앱 폴더에 자동 준비, 모든 다운로드 해시 검증, 최초 실행까지 마치고 목록에 등록 |
+| **새 서버 만들기** | 빈 폴더만 고르면 **Fabric · Paper · Forge · NeoForge · 순정** 서버를 처음부터 구축. 종류와 정식 버전·로더 버전(Paper 는 빌드) 선택, 필요한 Java 를 앱 폴더에 자동 준비, 받는 파일 해시 검증, 최초 실행까지 마치고 목록에 등록 |
 | **대시보드** | 로더·버전·접속자·모드 수 요약, 레버로 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔, **성능**(메모리·틱 시간 그래프, 렉 경고), **친구 접속**(접속 주소 복사, 밖에서 접속되는지 검사), 크래시 원인 요약 |
 | **서버 설정** | `server.properties`를 게임플레이 / 월드 / 플레이어 / 네트워크 / 성능 탭의 폼으로 편집. 그 외 키는 고급 탭에서 raw 편집. 주석과 키 순서 보존. **알림·자동화** 탭에서 디스코드 알림, 크래시 자동 재시작, 예약 재시작. 맨 아래 **서버 관리**에서 목록 등록 해제(파일 유지) 또는 **서버 삭제**(폴더째 영구 삭제) |
 | **플레이어** | 화이트리스트 · OP · 밴(플레이어/IP). 닉네임만 입력하면 Mojang API로 UUID 자동 조회 |
@@ -79,11 +79,11 @@
 | | macOS | Linux | Windows |
 |---|---|---|---|
 | 기존 서버 연결·관리 | ✅ | ✅ | ✅ |
-| 새 서버 만들기 (Fabric) | ✅ Apple Silicon · Intel | ✅ x64 · ARM64 (Ubuntu·Debian·Fedora 등, Alpine) | ✅ Windows 10·11, x64 · ARM64 |
+| 새 서버 만들기 (Fabric · Paper · Forge · NeoForge · 순정) | ✅ Apple Silicon · Intel | ✅ x64 · ARM64 (Ubuntu·Debian·Fedora 등, Alpine) | ✅ Windows 10·11, x64 · ARM64 |
 | 서버 시작 스크립트 | `start.sh` / `run.sh` | `start.sh` / `run.sh` | `start.bat` / `run.bat` (끝의 `pause` 처리) |
 
 OS 는 고르지 않아요. BlockPilot 이 켜질 때 돌고 있는 컴퓨터를 자동으로 알아보고, 첫 화면 아래에 "이 컴퓨터: OS · CPU" 로 보여 줘요.
-push 할 때마다 GitHub Actions 가 macOS·Ubuntu·Windows 에서 단위 테스트와 **실제 서버 만들기 → 켜기 → 끄기 → 삭제** 를 돌려요.
+push 할 때마다 GitHub Actions 가 macOS·Ubuntu·Windows 에서 단위 테스트와, 다섯 가지 서버 종류마다 **실제 서버 만들기 → 켜기 → 끄기 → 삭제** 를 돌려요.
 
 ## 스크린샷
 
@@ -171,23 +171,33 @@ npm start
 
 ### 새 서버 만들기
 
-첫 화면의 **새 서버 만들기** → 폴더를 고르고 버전·기본 설정을 정한 뒤 EULA 에 직접 동의하면, 나머지는 BlockPilot 이 해요.
+첫 화면의 **새 서버 만들기** → 서버 종류와 폴더를 고르고 버전·기본 설정을 정한 뒤 EULA 에 직접 동의하면, 나머지는 BlockPilot 이 해요.
+
+| 종류 | 이런 때 | 받는 것 |
+|---|---|---|
+| **Fabric** | 가벼운 모드 서버. Fabric API 모드 생태계 | Mojang `server.jar` + Fabric 설치기 → 라이브러리까지 전부 sha256 대조 |
+| **Paper** | 플러그인 서버. 친구들은 아무것도 안 깔고 순정 클라이언트로 접속 | Paper jar 하나 (sha256). 첫 실행 때 Paper 가 Mojang 서버 파일을 직접 받아요 |
+| **Forge** | 가장 오래된 모드 생태계, 대형 모드팩 | Forge 설치기 (sha256) → 설치기가 Minecraft 서버·라이브러리를 받고 스스로 검증 |
+| **NeoForge** | Forge 에서 갈라져 나온 현대판 모드 로더 (1.20.2 이상) | NeoForge 설치기 (sha256) → 위와 같음 |
+| **순정** | 모드·플러그인 없이 Mojang 공식 서버 그대로 | Mojang `server.jar` (sha1) |
+
+Paper · Forge 는 Minecraft **1.18 이상**, NeoForge 는 **1.20.2 이상**만 보여 줘요 (그 아래는 Temurin 배포가 없는 Java 가 필요해요). NeoForge 처럼 안정판 없이 베타만 있는 버전은 "(베타)" 로 표시해요.
 
 <table>
   <tr>
-    <td align="center"><b>입력</b><br><img src="docs/screenshots/10-new-form.png" width="420"></td>
-    <td align="center"><b>폴더 찾기</b><br><img src="docs/screenshots/11-new-picker.png" width="420"></td>
+    <td><img src="docs/screenshots/10-new-form.png" alt="새 서버 만들기 폼"></td>
+    <td><img src="docs/screenshots/12-new-progress.png" alt="만드는 중"></td>
   </tr>
   <tr>
-    <td align="center"><b>진행</b><br><img src="docs/screenshots/12-new-progress.png" width="420"></td>
-    <td align="center"><b>완료</b><br><img src="docs/screenshots/13-new-done.png" width="420"></td>
+    <td align="center"><sub>종류 · 폴더 · 버전 · 기본 설정 · EULA</sub></td>
+    <td align="center"><sub>단계마다 램프가 켜지고 경험치 바가 차요</sub></td>
   </tr>
 </table>
 
 1. **사전 점검** — 폴더가 비었는지, 포트·메모리·디스크 여유, 닉네임이 실제로 있는지
-2. **버전 확인** — Minecraft 정식 버전과 Fabric 로더 호환, 이 버전이 요구하는 Java (1.21.x → 21, 26.x → 25)
+2. **버전 확인** — Minecraft 정식 버전과 로더 버전 호환, 이 버전이 요구하는 Java (1.18~1.20.4 → 17, 1.21.x → 21, 26.x → 25)
 3. **Java 준비** — 이 컴퓨터에 정확히 그 버전 JDK 가 있으면 사용(macOS `java_home`, Linux `/usr/lib/jvm`·SDKMAN, Windows `JAVA_HOME`·Program Files, 그리고 PATH), 없으면 Temurin 을 앱 폴더(`~/.blockpilot/runtimes/`, Windows 는 `%USERPROFILE%\.blockpilot\runtimes\`)에 받아서 사용. 시스템에는 설치하지 않아요
-4. **server.jar · Fabric 설치** — 공식 설치기로 설치하고 라이브러리까지 전부 해시 대조
+4. **서버 파일 · 로더 설치** — 종류에 따라 위 표대로. Forge · NeoForge 는 설치기가 만든 `run.sh`·`run.bat`·`user_jvm_args.txt` 도 폴더에 남지만 BlockPilot 은 자기가 만든 `start.sh`·`start.bat` 으로 켜요 (메모리는 그 파일의 `-Xmx` 로)
 5. **설정 파일** — `start.sh` 또는 Windows 는 `start.bat`(Java 경로·메모리 고정), `server.properties`, `eula.txt`, 닉네임을 OP·화이트리스트에 추가
 6. **최초 실행** — 월드를 만들고 `Done` 이 뜨면 정상 종료
 7. **등록** — 서버 목록에 추가하고 대시보드로
@@ -195,9 +205,11 @@ npm start
 | 받는 파일 | 출처 | 검증 |
 |---|---|---|
 | 버전 정보 | Mojang `piston-meta` | 매니페스트의 sha1 |
-| `server.jar` | Mojang | sha1 |
-| Fabric 설치기 | `maven.fabricmc.net` | 같은 저장소의 sha256 |
-| Fabric 라이브러리 | 설치기가 받음 | 설치 후 하나씩 sha256 대조 |
+| `server.jar` (순정 · Fabric) | Mojang | sha1 |
+| Fabric 설치기 · 라이브러리 | `maven.fabricmc.net` / 설치기가 받음 | sha256 (설치 후 하나씩 대조) |
+| Paper jar | PaperMC Fill API | API 가 주는 sha256 |
+| Forge 설치기 | `maven.minecraftforge.net` | 같은 저장소의 sha256 |
+| NeoForge 설치기 | `maven.neoforged.net` | 같은 저장소의 sha256 |
 | JDK (Temurin) | Adoptium | sha256 |
 
 - **EULA** 는 사용자가 체크박스를 직접 체크해야만 진행돼요. 체크하지 않으면 버튼이 눌리지 않고 API 도 거부해요.
@@ -256,8 +268,8 @@ BlockPilot/
 │   │       │                create(새 서버 만들기) · fs(폴더 찾기)
 │   │       ├── services/    serverInfo(로더 감지) · properties(파서) · mods(jar 파싱·의존성)
 │   │       │                process(spawn/stdin) · rcon · backups · scheduler · logs · configs · mojang
-│   │       │                create/  sources(Mojang·Fabric·Adoptium) · download(해시 검증) · java · target(폴더 검증·정리)
-│   │       │                         job(진행·일지·취소·복구) · pipeline(설치 단계)
+│   │       │                create/  download(해시 검증) · java · target(폴더 검증·정리) · job(진행·일지·취소·복구) · pipeline(설치 단계)
+│   │       │                         loaders/  mojang · fabric · paper · forge · neoforge · vanilla (종류별 배포처·설치)
 │   │       └── lib/         safePath(경로 탈출 차단) · atomicWrite(백업+원자적 쓰기) · auth
 │   └── web/
 │       └── src/
@@ -282,7 +294,7 @@ BlockPilot/
 - 모드 변경 · 월드 복원은 서버가 중지된 상태에서만 허용
 - 복원 시 기존 월드는 삭제하지 않고 `.blockpilot-backup/restore-<시각>/` 으로 이동
 - 모드·플레이어·백업 삭제는 버튼을 꾹 누르고 있어야 실행, 서버 중지·재시작·복원은 두 번 눌러 확인
-- 새 서버 만들기: 빈 폴더만 허용(시스템·홈·앱 폴더, 등록된 서버와 겹치는 폴더 거부), 받는 파일 전부 해시 검증, 실패 시 시작 시점에 없던 항목만 삭제, EULA 자동 동의 없음
+- 새 서버 만들기: 빈 폴더만 허용(시스템·홈·앱 폴더, 등록된 서버와 겹치는 폴더 거부), 받는 파일은 해시 검증(Forge·NeoForge 가 설치기로 받는 라이브러리는 설치기가 검증), 실패 시 시작 시점에 없던 항목만 삭제, EULA 자동 동의 없음
 - 서버 삭제: 서버 이름을 그대로 입력해야 하고(API 도 확인), 서버가 꺼져 있을 때만 가능. 심볼릭 링크는 실제 폴더를 따라가 확인하고, 시스템·홈·앱 폴더나 더 이상 서버 폴더가 아닌 곳, 다른 등록된 서버를 품은 폴더는 거부
 
 ## 개발
@@ -301,7 +313,7 @@ npm run build:sea    # 이 컴퓨터용 단일 실행 파일 → release/ (node 
 ## 로드맵
 
 - [x] 새 서버 만들기 — Fabric (macOS · Linux · Windows)
-- [ ] 새 서버 만들기 — Paper · Forge · NeoForge
+- [x] 새 서버 만들기 — Paper · Forge · NeoForge · 순정
 - [x] Linux 지원
 - [x] Windows 지원 ([실제 PC 점검 체크리스트](docs/windows-checklist.md))
 - [x] Node 설치 없이 실행되는 단일 실행 파일 (macOS · Windows · Linux, x64 · ARM64)
