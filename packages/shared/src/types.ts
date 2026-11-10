@@ -429,6 +429,36 @@ export interface SystemInfo {
   sep: "/" | "\\";
 }
 
+// ---------- 로그인 때 자동 실행 ----------
+
+export type AutostartMethod = "launchd" | "systemd" | "xdg" | "registry";
+
+export interface AutostartInfo {
+  /** 단일 실행 파일로 켰을 때만 등록할 수 있다 */
+  supported: boolean;
+  /** 지원하지 않는 이유 */
+  reason?: string;
+  method: AutostartMethod;
+  /** 사람이 읽는 방식 이름 (예: "macOS 로그인 항목(launchd)") */
+  methodLabel: string;
+  enabled: boolean;
+  /** 지금 실행 중인 실행 파일 */
+  exePath?: string;
+  /** 등록에 적힌 실행 파일 */
+  registeredExe?: string;
+  /** 등록된 실행 파일이 디스크에 없음 (옮겼거나 지움) */
+  exeMissing?: boolean;
+  /** 등록된 실행 파일이 지금 실행 중인 것과 다름 */
+  stale?: boolean;
+  /** 지금 프로세스가 자동 실행으로 켜진 것인지 */
+  autostarted: boolean;
+  /** OS 별 한 줄 안내 */
+  hint?: string;
+}
+
+export const AutostartUpdate = z.object({ enabled: z.boolean() });
+export type AutostartUpdate = z.infer<typeof AutostartUpdate>;
+
 // ---------- 서버 삭제 ----------
 
 export const DeleteServerInput = z.object({

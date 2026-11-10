@@ -216,6 +216,18 @@ Paper · Forge 는 Minecraft **1.18 이상**, NeoForge 는 **1.20.2 이상**만 
 - **실패하거나 취소하면** 원인과 해결 방법을 한글로 보여 주고, 이번에 만든 파일만 지워요. 원래 폴더에 있던 것은 건드리지 않아요. 도중에 BlockPilot 이 꺼져도 다음에 켤 때 같은 방식으로 정리해요.
 - 해시 검증까지 끝난 JDK 는 다음에 다시 쓰도록 앱 폴더에 남겨요.
 
+### 로그인하면 자동으로 켜기 (선택)
+
+릴리스에서 받은 실행 파일로 켠 BlockPilot 의 첫 화면 아래에 **로그인하면 BlockPilot 자동으로 켜기** 토글이 있어요. 켜 두면 컴퓨터에 로그인할 때 BlockPilot 이 브라우저 없이 조용히 켜지고, 끄면 등록이 지워져 다음 로그인부터 켜지지 않아요. 기본은 꺼짐이에요.
+
+| OS | 등록되는 곳 | 비고 |
+|---|---|---|
+| macOS | `~/Library/LaunchAgents/com.blockpilot.app.plist` (launchd) | 터미널 창 없이 켜져요. 크래시로 꺼졌을 때만 다시 켜요 |
+| Windows | 현재 사용자 레지스트리 `Run` 키 | 최소화된 창으로 켜져요. 그 창을 닫으면 BlockPilot 과 켜 둔 서버가 함께 꺼져요 |
+| Linux | systemd 사용자 서비스 `~/.config/systemd/user/blockpilot.service` (없으면 `~/.config/autostart/blockpilot.desktop`) | 로그인(사용자 세션) 때 켜져요. 화면 없는 서버에서 부팅만으로 켜려면 `loginctl enable-linger $USER` |
+
+토글을 켤 때 쓰고 있던 `BLOCKPILOT_PORT` · `BLOCKPILOT_HOST` · `BLOCKPILOT_TOKEN` · `BLOCKPILOT_HOME` 값을 그대로 적어 두어, 자동 실행된 BlockPilot 도 같은 포트·주소·토큰으로 떠요. 실행 파일을 다른 곳으로 옮기면 첫 화면에서 알려 주니 토글을 껐다 켜 주세요. `npm start` 로 켠 개발용 실행에서는 등록할 실행 파일이 없어 토글이 비활성이에요.
+
 ### 외부에서 접속하기 (선택)
 
 기본값은 `127.0.0.1` 바인딩, 인증 없음입니다. 다른 기기에서 접속하려면:
@@ -239,7 +251,7 @@ $env:BLOCKPILOT_HOST="0.0.0.0"; npm start   # Windows PowerShell
 | `BLOCKPILOT_TOKEN` | (없음) | 접속 토큰 지정. 설정하면 루프백에서도 토큰 필요 |
 | `BLOCKPILOT_HOME` | `~/.blockpilot` | 앱 폴더: 등록된 서버 목록 · 자동 백업·알림·자동화 설정(디스코드 웹훅 포함, 나만 읽기) · 토큰 · 받아 둔 JDK(`runtimes/`) · 만들기 작업 일지(`jobs/`) · 접속 시간 기록(`playtime/`) |
 | `LOG_LEVEL` | `info` | Fastify 로그 레벨 |
-| `BLOCKPILOT_NO_BROWSER` | (없음) | `1` 이면 실행 파일로 켤 때 브라우저를 자동으로 열지 않음 |
+| `BLOCKPILOT_NO_BROWSER` | (없음) | `1` 이면 실행 파일로 켤 때 브라우저를 자동으로 열지 않음 (로그인 자동 실행은 `--autostart` 인자로 같은 효과) |
 
 ## 기술 스택
 
@@ -317,7 +329,7 @@ npm run build:sea    # 이 컴퓨터용 단일 실행 파일 → release/ (node 
 - [x] Linux 지원
 - [x] Windows 지원 ([실제 PC 점검 체크리스트](docs/windows-checklist.md))
 - [x] Node 설치 없이 실행되는 단일 실행 파일 (macOS · Windows · Linux, x64 · ARM64)
-- [ ] 로그인·부팅 시 자동 실행 (launchd · 작업 스케줄러 · systemd)
+- [x] 로그인 시 자동 실행 (launchd · 레지스트리 Run · systemd)
 - [x] Modrinth 모드 검색·설치·업데이트
 - [x] 플레이어 통계, 디스코드 알림, 크래시 자동 재시작, 예약 재시작, 친구 접속 도우미, 성능 모니터, 휴대폰 화면
 

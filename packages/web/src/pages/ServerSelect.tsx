@@ -1,9 +1,9 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, FolderOpen, Hammer, Plus, Server, Trash2 } from "lucide-react";
-import { useCreateOptions, useRegisterServer, useRemoveServer, useServers, useSystem, useUpdateCheck } from "../api/hooks";
+import { ArrowRight, FolderOpen, Hammer, Plus, Power, Server, Trash2 } from "lucide-react";
+import { useAutostart, useCreateOptions, useRegisterServer, useRemoveServer, useServers, useSetAutostart, useSystem, useUpdateCheck } from "../api/hooks";
 import { Logo } from "../App";
-import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Input, Spinner, cx, useToast } from "../lib/ui";
+import { Badge, Button, Callout, Card, ConfirmButton, EmptyState, Field, Input, Spinner, Toggle, cx, useToast } from "../lib/ui";
 import { usePlayOnce } from "../lib/fx";
 
 export default function ServerSelect() {
@@ -124,6 +124,8 @@ export default function ServerSelect() {
         )}
       </section>
 
+      <AutostartCard />
+
       {sys && (
         <footer className="mt-10 flex flex-wrap items-center justify-center gap-2 text-[12px] text-slate-500">
           <span className="font-block">이 컴퓨터</span>
@@ -150,5 +152,42 @@ export default function ServerSelect() {
         </footer>
       )}
     </div>
+  );
+}
+
+/** 로그인 때 BlockPilot 자동 실행. 릴리스 실행 파일로 켰을 때만 토글을 쓸 수 있다 */
+function AutostartCard() {
+  const { data: info } = useAutostart();
+  const set = useSetAutostart();
+  const toast = useToast();
+  if (!info) return null;
+  const onChange = (v: boolean) =>
+    set.mutate(v, {
+      onSuccess: (r) => toast(v ? "ok" : "info", v ? "이제 로그인하면 BlockPilot 이 저절로 켜져요." : `로그인 자동 실행을 껐어요. 다음 로그인부터 켜지지 않아요.${r.autostarted ? " 지금 켜진 BlockPilot 은 그대로예요." : ""}`, v ? { icon: "lever" } : undefined),
+      onError: (e) => toast("err", (e as Error).message),
+    });
+  const mono = (p?: string) => <span className="break-all font-mono text-[12px]">{p}</span>;
+  return (
+    <Card className="mt-8 space-y-3">
+      {/* label 에는 제목만 — 스크린리더가 스위치 이름으로 설명문까지 읽지 않게. 글자를 눌러도 레버가 움직인다 */}
+      <label className={cx("flex items-center justify-between gap-4", info.supported && "cursor-pointer")}>
+        <span className={cx("flex items-center gap-2 font-block text-[12px]", info.supported ? "text-slate-200" : "text-slate-400")}>
+          <Power className="h-4 w-4 text-redstone" /> 로그인하면 BlockPilot 자동으로 켜기
+        </span>
+        <Toggle checked={info.enabled} onChange={onChange} disabled={!info.supported || set.isPending} />
+      </label>
+      <p className="text-[11px] text-slate-500">{info.supported ? (info.enabled && info.hint ? `${info.methodLabel} · ${info.hint}` : info.methodLabel) : info.reason}</p>
+      {info.enabled && info.exeMissing && (
+        <Callout tone="warning">등록된 실행 파일 {mono(info.registeredExe)} 이(가) 없어요. 옮겼거나 지웠다면 토글을 껐다 켜서 지금 위치로 다시 등록하세요.</Callout>
+      )}
+      {info.enabled && !info.exeMissing && info.stale && (
+        <Callout tone="warning">다른 위치의 실행 파일 {mono(info.registeredExe)} 로 등록돼 있어요. 토글을 껐다 켜면 지금 실행 중인 파일로 바꿔요.</Callout>
+      )}
+      {info.enabled && info.exePath && !info.stale && !info.exeMissing && (
+        <p className="truncate font-mono text-[12px] text-slate-500" title={info.exePath}>
+          {info.exePath}
+        </p>
+      )}
+    </Card>
   );
 }

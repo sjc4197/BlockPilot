@@ -264,6 +264,16 @@ export async function cancelAllJobs() {
   }
 }
 
+function processAlive(pid: number): boolean {
+  if (!pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 export interface RecoveredJob {
   target: string;
   cleaned: string[];
@@ -286,6 +296,8 @@ export async function recoverInterruptedJobs(log?: { info: (o: object, m: string
     try {
       const j = JSON.parse(await fsp.readFile(file, "utf8")) as Journal;
       if (j.pid === process.pid) continue;
+      // 다른 BlockPilot 인스턴스(예: 로그인 자동 실행으로 겹쳐 뜬 것)가 지금 만들고 있는 서버는 건드리지 않는다
+      if (processAlive(j.pid)) continue;
       const cleaned = await cleanupTarget(j);
       for (const t of j.tempPaths ?? []) await removeTempPath(t);
       await fsp.rm(file, { force: true });

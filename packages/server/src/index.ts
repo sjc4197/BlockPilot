@@ -34,19 +34,23 @@ import { shutdownAll } from "./services/process.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
 import { cancelAllJobs, recoverInterruptedJobs } from "./services/create/job.js";
 import { updateRoutes } from "./routes/update.js";
+import { autostartRoutes } from "./routes/autostart.js";
+import { isAutostarted } from "./services/platform/autostart/index.js";
 import { APP_VERSION, isSingleExecutable, webRoot } from "./lib/appInfo.js";
 import { alreadyRunning, openBrowser } from "./lib/launch.js";
 
 const PORT = Number(process.env.BLOCKPILOT_PORT ?? 4800);
 const HOST = process.env.BLOCKPILOT_HOST ?? "127.0.0.1";
+/** 로그인 항목으로 켜졌으면(--autostart) 브라우저를 열지 않는다 */
+const NO_BROWSER = process.env.BLOCKPILOT_NO_BROWSER === "1" || isAutostarted();
 
 // 단일 실행 파일은 최상위 await 를 쓸 수 없어서 시작 과정을 함수 하나에 담는다
 async function main() {
   const single = await isSingleExecutable();
   // 실행 파일을 두 번 눌러도 서버를 둘 띄우지 않고 이미 켜진 대시보드를 연다
   if (single && (await alreadyRunning(PORT))) {
-    console.log(`BlockPilot 이 이미 켜져 있어요. 브라우저로 http://127.0.0.1:${PORT} 을 열게요.`);
-    if (process.env.BLOCKPILOT_NO_BROWSER !== "1") openBrowser(`http://127.0.0.1:${PORT}`);
+    console.log(`BlockPilot 이 이미 켜져 있어요.${NO_BROWSER ? "" : ` 브라우저로 http://127.0.0.1:${PORT} 을 열게요.`}`);
+    if (!NO_BROWSER) openBrowser(`http://127.0.0.1:${PORT}`);
     return;
   }
 
@@ -93,6 +97,7 @@ async function main() {
   await app.register(modrinthRoutes);
 
   await app.register(updateRoutes);
+  await app.register(autostartRoutes);
 
   // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist, 단일 실행 파일은 안에 든 파일을 풀어서)
   const webDist = await webRoot(path.dirname(fileURLToPath(import.meta.url)));
@@ -134,14 +139,24 @@ async function main() {
   await app.listen({ port: PORT, host: HOST });
   if (single) {
     const url = `http://${HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST}:${PORT}`;
-    console.log(`\n  BlockPilot ${APP_VERSION} 이 켜졌어요 → ${url}\n  이 창을 닫거나 Ctrl+C 를 누르면 BlockPilot 과 켜 둔 마인크래프트 서버가 함께 꺼져요.\n`);
-    if (process.env.BLOCKPILOT_NO_BROWSER !== "1") openBrowser(url);
+    console.log(`\n  BlockPilot ${APP_VERSION} 이 켜졌어요 → ${url}${isAutostarted() ? " (로그인 자동 실행)" : ""}\n  이 창을 닫거나 Ctrl+C 를 누르면 BlockPilot 과 켜 둔 마인크래프트 서버가 함께 꺼져요.\n`);
+    if (!NO_BROWSER) openBrowser(url);
   }
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch(async (e) => {
   // 포트를 다른 프로그램이 쓰는 경우는 한글로 알려 준다
-  if ((e as NodeJS.ErrnoException)?.code === "EADDRINUSE") console.error(`\n포트 ${PORT} 을 다른 프로그램이 쓰고 있어요. BLOCKPILOT_PORT=4801 처럼 다른 포트로 켜 주세요.`);
+  if ((e as NodeJS.ErrnoException)?.code === "EADDRINUSE") {
+    // 로그인 자동 실행 인스턴스가 이미 켜진 BlockPilot 과 겹친 경우: 실패가 아니라 "이미 켜져 있음" 이다.
+    // 0 이 아닌 코드로 끝나면 launchd·systemd 가 계속 다시 띄우므로 0 으로 조용히 끝낸다
+    if (isAutostarted() || (await isSingleExecutable())) {
+      console.log(`포트 ${PORT} 이 이미 쓰이고 있어요. BlockPilot 이 이미 켜져 있는 것으로 보고 이 인스턴스는 끝낼게요.`);
+      process.exit(0);
+    }
+    console.error(e);
+    console.error(`\n포트 ${PORT} 을 다른 프로그램이 쓰고 있어요. BLOCKPILOT_PORT=4801 처럼 다른 포트로 켜 주세요.`);
+    process.exit(1);
+  }
+  console.error(e);
   process.exit(1);
 });

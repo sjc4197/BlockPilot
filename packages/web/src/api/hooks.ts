@@ -18,6 +18,7 @@ import type {
   BackupStatus,
   BackupSettings,
   AuthInfo,
+  AutostartInfo,
   CreateLoader,
   CreateOptions,
   CreateRelease,
@@ -408,4 +409,14 @@ export interface UpdateCheck {
   url: string;
   note?: string;
 }
+/** 로그인 때 BlockPilot 자동 실행 (이 컴퓨터의 로그인 항목) */
+export const useAutostart = () => useQuery({ queryKey: ["autostart"], queryFn: () => api<AutostartInfo>("/api/autostart"), staleTime: 60_000 });
+export function useSetAutostart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api<AutostartInfo>("/api/autostart", { method: "PUT", json: { enabled } }),
+    onSuccess: (info) => qc.setQueryData(["autostart"], info),
+  });
+}
+
 export const useUpdateCheck = () => useMutation({ mutationFn: () => api<UpdateCheck>("/api/update-check", { method: "POST" }) });

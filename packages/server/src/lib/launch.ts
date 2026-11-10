@@ -1,12 +1,15 @@
 import { spawn } from "node:child_process";
 import { platform } from "../services/platform/index.js";
 
-/** 같은 포트에 BlockPilot 이 이미 켜져 있는지 */
+/**
+ * 같은 포트에 BlockPilot 이 이미 켜져 있는지.
+ * /api/auth 는 토큰 인증이 켜져 있어도 열려 있는 유일한 API 라 이것으로 묻는다 (/api/system 은 토큰이 있으면 401 → 항상 "안 켜짐" 으로 잘못 판단).
+ */
 export async function alreadyRunning(port: number): Promise<boolean> {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/system`, { signal: AbortSignal.timeout(1500) });
-    const j = (await res.json()) as { os?: string; words?: unknown };
-    return res.ok && typeof j.os === "string" && !!j.words;
+    const res = await fetch(`http://127.0.0.1:${port}/api/auth`, { signal: AbortSignal.timeout(1500) });
+    const j = (await res.json()) as { required?: unknown; authenticated?: unknown };
+    return res.ok && typeof j.required === "boolean" && typeof j.authenticated === "boolean";
   } catch {
     return false;
   }
