@@ -2,13 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, FolderSearch, Hammer, LayoutDashboard, RotateCcw, X } from "lucide-react";
-import type { CreateJobStatus, CreateServerInput, CreateStep } from "@blockpilot/shared";
-import { useCancelCreate, useCreateJob, useCreateOptions, useStartCreate, useSystem, useVersionInfo, keys } from "../api/hooks";
+import { CREATE_LOADER_LABEL, displayLoaderVersion, type CreateJobStatus, type CreateLoader, type CreateLoaderInfo, type CreateServerInput, type CreateStep } from "@blockpilot/shared";
+import { useCancelCreate, useCreateJob, useCreateOptions, useCreateReleases, useStartCreate, useSystem, useVersionInfo, keys } from "../api/hooks";
 import { ApiRequestError } from "../api/client";
 import { FolderPicker } from "../components/FolderPicker";
 import { Lamp, TntIcon } from "../lib/pixel";
 import { Badge, Button, Callout, Card, ConfirmButton, Field, Input, PageHeader, SectionTitle, Select, Spinner, Toggle, cx, useToast } from "../lib/ui";
 import { XpBar } from "../lib/fx";
+
+/** 고른 서버 종류 아래 한 줄 안내. 다섯 종류 모두 한 줄이라 카드 높이가 바뀌지 않는다 */
+const LOADER_HINT: Record<CreateLoader, string> = {
+  fabric: "모드는 만든 뒤 모드 화면에서 Modrinth 로 넣을 수 있어요. 친구들도 같은 모드와 Fabric 을 깔아야 접속해요.",
+  paper: "플러그인은 만든 뒤 모드 화면에서 Modrinth 로 넣을 수 있어요. 친구들은 아무것도 깔지 않아도 돼요.",
+  forge: "친구들도 같은 버전의 Forge 와 모드를 깔아야 접속해요. 설치기가 만든 run 스크립트 대신 BlockPilot 의 start 스크립트로 켜요.",
+  neoforge: "친구들도 같은 버전의 NeoForge 와 모드를 깔아야 접속해요. 설치기의 run 스크립트 대신 BlockPilot 의 start 스크립트로 켜요.",
+  vanilla: "모드·플러그인을 쓸 수 없어요. 나중에 필요하면 Fabric 이나 Paper 로 새로 만들어 주세요.",
+};
 
 const MEMORY_STEPS_MB = [1024, 1536, 2048, 3072, 4096, 5120, 6144, 8192, 10240, 12288, 16384];
 const gb = (mb: number) => `${mb / 1024}GB`;
@@ -61,7 +70,10 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
   const [path, setPath] = useState(initial?.path ?? "");
   const [pathTouched, setPathTouched] = useState(!!initial);
   const [picking, setPicking] = useState(false);
-  const [mc, setMc] = useState(initial?.mcVersion ?? options.releases[0]?.id ?? "");
+  const [kind, setKind] = useState<CreateLoader>(initial?.loader ?? "fabric");
+  const kindInfo = options.loaders.find((l) => l.id === kind) ?? options.loaders[0];
+  const { data: releases, isLoading: rLoading, error: rError } = useCreateReleases(kind);
+  const [mc, setMc] = useState(initial?.mcVersion ?? "");
   const [loader, setLoader] = useState(initial?.loaderVersion ?? "");
   const [difficulty, setDifficulty] = useState(p.difficulty ?? "normal");
   const [gamemode, setGamemode] = useState(p.gamemode ?? "survival");
@@ -79,18 +91,29 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
 
   const start = useStartCreate();
   const here = useSystem().data?.words.thisComputer ?? "이 컴퓨터";
-  const { data: vinfo, isFetching: vLoading, error: vError } = useVersionInfo(mc);
+  const mcListed = !!releases?.some((r) => r.id === mc);
+  const { data: vinfo, isFetching: vLoading, error: vError } = useVersionInfo(mcListed ? mc : undefined, kind);
   const folder = folderNameOf(name);
+  const toast = useToast();
+
+  // 서버 종류를 바꾸면 그 종류가 지원하는 Minecraft 목록으로 (고른 버전이 없으면 가장 새 것으로 바꾸고 알려 준다)
+  useEffect(() => {
+    if (!releases || mcListed) return;
+    const next = releases[0]?.id ?? "";
+    if (mc && next) toast("info", `${kindInfo.label} 는 Minecraft ${mc} 를 지원하지 않아 ${next} 으로 바꿨어요.`);
+    setMc(next);
+  }, [releases, mcListed, mc, kindInfo.label, toast]);
 
   useEffect(() => {
     if (!pathTouched) setPath(`${options.defaults.parentDir}/${folder}`);
   }, [folder, pathTouched, options.defaults.parentDir]);
   useEffect(() => {
-    if (vinfo && !vinfo.loaders.some((l) => l.version === loader)) setLoader(vinfo.recommendedLoader ?? "");
-  }, [vinfo, loader]);
+    if (vinfo && vinfo.loader === kind && vinfo.mcVersion === mc && !vinfo.loaders.some((l) => l.version === loader)) setLoader(vinfo.recommendedLoader ?? "");
+  }, [vinfo, loader, kind, mc]);
 
   const memOptions = useMemo(() => MEMORY_STEPS_MB.filter((m) => m <= options.totalMemMb * 0.75), [options.totalMemMb]);
-  const ready = eula && name.trim() && path.trim() && mc && loader && !vLoading && !start.isPending;
+  const versionOk = kindInfo.hasVersions ? !!loader && !!vinfo?.loaders.some((l) => l.version === loader) : true;
+  const ready = eula && name.trim() && path.trim() && mc && versionOk && !vLoading && !start.isPending;
 
   const submit = () => {
     const properties: Record<string, string> = {
@@ -106,8 +129,9 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
     const input = {
       path: path.trim(),
       name: name.trim(),
+      loader: kind,
       mcVersion: mc,
-      loaderVersion: loader,
+      loaderVersion: kindInfo.hasVersions ? loader : "",
       memory: { minMb, maxMb },
       properties,
       ...(owner.trim() ? { ownerName: owner.trim() } : {}),
@@ -120,7 +144,7 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
 
   return (
     <div className="space-y-5">
-      <PageHeader icon={Hammer} title="새 서버 만들기" description="빈 폴더만 고르면 Fabric 서버를 처음부터 만들어요. 받는 파일은 모두 공식 배포처의 해시로 검증해요." />
+      <PageHeader icon={Hammer} title="새 서버 만들기" description="빈 폴더만 고르면 서버를 처음부터 만들어요. 받는 파일은 공식 배포처의 해시로 검증해요." />
 
       {options.recovered.length > 0 && (
         <Callout tone="info" title="지난번에 만들다 중단된 서버를 정리했어요">
@@ -158,40 +182,55 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
         </div>
       </Card>
 
+      {/* 서버 종류 */}
+      <Card className="space-y-4">
+        <SectionTitle>서버 종류</SectionTitle>
+        <LoaderPicker loaders={options.loaders} value={kind} onChange={(k) => { setKind(k); setLoader(""); }} />
+        <p className="text-[11px] text-slate-500">{LOADER_HINT[kind]}</p>
+      </Card>
+
       {/* 버전 */}
       <Card className="space-y-4">
         <SectionTitle>버전</SectionTitle>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Minecraft (정식 버전)">
-            <Select id="new-mc" value={mc} onChange={(e) => setMc(e.target.value)}>
-              {options.releases.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.id}
-                </option>
-              ))}
-            </Select>
+          <Field label={`Minecraft (정식 버전${kindInfo.minMc ? ` · ${kindInfo.minMc} 이상` : ""})`}>
+            {rError ? (
+              <span className="text-sm text-red-300">{(rError as Error).message}</span>
+            ) : (
+              <Select id="new-mc" value={mc} onChange={(e) => setMc(e.target.value)} disabled={rLoading || !releases?.length}>
+                {rLoading && <option value="">불러오는 중…</option>}
+                {releases?.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.id}
+                  </option>
+                ))}
+              </Select>
+            )}
           </Field>
-          <Field label="Fabric 로더">
-            <Select id="new-loader" value={loader} onChange={(e) => setLoader(e.target.value)} disabled={!vinfo}>
-              {vinfo?.loaders.map((l) => (
-                <option key={l.version} value={l.version}>
-                  {l.version}
-                  {l.stable ? (l.version === vinfo.recommendedLoader ? " (추천)" : "") : " (베타)"}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {kindInfo.hasVersions && (
+            <Field label={kindInfo.versionLabel}>
+              <Select id="new-loader" value={loader} onChange={(e) => setLoader(e.target.value)} disabled={!vinfo || vinfo.loader !== kind}>
+                {vinfo?.loader === kind &&
+                  vinfo.loaders.map((l) => (
+                    <option key={l.version} value={l.version}>
+                      {displayLoaderVersion(kind, mc, l.version)}
+                      {l.stable ? (l.version === vinfo.recommendedLoader ? " (추천)" : "") : l.version === vinfo.recommendedLoader ? " (베타 · 추천)" : " (베타)"}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+          )}
         </div>
         <div className="well flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm">
-          {vLoading ? (
+          {vLoading || rLoading ? (
             <Spinner />
           ) : vError ? (
             <span className="text-red-300">{(vError as Error).message}</span>
           ) : vinfo ? (
             <>
-              <span className="flex items-center gap-2">
+              <span className="flex min-w-0 flex-1 items-center gap-2">
                 <Lamp state={vinfo.java.source === "download" ? "off" : "on"} />
-                <span>
+                <span className="break-keep">
                   <b className="font-block text-[12px] text-white">Java {vinfo.javaMajor}</b>{" "}
                   <span className="text-slate-400">
                     {vinfo.java.source === "system"
@@ -202,7 +241,10 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
                   </span>
                 </span>
               </span>
-              <span className="text-slate-500">서버 파일 {vinfo.serverJarMb}MB</span>
+              <span className="text-slate-500">
+                {kind === "forge" || kind === "neoforge" ? "설치기" : "서버 파일"} {vinfo.downloadMb}MB
+                {vinfo.downloadNote ? ` · ${vinfo.downloadNote}` : ""}
+              </span>
             </>
           ) : null}
         </div>
@@ -328,13 +370,45 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
   );
 }
 
+/**
+ * 서버 종류 고르기. 넓은 화면에선 인벤토리 칸처럼 다섯 칸을 늘어놓고, 좁은 화면에선 목록 줄로.
+ * 고른 칸은 볼록(slab) + 램프 켜짐, 나머지는 오목(well). 알림·자동화 패널의 토글 버튼과 같은 aria-pressed 방식.
+ */
+function LoaderPicker({ loaders, value, onChange }: { loaders: CreateLoaderInfo[]; value: CreateLoader; onChange: (k: CreateLoader) => void }) {
+  return (
+    <div role="group" aria-label="서버 종류" className="grid grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-5">
+      {loaders.map((l) => {
+        const active = l.id === value;
+        return (
+          <button
+            key={l.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(l.id)}
+            className={cx(
+              "group flex min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors focus-ring lg:min-h-[5.5rem] lg:flex-col lg:items-start lg:gap-1.5 lg:py-2.5",
+              active ? "slab" : "well hover:bg-ink-2",
+            )}
+          >
+            <span className="flex shrink-0 items-center gap-2">
+              <Lamp state={active ? "on" : "off"} size={10} />
+              <span className={cx("font-block text-[12px]", active ? "text-white" : "text-slate-300 group-hover:text-white")}>{l.label}</span>
+            </span>
+            <span className={cx("min-w-0 flex-1 truncate text-[12px] leading-snug lg:whitespace-normal", active ? "text-slate-300" : "text-slate-500")}>{l.summary}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** OS 마다 처음 만들 때 알아 두면 좋은 것 */
 function OsNotice() {
   const { data: sys } = useSystem();
   if (sys?.os === "windows") {
     return (
       <Callout tone="warning" title="Windows 방화벽">
-        최초 실행 때 "Windows 보안 경고" 창이 뜨면 <b>액세스 허용</b>을 눌러 주세요. 허용해야 친구들이 접속할 수 있어요.
+        최초 실행 때 "Windows 보안 경고" 창이 뜨면 <b className="text-slate-200">액세스 허용</b>을 눌러 주세요. 허용해야 친구들이 접속할 수 있어요.
       </Callout>
     );
   }
@@ -389,7 +463,8 @@ function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
         title={job.state === "running" ? "서버를 만드는 중" : job.state === "succeeded" ? "서버를 만들었어요" : job.state === "cancelled" ? "만들기를 취소했어요" : "서버를 만들지 못했어요"}
         description={
           <span className="font-mono text-[12px]">
-            {job.input.name} · Minecraft {job.input.mcVersion} · Fabric {job.input.loaderVersion} · {job.input.path}
+            {job.input.name} · Minecraft {job.input.mcVersion} · {CREATE_LOADER_LABEL[job.input.loader]}
+            {job.input.loaderVersion ? ` ${displayLoaderVersion(job.input.loader, job.input.mcVersion, job.input.loaderVersion)}` : ""} · {job.input.path}
           </span>
         }
         actions={

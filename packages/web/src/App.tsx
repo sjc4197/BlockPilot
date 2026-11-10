@@ -279,5 +279,5 @@ function FullscreenLoader({ inline }: { inline?: boolean }) {
 }
 
 export function loaderLabel(loader: string) {
-  return { fabric: "Fabric", forge: "Forge", neoforge: "NeoForge", paper: "Paper", vanilla: "Vanilla", unknown: "알 수 없음" }[loader] ?? loader;
+  return { fabric: "Fabric", forge: "Forge", neoforge: "NeoForge", paper: "Paper", vanilla: "순정", unknown: "알 수 없음" }[loader] ?? loader;
 }

@@ -49,7 +49,7 @@ export default function ServerSelect() {
             <Hammer className="h-4 w-4 text-redstone" /> 새 서버 만들기
             {createOpts && !createOpts.supported && <Badge tone="warning">이 OS 는 준비 중</Badge>}
           </h2>
-          <p className="mt-1.5 text-sm text-slate-400">빈 폴더만 고르면 Fabric 서버를 처음부터 만들어요. Java 가 없으면 앱 폴더에 받아서 써요.</p>
+          <p className="mt-1.5 text-sm text-slate-400">빈 폴더만 고르면 Fabric · Paper · Forge · NeoForge · 순정 서버를 처음부터 만들어요. Java 가 없으면 앱 폴더에 받아서 써요.</p>
         </div>
         <Button variant="primary" icon={Hammer} disabled={!createOpts?.supported} onClick={() => navigate("/new")} title={createOpts?.unsupportedMessage}>
           새 서버 만들기

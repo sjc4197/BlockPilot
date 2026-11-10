@@ -18,7 +18,9 @@ import type {
   BackupStatus,
   BackupSettings,
   AuthInfo,
+  CreateLoader,
   CreateOptions,
+  CreateRelease,
   CreateVersionInfo,
   CreateServerInput,
   CreateJobStatus,
@@ -271,8 +273,17 @@ export function useSaveBackupSettings(id: string) {
 
 export const useCreateOptions = () => useQuery({ queryKey: ["create", "options"], queryFn: () => api<CreateOptions>("/api/create/options"), staleTime: 60_000 });
 
-export const useVersionInfo = (mc: string | undefined) =>
-  useQuery({ queryKey: ["create", "version", mc], queryFn: () => api<CreateVersionInfo>(`/api/create/version-info?mc=${encodeURIComponent(mc!)}`), enabled: !!mc, staleTime: 60_000 });
+/** 서버 종류(로더)별 Minecraft 정식 버전 목록 */
+export const useCreateReleases = (loader: CreateLoader) =>
+  useQuery({ queryKey: ["create", "releases", loader], queryFn: () => api<CreateRelease[]>(`/api/create/releases?loader=${loader}`), staleTime: 60_000 });
+
+export const useVersionInfo = (mc: string | undefined, loader: CreateLoader) =>
+  useQuery({
+    queryKey: ["create", "version", loader, mc],
+    queryFn: () => api<CreateVersionInfo>(`/api/create/version-info?mc=${encodeURIComponent(mc!)}&loader=${loader}`),
+    enabled: !!mc,
+    staleTime: 60_000,
+  });
 
 /** nearest: 아직 없는 경로면 있는 상위 폴더를 연다 (처음 열 때) */
 export const useFsList = (path: string | null, nearest = false) =>
