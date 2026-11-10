@@ -42,6 +42,7 @@
 
 | 화면 | 할 수 있는 것 |
 |---|---|
+| **첫 화면** | 서버 폴더 등록, 새 서버 만들기, **로그인하면 BlockPilot 자동으로 켜기** 토글(릴리스 실행 파일), 업데이트 확인 |
 | **새 서버 만들기** | 빈 폴더만 고르면 **Fabric · Paper · Forge · NeoForge · 순정** 서버를 처음부터 구축. 종류와 정식 버전·로더 버전(Paper 는 빌드) 선택, 필요한 Java 를 앱 폴더에 자동 준비, 받는 파일 해시 검증, 최초 실행까지 마치고 목록에 등록 |
 | **대시보드** | 로더·버전·접속자·모드 수 요약, 레버로 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔, **성능**(메모리·틱 시간 그래프, 렉 경고), **친구 접속**(접속 주소 복사, 밖에서 접속되는지 검사), 크래시 원인 요약 |
 | **서버 설정** | `server.properties`를 게임플레이 / 월드 / 플레이어 / 네트워크 / 성능 탭의 폼으로 편집. 그 외 키는 고급 탭에서 raw 편집. 주석과 키 순서 보존. **알림·자동화** 탭에서 디스코드 알림, 크래시 자동 재시작, 예약 재시작. 맨 아래 **서버 관리**에서 목록 등록 해제(파일 유지) 또는 **서버 삭제**(폴더째 영구 삭제) |
@@ -277,16 +278,18 @@ BlockPilot/
 │   ├── server/
 │   │   └── src/
 │   │       ├── routes/      servers · properties · players · mods · process(+WS 콘솔) · configs · logs · backups · auth
-│   │       │                create(새 서버 만들기) · fs(폴더 찾기)
-│   │       ├── services/    serverInfo(로더 감지) · properties(파서) · mods(jar 파싱·의존성)
+│   │       │                create(새 서버 만들기) · fs(폴더 찾기) · automation · network · stats · modrinth · update · autostart
+│   │       ├── services/    serverInfo(로더 감지) · properties(파서) · mods(jar 파싱·의존성) · modrinth
 │   │       │                process(spawn/stdin) · rcon · backups · scheduler · logs · configs · mojang
+│   │       │                events(사건 알림판) · discord · crash · autoRestart · scheduledRestart · perf · stats · network
 │   │       │                create/  download(해시 검증) · java · target(폴더 검증·정리) · job(진행·일지·취소·복구) · pipeline(설치 단계)
 │   │       │                         loaders/  mojang · fabric · paper · forge · neoforge · vanilla (종류별 배포처·설치)
-│   │       └── lib/         safePath(경로 탈출 차단) · atomicWrite(백업+원자적 쓰기) · auth
+│   │       │                platform/  macos · linux · windows (OS 별 실행·Java·경로) · autostart/ (로그인 항목: launchd · systemd · 레지스트리)
+│   │       └── lib/         safePath(경로 탈출 차단) · atomicWrite(백업+원자적 쓰기) · auth · version(버전 비교)
 │   └── web/
 │       └── src/
-│           ├── pages/       Dashboard · Settings · Players · Mods · ConfigFiles · Console · Logs · Backups · Login · NewServer
-│           ├── components/  ProcessControls · Lever · FolderPicker
+│           ├── pages/       ServerSelect · Dashboard · Settings · Players · Mods · ConfigFiles · Console · Logs · Backups · Stats · Login · NewServer
+│           ├── components/  ProcessControls · Lever · FolderPicker · AutomationPanel · ConnectCard · PerfCard · CrashBanner · ModrinthSearch · ServerDanger
 │           ├── api/         fetch 클라이언트, react-query 훅
 │           └── lib/         UI 프리미티브, 픽셀 그림, 연출(fx·burst), WebSocket 콘솔 훅
 └── docs/screenshots/
@@ -321,17 +324,6 @@ npm run build:sea    # 이 컴퓨터용 단일 실행 파일 → release/ (node 
 릴리스: `package.json` 버전을 올리고 `v1.2.3` 태그를 push 하면 GitHub Actions 가 6개 OS 실행 파일을 만들고, 각 OS 에서 직접 켜서 확인한 뒤 릴리스로 올려요.
 
 테스트 전용 환경 변수: `BLOCKPILOT_DISCORD_ALLOW_LOCAL=1`(디스코드 대신 `http://127.0.0.1` 가짜 수신기 허용), `BLOCKPILOT_PUBLIC_IP_URL` · `BLOCKPILOT_SERVER_CHECK_URL` · `BLOCKPILOT_MODRINTH_URL`(외부 서비스 대신 가짜 서버). 평소에는 쓰지 않아요.
-
-## 로드맵
-
-- [x] 새 서버 만들기 — Fabric (macOS · Linux · Windows)
-- [x] 새 서버 만들기 — Paper · Forge · NeoForge · 순정
-- [x] Linux 지원
-- [x] Windows 지원 ([실제 PC 점검 체크리스트](docs/windows-checklist.md))
-- [x] Node 설치 없이 실행되는 단일 실행 파일 (macOS · Windows · Linux, x64 · ARM64)
-- [x] 로그인 시 자동 실행 (launchd · 레지스트리 Run · systemd)
-- [x] Modrinth 모드 검색·설치·업데이트
-- [x] 플레이어 통계, 디스코드 알림, 크래시 자동 재시작, 예약 재시작, 친구 접속 도우미, 성능 모니터, 휴대폰 화면
 
 ## 라이선스
 
