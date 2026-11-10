@@ -42,6 +42,7 @@ certutil -hashfile blockpilot-v{VERSION}-windows-x64.zip SHA256   # Windows
 - 디스코드 알림, 크래시 원인 요약과 자동 재시작, 예약 재시작
 - 친구 접속 도우미, 성능 모니터, 플레이어 통계, Modrinth 모드 검색·설치·업데이트
 - 로그인하면 BlockPilot 자동으로 켜기 (첫 화면 토글)
+- **포트포워딩 없이 친구 초대 (P2P)**: 초대코드 하나로 친구가 들어와요. 승인·차단, 종단간 암호화
 - macOS · Windows · Linux, 휴대폰 화면
 
 설정은 `~/.blockpilot` 에 저장돼서 새 버전으로 바꿔도 그대로 남아요. 앱 아래쪽 **업데이트 확인**을 누르면 새 버전이 있는지 알려 줘요.

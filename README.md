@@ -42,9 +42,9 @@
 
 | 화면 | 할 수 있는 것 |
 |---|---|
-| **첫 화면** | 서버 폴더 등록, 새 서버 만들기, **로그인하면 BlockPilot 자동으로 켜기** 토글(릴리스 실행 파일), 업데이트 확인 |
+| **첫 화면** | 서버 폴더 등록, 새 서버 만들기, **친구 서버에 접속**(초대코드로 포트포워딩 없이), **로그인하면 BlockPilot 자동으로 켜기** 토글(릴리스 실행 파일), 업데이트 확인 |
 | **새 서버 만들기** | 빈 폴더만 고르면 **Fabric · Paper · Forge · NeoForge · 순정** 서버를 처음부터 구축. 종류와 정식 버전·로더 버전(Paper 는 빌드) 선택, 필요한 Java 를 앱 폴더에 자동 준비, 받는 파일 해시 검증, 최초 실행까지 마치고 목록에 등록 |
-| **대시보드** | 로더·버전·접속자·모드 수 요약, 레버로 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔, **성능**(메모리·틱 시간 그래프, 렉 경고), **친구 접속**(접속 주소 복사, 밖에서 접속되는지 검사), 크래시 원인 요약 |
+| **대시보드** | 로더·버전·접속자·모드 수 요약, 레버로 시작 / 중지 / 재시작, 접속자 킥·밴, 최근 콘솔, **성능**(메모리·틱 시간 그래프, 렉 경고), **친구 접속**(접속 주소 복사, 밖에서 접속되는지 검사), **포트포워딩 없이 초대**(P2P 초대코드, 승인·차단), 크래시 원인 요약 |
 | **서버 설정** | `server.properties`를 게임플레이 / 월드 / 플레이어 / 네트워크 / 성능 탭의 폼으로 편집. 그 외 키는 고급 탭에서 raw 편집. 주석과 키 순서 보존. **알림·자동화** 탭에서 디스코드 알림, 크래시 자동 재시작, 예약 재시작. 맨 아래 **서버 관리**에서 목록 등록 해제(파일 유지) 또는 **서버 삭제**(폴더째 영구 삭제) |
 | **플레이어** | 화이트리스트 · OP · 밴(플레이어/IP). 닉네임만 입력하면 Mojang API로 UUID 자동 조회 |
 | **모드** | jar 안의 `fabric.mod.json` / `mods.toml` / `plugin.yml`을 읽어 이름·버전·설명·의존성 표시, **의존성 누락 경고**, 활성/비활성 토글, 삭제, 업로드, 친구용 클라이언트 모드 zip 내보내기. **Modrinth 에서 검색·설치**(의존 모드 포함, sha512 검증)와 **업데이트**(이전 jar 보관) |
@@ -217,6 +217,45 @@ Paper · Forge 는 Minecraft **1.18 이상**, NeoForge 는 **1.20.2 이상**만 
 - **실패하거나 취소하면** 원인과 해결 방법을 한글로 보여 주고, 이번에 만든 파일만 지워요. 원래 폴더에 있던 것은 건드리지 않아요. 도중에 BlockPilot 이 꺼져도 다음에 켤 때 같은 방식으로 정리해요.
 - 해시 검증까지 끝난 JDK 는 다음에 다시 쓰도록 앱 폴더에 남겨요.
 
+### 포트포워딩 없이 친구 초대 (P2P)
+
+공유기 설정을 못 하거나(통신사 CGNAT, 기숙사·회사망) 하기 싫을 때, 라드민 VPN 처럼 **친구끼리 직접 연결**해서 들어오게 할 수 있어요. 중계 서버도, 계정도, 가상 랜카드도 없어요.
+
+**호스트(서버 주인)**: 대시보드 → **포트포워딩 없이 초대** 카드의 레버를 켜고, 초대코드를 **복사**해 친구에게 보내요. 친구가 들어오려 하면 카드에 **승인 요청**이 떠요. 승인하면 그 친구는 다음부터 자동으로 들어와요. 끊기·차단·승인 취소도 여기서 해요.
+**친구(참가)**: BlockPilot 을 받아 켠 뒤 첫 화면 → **친구 서버에 접속** → 초대코드를 붙여 넣고 **접속**. 호스트가 승인하면 "연결됐어요" 와 함께 주소(`localhost` 또는 `localhost:포트`)가 떠요. 마인크래프트 → 멀티플레이 → 직접 접속에 그 주소를 넣으면 끝이에요.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/18-invite.png" alt="호스트: 포트포워딩 없이 초대 카드"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>호스트 대시보드 — 초대코드, 승인 기다리는 친구, 접속 중</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/19-join.png" alt="친구: 연결됨"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>친구 쪽 — 연결되면 마인크래프트에 넣을 주소가 떠요</sub></td>
+  </tr>
+</table>
+
+어떻게 동작하나요
+
+- [hyperdht](https://github.com/holepunchto/hyperdht)(Holepunch) 로 UDP 홀 펀칭을 해서 두 PC 를 직접 잇고, 그 위로 마인크래프트 TCP 연결을 흘려보내요. 연결은 Noise 로 종단간 암호화돼요.
+- 초대코드 = 호스트 공개키 + 비밀값(80자). 연결 직후 비밀값을 **아는지만 증명**(HMAC 챌린지)하고 비밀값 자체는 보내지 않아요. 틀리면 바로 끊고, 같은 상대가 반복해서 틀리면 잠시 거부해요.
+- 처음 보는 친구는 호스트가 **승인**해야 들어와요. 승인·차단 목록은 앱 폴더에 저장돼요.
+- 호스트는 들어온 연결을 **오직 `127.0.0.1:<서버 포트>`** 로만 넘겨요. 친구 쪽 로컬 포트도 **127.0.0.1** 에만 열려요. 초대코드를 **다시 만들기** 하면 옛 코드는 바로 못 써요(접속 중인 친구는 유지).
+- 초대는 서버가 켜져 있는 동안만 돌아요. 서버를 끄면 같이 꺼지고, 다시 켜면 같이 켜져요.
+
+알아 둘 것
+
+- **화이트리스트를 켜 두세요.** 터널로 들어온 접속은 서버에 전부 같은 주소(127.0.0.1)로 보여서 IP 밴이 소용없어요. 화이트리스트가 꺼져 있으면 카드에 경고가 떠요. `online-mode=false` 도 경고해요.
+- P2P 특성상 **서로의 공인 IP 가 상대에게 보일 수 있어요.** 신뢰하는 친구와만 쓰세요. 초대코드는 이 서버의 열쇠예요. 새어 나갔다 싶으면 다시 만드세요.
+- **100% 연결을 보장하지 않아요.** 둘 다 대칭형 NAT 뒤(휴대폰 핫스팟, 일부 통신사·회사망)면 홀 펀칭이 실패해요. 그러면 원인과 함께 playit.gg · Tailscale 같은 대안을 안내해요(연동은 아니에요).
+- 양쪽 다 처음엔 방화벽 허용 창이 떠요(Windows). 친구도 BlockPilot 을 받아야 해요. 호스트와 친구가 서로를 찾는 데 쓰는 공개 부트스트랩 노드(Holepunch 운영)에 의존해요. 바꾸려면 `BLOCKPILOT_DHT_BOOTSTRAP`.
+- 다른 곳에서 띄운(BlockPilot 밖에서 켠) 서버는 켜고 꺼지는 사건이 없어서 30초마다 확인해 따라가요.
+- Alpine Linux(musl) 는 네이티브 모듈이 없어 이 기능이 꺼져요.
+
 ### 로그인하면 자동으로 켜기 (선택)
 
 릴리스에서 받은 실행 파일로 켠 BlockPilot 의 첫 화면 아래에 **로그인하면 BlockPilot 자동으로 켜기** 토글이 있어요. 켜 두면 컴퓨터에 로그인할 때 BlockPilot 이 브라우저 없이 조용히 켜지고, 끄면 등록이 지워져 다음 로그인부터 켜지지 않아요. 기본은 꺼짐이에요.
@@ -252,6 +291,8 @@ $env:BLOCKPILOT_HOST="0.0.0.0"; npm start   # Windows PowerShell
 | `BLOCKPILOT_TOKEN` | (없음) | 접속 토큰 지정. 설정하면 루프백에서도 토큰 필요 |
 | `BLOCKPILOT_HOME` | `~/.blockpilot` | 앱 폴더: 등록된 서버 목록 · 자동 백업·알림·자동화 설정(디스코드 웹훅 포함, 나만 읽기) · 토큰 · 받아 둔 JDK(`runtimes/`) · 만들기 작업 일지(`jobs/`) · 접속 시간 기록(`playtime/`) |
 | `LOG_LEVEL` | `info` | Fastify 로그 레벨 |
+| `BLOCKPILOT_DHT_BOOTSTRAP` | (hyperdht 기본 노드) | P2P 초대가 호스트를 찾는 부트스트랩 노드. `host:port,host:port` |
+| `BLOCKPILOT_JOIN_PORT` | `25565` (쓰고 있으면 빈 포트) | 친구 서버에 접속할 때 여는 로컬 포트. `0` 이면 항상 빈 포트 |
 | `BLOCKPILOT_NO_BROWSER` | (없음) | `1` 이면 실행 파일로 켤 때 브라우저를 자동으로 열지 않음 (로그인 자동 실행은 `--autostart` 인자로 같은 효과) |
 
 ## 기술 스택
@@ -265,6 +306,8 @@ $env:BLOCKPILOT_HOST="0.0.0.0"; npm start   # Windows PowerShell
 | 파일 처리 | `yauzl` / `yazl` | jar 메타데이터 읽기, 백업·모드 zip 생성 |
 | 설정 파서 | `smol-toml`, `yaml` | 모드 설정 문법 검사. `server.properties`는 주석·순서 보존 자체 파서 |
 | 프로세스 | Node `child_process` + 자체 **RCON** 클라이언트 | stdin/stdout 파이프 제어, 외부 서버는 Source RCON 프로토콜 |
+| P2P | **hyperdht** (Holepunch) | UDP 홀 펀칭 + Noise 암호화 스트림. 네이티브 모듈(udx-native · sodium-native)은 실행 파일 안에 넣고 시작할 때 앱 폴더에 풀어 써요 |
+| P2P | **hyperdht** (Holepunch) | UDP 홀 펀칭 + Noise 암호화 스트림. 네이티브 모듈(udx-native · sodium-native)은 실행 파일 안에 넣고 시작할 때 앱 폴더에 풀어 써요 |
 | 테스트 | **vitest** | 파서(properties, 버전 범위, 설정 문법), 다운로드·해시 검증(로컬 HTTP 서버), 작업 정리·취소·재시작 복구 |
 | 폰트 | [Galmuri11](https://github.com/quiple/galmuri) · Silkscreen (SIL OFL 1.1), IBM Plex Sans KR, JetBrains Mono | 제목·메뉴는 한글 픽셀 서체, 본문은 일반 서체, 콘솔은 고정폭 |
 | 패키지 구조 | npm workspaces 모노레포 | `shared` · `server` · `web` |
@@ -278,18 +321,19 @@ BlockPilot/
 │   ├── server/
 │   │   └── src/
 │   │       ├── routes/      servers · properties · players · mods · process(+WS 콘솔) · configs · logs · backups · auth
-│   │       │                create(새 서버 만들기) · fs(폴더 찾기) · automation · network · stats · modrinth · update · autostart
+│   │       │                create(새 서버 만들기) · fs(폴더 찾기) · automation · network · stats · modrinth · update · autostart · p2p · join
 │   │       ├── services/    serverInfo(로더 감지) · properties(파서) · mods(jar 파싱·의존성) · modrinth
 │   │       │                process(spawn/stdin) · rcon · backups · scheduler · logs · configs · mojang
 │   │       │                events(사건 알림판) · discord · crash · autoRestart · scheduledRestart · perf · stats · network
 │   │       │                create/  download(해시 검증) · java · target(폴더 검증·정리) · job(진행·일지·취소·복구) · pipeline(설치 단계)
 │   │       │                         loaders/  mojang · fabric · paper · forge · neoforge · vanilla (종류별 배포처·설치)
 │   │       │                platform/  macos · linux · windows (OS 별 실행·Java·경로) · autostart/ (로그인 항목: launchd · systemd · 레지스트리)
+│   │       │                p2p/  invite(초대코드) · protocol(HMAC 챌린지) · tunnel(호스트·참가자) · host(서버별 관리) · join · diagnose · native
 │   │       └── lib/         safePath(경로 탈출 차단) · atomicWrite(백업+원자적 쓰기) · auth · version(버전 비교)
 │   └── web/
 │       └── src/
-│           ├── pages/       ServerSelect · Dashboard · Settings · Players · Mods · ConfigFiles · Console · Logs · Backups · Stats · Login · NewServer
-│           ├── components/  ProcessControls · Lever · FolderPicker · AutomationPanel · ConnectCard · PerfCard · CrashBanner · ModrinthSearch · ServerDanger
+│           ├── pages/       ServerSelect · Dashboard · Settings · Players · Mods · ConfigFiles · Console · Logs · Backups · Stats · Login · NewServer · Join
+│           ├── components/  ProcessControls · Lever · FolderPicker · AutomationPanel · ConnectCard · InviteCard · PerfCard · CrashBanner · ModrinthSearch · ServerDanger
 │           ├── api/         fetch 클라이언트, react-query 훅
 │           └── lib/         UI 프리미티브, 픽셀 그림, 연출(fx·burst), WebSocket 콘솔 훅
 └── docs/screenshots/
@@ -310,6 +354,7 @@ BlockPilot/
 - 복원 시 기존 월드는 삭제하지 않고 `.blockpilot-backup/restore-<시각>/` 으로 이동
 - 모드·플레이어·백업 삭제는 버튼을 꾹 누르고 있어야 실행, 서버 중지·재시작·복원은 두 번 눌러 확인
 - 새 서버 만들기: 빈 폴더만 허용(시스템·홈·앱 폴더, 등록된 서버와 겹치는 폴더 거부), 받는 파일은 해시 검증(Forge·NeoForge 가 설치기로 받는 라이브러리는 설치기가 검증), 실패 시 시작 시점에 없던 항목만 삭제, EULA 자동 동의 없음
+- P2P 초대: 초대코드 없이는 연결 자체가 안 되고(공개키), 코드를 알아도 HMAC 챌린지로 비밀값을 증명해야 하며, 처음 보는 친구는 호스트가 승인해야 해요. 호스트는 `127.0.0.1:<서버 포트>` 로만 넘기고(대시보드 포트는 거부), 친구 쪽 포트는 `127.0.0.1` 에만 열려요. 인증 실패 반복·핸드셰이크 폭주·승인 전 데이터는 끊어요. 초대코드·비밀값은 로그에 남기지 않아요
 - 서버 삭제: 서버 이름을 그대로 입력해야 하고(API 도 확인), 서버가 꺼져 있을 때만 가능. 심볼릭 링크는 실제 폴더를 따라가 확인하고, 시스템·홈·앱 폴더나 더 이상 서버 폴더가 아닌 곳, 다른 등록된 서버를 품은 폴더는 거부
 
 ## 개발
