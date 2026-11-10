@@ -21,14 +21,17 @@ const NODE_VERSION = process.version; // 묶는 Node 와 blob 을 만드는 Node
 const OUT = path.join(ROOT, "out", "sea");
 const RELEASE = path.join(ROOT, "release");
 
+// prebuild: P2P 터널(hyperdht)이 쓰는 네이티브 모듈의 미리 빌드된 폴더 이름 (node_modules/<pkg>/prebuilds/<prebuild>/<pkg>.node)
 const TARGETS = {
-  "macos-arm64": { os: "darwin", arch: "arm64", ext: "tar.gz", exe: "blockpilot" },
-  "macos-x64": { os: "darwin", arch: "x64", ext: "tar.gz", exe: "blockpilot" },
-  "linux-x64": { os: "linux", arch: "x64", ext: "tar.xz", exe: "blockpilot" },
-  "linux-arm64": { os: "linux", arch: "arm64", ext: "tar.xz", exe: "blockpilot" },
-  "windows-x64": { os: "win", arch: "x64", ext: "zip", exe: "blockpilot.exe" },
-  "windows-arm64": { os: "win", arch: "arm64", ext: "zip", exe: "blockpilot.exe" },
+  "macos-arm64": { os: "darwin", arch: "arm64", ext: "tar.gz", exe: "blockpilot", prebuild: "darwin-arm64" },
+  "macos-x64": { os: "darwin", arch: "x64", ext: "tar.gz", exe: "blockpilot", prebuild: "darwin-x64" },
+  "linux-x64": { os: "linux", arch: "x64", ext: "tar.xz", exe: "blockpilot", prebuild: "linux-x64" },
+  "linux-arm64": { os: "linux", arch: "arm64", ext: "tar.xz", exe: "blockpilot", prebuild: "linux-arm64" },
+  "windows-x64": { os: "win", arch: "x64", ext: "zip", exe: "blockpilot.exe", prebuild: "win32-x64" },
+  "windows-arm64": { os: "win", arch: "arm64", ext: "zip", exe: "blockpilot.exe", prebuild: "win32-arm64" },
 };
+/** 실행 파일 안에 넣고 시작할 때 앱 폴더에 풀어 쓰는 네이티브 모듈 */
+const NATIVE_ADDONS = ["udx-native", "sodium-native"];
 const hostOs = { darwin: "macos", linux: "linux", win32: "windows" }[process.platform];
 const argv = process.argv.slice(2);
 const target = argv.includes("--target") ? argv[argv.indexOf("--target") + 1] : `${hostOs}-${process.arch}`;
@@ -55,6 +58,37 @@ if (!fs.existsSync(path.join(webDist, "index.html"))) throw new Error("packages/
 await fsp.mkdir(OUT, { recursive: true });
 const bundle = path.join(OUT, "server.cjs");
 log("서버 묶기 (esbuild)");
+// 네이티브 모듈(.node)은 실행 파일 안에서 바로 못 부른다. 각 패키지의 require-addon 호출을
+// "실행 파일 자산에서 .node 를 앱 폴더(~/.blockpilot/app/<버전>/native)에 풀고 진짜 require 로 부르는" shim 으로 바꾼다.
+const addonShim = {
+  name: "bp-addon-shim",
+  setup(b) {
+    b.onResolve({ filter: /^require-addon$/ }, (args) => {
+      const name = NATIVE_ADDONS.find((n) => args.importer.split(/[\\/]/).includes(n));
+      if (!name) throw new Error(`require-addon 을 쓰는 알 수 없는 패키지: ${args.importer}`);
+      return { path: name, namespace: "bp-addon" };
+    });
+    b.onLoad({ filter: /.*/, namespace: "bp-addon" }, (args) => ({
+      contents: `module.exports = function addon() { return globalThis.__bpLoadAddon(${JSON.stringify(args.path)}); };`,
+      loader: "js",
+    }));
+  },
+};
+const banner = `const __bp_import_meta_url = require("node:url").pathToFileURL(__filename).href;
+globalThis.__bpLoadAddon = function (name) {
+  const fs = require("node:fs"), path = require("node:path"), os = require("node:os");
+  const home = process.env.BLOCKPILOT_HOME || path.join(os.homedir(), ".blockpilot");
+  const dir = path.join(home, "app", ${JSON.stringify(VERSION)}, "native");
+  const file = path.join(dir, name + ".node");
+  if (!fs.existsSync(file)) {
+    fs.mkdirSync(dir, { recursive: true });
+    const tmp = file + ".tmp-" + process.pid;
+    fs.writeFileSync(tmp, Buffer.from(require("node:sea").getAsset("native/" + name + ".node")));
+    // 두 인스턴스가 동시에 처음 켜지면 한쪽이 이미 놓고 열어 둔(Windows 는 잠긴) 파일 위에 못 덮는다 → 있으면 그걸 쓴다
+    try { fs.renameSync(tmp, file); } catch (e) { if (!fs.existsSync(file)) throw e; fs.rmSync(tmp, { force: true }); }
+  }
+  return require("node:module").createRequire(path.join(dir, "index.js"))(file);
+};`;
 await build({
   entryPoints: [path.join(ROOT, "packages", "server", "src", "index.ts")],
   outfile: bundle,
@@ -65,8 +99,9 @@ await build({
   legalComments: "none",
   // ws 의 선택적 네이티브 가속 모듈 (없으면 순수 JS 로 동작)
   external: ["bufferutil", "utf-8-validate"],
+  plugins: [addonShim],
   define: { __BLOCKPILOT_VERSION__: JSON.stringify(VERSION), "import.meta.url": "__bp_import_meta_url" },
-  banner: { js: 'const __bp_import_meta_url = require("node:url").pathToFileURL(__filename).href;' },
+  banner: { js: banner },
   logLevel: "warning",
 });
 
@@ -87,10 +122,15 @@ const manifest = path.join(tdir, "web-manifest.json");
 await fsp.writeFile(manifest, JSON.stringify(webFiles));
 const assets = { "web-manifest.json": manifest };
 for (const f of webFiles) assets[`web/${f}`] = path.join(webDist, ...f.split("/"));
+for (const n of NATIVE_ADDONS) {
+  const file = path.join(ROOT, "node_modules", n, "prebuilds", T.prebuild, `${n}.node`);
+  if (!fs.existsSync(file)) throw new Error(`${n} 의 ${T.prebuild} 용 미리 빌드된 파일이 없어요: ${file}`);
+  assets[`native/${n}.node`] = file;
+}
 const blob = path.join(tdir, "sea-prep.blob");
 const seaConfig = path.join(tdir, "sea-config.json");
 await fsp.writeFile(seaConfig, JSON.stringify({ main: bundle, output: blob, disableExperimentalSEAWarning: true, useSnapshot: false, useCodeCache: false, assets }, null, 2));
-log(`SEA blob 만들기 (웹 파일 ${webFiles.length}개)`);
+log(`SEA blob 만들기 (웹 파일 ${webFiles.length}개 + 네이티브 모듈 ${NATIVE_ADDONS.length}개)`);
 run(process.execPath, ["--experimental-sea-config", seaConfig]);
 
 // 4) 대상 OS 의 공식 Node (Homebrew 등 이 컴퓨터의 node 는 다른 컴퓨터에서 안 돌 수 있어서 항상 공식 파일)

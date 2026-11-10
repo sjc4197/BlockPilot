@@ -53,6 +53,12 @@ console.log("✔ 대시보드 화면과 스크립트");
 if (!fs.existsSync(path.join(home, "app", VERSION, "web", ".complete"))) fail("웹 파일이 앱 폴더에 풀리지 않았어요");
 console.log("✔ 웹 파일을 앱 폴더에 풂");
 
+// P2P 터널의 네이티브 모듈이 실행 파일 안에서 풀려 로드되는지
+const p2p = await fetch(`${base}/api/p2p/support`).then((r) => r.json());
+if (!p2p.supported) fail(`P2P 네이티브 모듈을 못 불러왔어요: ${p2p.reason}`);
+if (!fs.existsSync(path.join(home, "app", VERSION, "native", "udx-native.node"))) fail("네이티브 모듈이 앱 폴더에 풀리지 않았어요");
+console.log("✔ P2P 네이티브 모듈 (udx-native · sodium-native)");
+
 const servers = await fetch(`${base}/api/servers`).then((r) => r.json());
 if (!Array.isArray(servers)) fail("/api/servers 가 목록을 돌려주지 않아요");
 console.log("✔ API (/api/servers)");

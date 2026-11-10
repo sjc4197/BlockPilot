@@ -35,6 +35,7 @@ import { startScheduler, stopScheduler } from "./services/scheduler.js";
 import { cancelAllJobs, recoverInterruptedJobs } from "./services/create/job.js";
 import { updateRoutes } from "./routes/update.js";
 import { autostartRoutes } from "./routes/autostart.js";
+import { p2pRoutes } from "./routes/p2p.js";
 import { isAutostarted } from "./services/platform/autostart/index.js";
 import { APP_VERSION, isSingleExecutable, webRoot } from "./lib/appInfo.js";
 import { alreadyRunning, openBrowser } from "./lib/launch.js";
@@ -98,6 +99,7 @@ async function main() {
 
   await app.register(updateRoutes);
   await app.register(autostartRoutes);
+  await app.register(p2pRoutes);
 
   // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist, 단일 실행 파일은 안에 든 파일을 풀어서)
   const webDist = await webRoot(path.dirname(fileURLToPath(import.meta.url)));
