@@ -169,14 +169,41 @@ export function getJavaVersion(): Promise<string | undefined> {
  * start.sh 에 java 절대 경로가 적혀 있으면(새 서버 만들기로 만든 서버) 그 Java 를, 아니면 시스템 java 를 본다.
  */
 export async function getServerJavaVersion(dir: string): Promise<string | undefined> {
-  const name = platform.startScripts[0];
-  const script = await fs.readFile(path.join(dir, name), "utf8").catch(() => "");
+  const file = path.join(dir, platform.startScripts[0]);
+  const script = await fs.readFile(file, "utf8").catch(() => "");
   const pinned = platform.pinnedJava(script);
   if (pinned) {
-    const v = await new Promise<string | undefined>((resolve) => {
-      execFile(pinned, ["-version"], { timeout: 10_000 }, (err, _o, stderr) => resolve(err ? undefined : String(stderr).match(/version "([^"]+)"/)?.[1]));
-    });
+    const mtime = await fs.stat(file).then((s) => s.mtimeMs, () => 0);
+    const v = await pinnedJavaVersion(pinned, mtime);
     if (v) return v;
   }
   return getJavaVersion();
+}
+
+/**
+ * 고정된 Java 의 버전. 대시보드가 5초마다 묻는데 매번 java 프로세스를 띄우면 아까우니
+ * (java 경로, 스크립트 수정 시각) 별로 한동안 기억해 둔다. 실패(없는 경로)도 기억해 같은 실패를 반복하지 않는다.
+ */
+const PINNED_JAVA_TTL_MS = 10 * 60_000;
+const PINNED_JAVA_CACHE_MAX = 64;
+const pinnedJavaCache = new Map<string, { version: string | undefined; at: number }>();
+
+function pinnedJavaVersion(javaPath: string, scriptMtime: number): Promise<string | undefined> {
+  const key = `${javaPath}\0${scriptMtime}`;
+  const hit = pinnedJavaCache.get(key);
+  if (hit && Date.now() - hit.at < PINNED_JAVA_TTL_MS) return Promise.resolve(hit.version);
+  return new Promise((resolve) => {
+    execFile(javaPath, ["-version"], { timeout: 10_000 }, (err, _o, stderr) => {
+      const version = err ? undefined : String(stderr).match(/version "([^"]+)"/)?.[1];
+      pinnedJavaCache.delete(key);
+      if (pinnedJavaCache.size >= PINNED_JAVA_CACHE_MAX) pinnedJavaCache.delete(pinnedJavaCache.keys().next().value!);
+      pinnedJavaCache.set(key, { version, at: Date.now() });
+      resolve(version);
+    });
+  });
+}
+
+/** 테스트 전용 */
+export function __clearPinnedJavaCacheForTests() {
+  pinnedJavaCache.clear();
 }

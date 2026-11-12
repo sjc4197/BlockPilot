@@ -6,13 +6,14 @@ const BACKUP_DIR = ".blockpilot-backup";
 const MAX_BACKUPS_PER_FILE = 10;
 
 /**
- * 기존 파일을 `.blockpilot-backup/<name>.<timestamp>`에 복사한 뒤
+ * 기존 파일을 `.blockpilot-backup/<name>.<timestamp>`에 복사한 뒤(backup:false 면 생략)
  * 임시 파일에 쓰고 rename으로 교체한다 (쓰다 중단돼도 원본이 깨지지 않음).
  */
-export async function writeFileAtomic(filePath: string, content: string): Promise<void> {
-  await backupIfExists(filePath);
+export async function writeFileAtomic(filePath: string, content: string, opts: { mode?: number; backup?: boolean } = {}): Promise<void> {
+  if (opts.backup !== false) await backupIfExists(filePath);
   const tmp = `${filePath}.${process.pid}.tmp`;
-  await fs.writeFile(tmp, content, "utf8");
+  // mode 를 주면 임시 파일부터 그 권한으로 만들어, rename 전까지 잠깐이라도 느슨한 권한으로 노출되지 않는다
+  await fs.writeFile(tmp, content, { encoding: "utf8", mode: opts.mode });
   await retryFs(() => fs.rename(tmp, filePath));
 }
 

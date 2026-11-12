@@ -1,8 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { detectServer } from "../src/services/serverInfo.js";
+import { __clearPinnedJavaCacheForTests, detectServer, getServerJavaVersion } from "../src/services/serverInfo.js";
+import { platform } from "../src/services/platform/index.js";
+
+// java -version 을 실제로 띄우지 않고 몇 번 불렸는지만 센다
+const execFileMock = vi.hoisted(() => vi.fn());
+vi.mock("node:child_process", async (importOriginal) => ({ ...(await importOriginal<typeof import("node:child_process")>()), execFile: execFileMock }));
 
 let dir: string;
 beforeEach(async () => {
@@ -56,5 +61,51 @@ describe("detectServer", () => {
     await fsp.rm(path.join(dir, "versions"), { recursive: true });
     const v = await detectServer(dir);
     expect(v).toMatchObject({ loader: "vanilla", launchJar: "server.jar" });
+  });
+});
+
+describe("getServerJavaVersion", () => {
+  const javaPath = process.platform === "win32" ? "C:\\jdk\\bin\\java.exe" : "/opt/jdk-21/bin/java";
+  const script = process.platform === "win32" ? `"${javaPath}" -jar server.jar nogui\r\n` : `#!/bin/sh\nexec "${javaPath}" -jar server.jar nogui\n`;
+
+  beforeEach(() => {
+    __clearPinnedJavaCacheForTests();
+    execFileMock.mockReset();
+    execFileMock.mockImplementation((_file: string, _args: string[], optsOrCb: unknown, cb?: (e: null, o: string, s: string) => void) => {
+      const done = typeof optsOrCb === "function" ? (optsOrCb as typeof cb)! : cb!;
+      done(null, "", 'openjdk version "21.0.4" 2024-07-16\n');
+    });
+  });
+
+  it("spawns the pinned java once and serves later polls from cache", async () => {
+    await fsp.writeFile(path.join(dir, platform.startScripts[0]), script);
+    expect(await getServerJavaVersion(dir)).toBe("21.0.4");
+    expect(await getServerJavaVersion(dir)).toBe("21.0.4");
+    expect(await getServerJavaVersion(dir)).toBe("21.0.4");
+    expect(execFileMock).toHaveBeenCalledTimes(1);
+    expect(execFileMock.mock.calls[0][0]).toBe(javaPath);
+  });
+
+  it("asks again when the start script changes (mtime) and remembers a failed lookup too", async () => {
+    const file = path.join(dir, platform.startScripts[0]);
+    await fsp.writeFile(file, script);
+    await fsp.utimes(file, new Date("2024-01-01"), new Date("2024-01-01"));
+    expect(await getServerJavaVersion(dir)).toBe("21.0.4");
+    await fsp.utimes(file, new Date("2024-06-01"), new Date("2024-06-01"));
+    expect(await getServerJavaVersion(dir)).toBe("21.0.4");
+    expect(execFileMock).toHaveBeenCalledTimes(2);
+
+    // 고정 java 가 없어졌다: 실패도 기억해서 시스템 java 로 떨어지되 매번 다시 띄우지 않는다
+    __clearPinnedJavaCacheForTests();
+    execFileMock.mockImplementation((file: string, _args: string[], optsOrCb: unknown, cb?: (e: Error | null, o: string, s: string) => void) => {
+      const done = typeof optsOrCb === "function" ? (optsOrCb as typeof cb)! : cb!;
+      if (file === javaPath) done(new Error("ENOENT"), "", "");
+      else done(null, "", 'openjdk version "17.0.2"\n');
+    });
+    execFileMock.mockClear();
+    await getServerJavaVersion(dir);
+    await getServerJavaVersion(dir);
+    const pinnedCalls = execFileMock.mock.calls.filter((c) => c[0] === javaPath);
+    expect(pinnedCalls).toHaveLength(1);
   });
 });
