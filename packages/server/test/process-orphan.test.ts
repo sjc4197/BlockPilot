@@ -78,6 +78,13 @@ describe("running.json and orphan detection", () => {
     // orphan 이 살아 있는 동안은 새로 켤 수 없다
     await expect(fresh.start()).rejects.toThrow(/지난번 BlockPilot 이 띄운 서버/);
 
+    if (!platform.canStopGracefully) {
+      // Windows: RCON 이 없는 고아 서버는 강제 종료 대신 안내만 한다 (월드 저장 없이 죽이지 않기 위해)
+      await expect(fresh.stopOrphan()).rejects.toThrow(/RCON/);
+      expect(pidAlive(pid)).toBe(true);
+      expect(await exists(file)).toBe(true);
+      return;
+    }
     await fresh.stopOrphan();
     expect(pidAlive(pid)).toBe(false);
     expect(await exists(file)).toBe(false);
