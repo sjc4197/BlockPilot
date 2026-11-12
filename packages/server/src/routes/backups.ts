@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import path from "node:path";
 import { BackupSettings } from "@blockpilot/shared";
-import { createBackup, deleteBackup, listBackups, restoreBackup, BACKUP_DIR, worldDirs } from "../services/backups.js";
+import { assertNotBusy, createBackup, deleteBackup, listBackups, restoreBackup, BACKUP_DIR, worldDirs } from "../services/backups.js";
 import { emitServerEvent } from "../services/events.js";
 import { backupStatus } from "../services/scheduler.js";
 import { getBackupSettings, setBackupSettings } from "../config/store.js";
@@ -21,6 +21,8 @@ export async function backupsRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { label } = (req.body ?? {}) as { label?: string };
     const { dir, managed } = await loadContext(id);
+    // 복원/백업이 돌고 있으면 save-off 를 걸기 전에 409 (createBackup 안에서도 한 번 더 잠근다)
+    assertNotBusy(dir);
     const b = await managed.withSavesPaused(() => createBackup(dir, { label }));
     emitServerEvent({ serverId: id, type: "backup", detail: b.file });
     reply.code(201);
@@ -39,6 +41,7 @@ export async function backupsRoutes(app: FastifyInstance) {
     const { dir, managed } = await loadContext(id);
     const st = await managed.status();
     if (st.state !== "stopped") throw conflict("복원은 서버가 중지된 상태에서만 가능합니다.");
+    // 같은 서버의 복원·백업은 한 번에 하나만 (restoreBackup 안에서 잠그고, 겹치면 409)
     return restoreBackup(dir, file);
   });
 
