@@ -24,6 +24,48 @@ export interface DownloadOptions {
   idleTimeoutMs?: number;
   /** 요청 헤더 (Paper 처럼 User-Agent 를 요구하는 배포처) */
   headers?: Record<string, string>;
+  /** 이 크기를 넘으면(content-length 든 실제로 받은 양이든) 즉시 멈춘다 */
+  maxBytes?: number;
+  /**
+   * 주면 리다이렉트를 자동으로 따라가지 않고, 넘겨지는 주소마다 이 함수로 확인한다 (최대 5번).
+   * false 면 받지 않는다. 없으면 예전처럼 어디로든 따라간다
+   */
+  allowRedirect?: (next: string, from: string) => boolean;
+}
+
+const MAX_REDIRECTS = 5;
+
+const tooLarge = (o: DownloadOptions, got: number) =>
+  new CreateError(
+    "http_error",
+    `받는 파일이 알려진 크기보다 커서 멈췄어요 (${path.basename(o.dest)}).`,
+    "배포처의 파일이 바뀌었거나 잘못된 파일일 수 있어요. 다시 시도해 보고, 계속되면 다른 버전을 골라 주세요.",
+    `최대 ${o.maxBytes}바이트, 받은 양 ${got}바이트 이상\n${o.url}`,
+  );
+
+/** redirect: "manual" 로 한 번씩 따라가며 주소마다 확인한다 */
+async function fetchChecked(o: DownloadOptions, signal: AbortSignal): Promise<Response> {
+  const headers = { "user-agent": USER_AGENT, ...o.headers };
+  if (!o.allowRedirect) return fetch(o.url, { signal, redirect: "follow", headers });
+  let url = o.url;
+  for (let hop = 0; ; hop++) {
+    const res = await fetch(url, { signal, redirect: "manual", headers });
+    if (![301, 302, 303, 307, 308].includes(res.status)) return res;
+    await res.body?.cancel().catch(() => {});
+    const loc = res.headers.get("location");
+    if (!loc) throw new CreateError("http_error", `파일을 받지 못했어요 (HTTP ${res.status}, 넘겨질 주소 없음).`, "잠시 후 다시 시도해 주세요.", url);
+    if (hop >= MAX_REDIRECTS) throw new CreateError("http_error", "파일 주소가 너무 여러 번 넘겨져서 받지 않았어요.", "잠시 후 다시 시도해 보고, 계속되면 다른 버전을 골라 주세요.", o.url);
+    let next: string;
+    try {
+      next = new URL(loc, url).toString();
+    } catch {
+      throw new CreateError("http_error", "파일 주소가 잘못된 곳으로 넘겨졌어요.", "다른 버전을 골라 주세요.", `${url} → ${loc}`);
+    }
+    if (!o.allowRedirect(next, url)) {
+      throw new CreateError("modpack_blocked_host", "파일 주소가 허용되지 않은 곳으로 넘겨져서 받지 않았어요.", "팩 제작자에게 알려 주세요. Modrinth·GitHub·GitLab 에 있는 파일만 받아요.", `${url} → ${next}`);
+    }
+    url = next;
+  }
 }
 
 /** 배포처에 보내는 User-Agent. Paper 는 소프트웨어 이름과 연락처가 든 UA 를 요구한다 */
@@ -67,7 +109,7 @@ async function downloadOnce(o: DownloadOptions) {
 
   try {
     resetIdle();
-    const res = await fetch(o.url, { signal: ctrl.signal, redirect: "follow", headers: { "user-agent": USER_AGENT, ...o.headers } });
+    const res = await fetchChecked(o, ctrl.signal);
     if (res.status === 404) {
       throw new CreateError("not_found", "받아야 할 파일이 서버에 없어요.", "선택한 버전이 더 이상 배포되지 않을 수 있어요. 다른 버전을 골라 주세요.", o.url);
     }
@@ -75,10 +117,15 @@ async function downloadOnce(o: DownloadOptions) {
       throw new CreateError("http_error", `파일을 받지 못했어요 (HTTP ${res.status}).`, "잠시 후 다시 시도해 주세요.", o.url);
     }
     const total = Number(res.headers.get("content-length")) || o.expectedSize;
+    if (o.maxBytes !== undefined && Number(res.headers.get("content-length")) > o.maxBytes) {
+      await res.body.cancel().catch(() => {});
+      throw tooLarge(o, Number(res.headers.get("content-length")));
+    }
     const hash = createHash(o.hash.algo);
     let done = 0;
     const meter = new Transform({
       transform(chunk: Buffer, _enc, cb) {
+        if (o.maxBytes !== undefined && done + chunk.length > o.maxBytes) return cb(tooLarge(o, done + chunk.length));
         hash.update(chunk);
         done += chunk.length;
         resetIdle();

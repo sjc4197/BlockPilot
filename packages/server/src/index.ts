@@ -26,6 +26,7 @@ import { automationRoutes } from "./routes/automation.js";
 import { networkRoutes } from "./routes/network.js";
 import { statsRoutes } from "./routes/stats.js";
 import { modrinthRoutes } from "./routes/modrinth.js";
+import { modpackRoutes } from "./routes/modpack.js";
 import { startPlaytimeTracker } from "./services/stats.js";
 import { startDiscordNotifier } from "./services/discord.js";
 import { startAutoRestart } from "./services/autoRestart.js";
@@ -111,6 +112,7 @@ async function main() {
   await app.register(networkRoutes);
   await app.register(statsRoutes);
   await app.register(modrinthRoutes);
+  await app.register(modpackRoutes);
 
   await app.register(updateRoutes);
   await app.register(autostartRoutes);

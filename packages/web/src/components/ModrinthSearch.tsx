@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Download, Package, Search } from "lucide-react";
 import type { ModrinthHit } from "@blockpilot/shared";
 import { useModrinthInstall, useModrinthSearch } from "../api/hooks";
+import { PackIcon } from "./ModpackPicker";
 import { Badge, Button, Callout, EmptyState, Input, Spinner, useToast } from "../lib/ui";
 
 const fmtDownloads = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}K` : String(n));
@@ -82,9 +83,7 @@ function HitCard({ serverId, hit: h, locked }: { serverId: string; hit: Modrinth
 
   return (
     <li className="slab flex min-w-0 gap-3 p-4 sm:gap-4">
-      <div className="h-14 w-14 shrink-0 overflow-hidden well">
-        {h.iconUrl ? <img src={h.iconUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center text-slate-500"><Package className="h-6 w-6" /></div>}
-      </div>
+      <PackIcon src={h.iconUrl} lazy />
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="truncate font-block text-[12px] text-white">{h.title}</span>

@@ -1,26 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, FolderSearch, Hammer, LayoutDashboard, RotateCcw, X } from "lucide-react";
-import { CREATE_LOADER_LABEL, displayLoaderVersion, type CreateJobStatus, type CreateLoader, type CreateLoaderInfo, type CreateServerInput, type CreateStep } from "@blockpilot/shared";
+import { ArrowLeft, ExternalLink, FolderSearch, Hammer, LayoutDashboard, Lock, PackageOpen, RotateCcw, X } from "lucide-react";
+import { CREATE_LOADER_LABEL, displayLoaderVersion, type CreateJobStatus, type CreateLoader, type CreateLoaderInfo, type CreateModpackRef, type CreateServerInput, type CreateStep, type ModpackInspectResult } from "@blockpilot/shared";
 import { useCancelCreate, useCreateJob, useCreateOptions, useCreateReleases, useStartCreate, useSystem, useVersionInfo, keys } from "../api/hooks";
 import { ApiRequestError } from "../api/client";
 import { FolderPicker } from "../components/FolderPicker";
+import { ModpackPicker, fmtSize } from "../components/ModpackPicker";
 import { Lamp, TntIcon } from "../lib/pixel";
 import { Badge, Button, Callout, Card, ConfirmButton, Field, Input, PageHeader, SectionTitle, Select, Spinner, Toggle, cx, useToast } from "../lib/ui";
 import { XpBar } from "../lib/fx";
 
-/** 고른 서버 종류 아래 한 줄 안내. 다섯 종류 모두 한 줄이라 카드 높이가 바뀌지 않는다 */
-const LOADER_HINT: Record<CreateLoader, string> = {
+/** 서버 종류 칸: 로더 다섯 + "모드팩" (모드팩은 팩이 정한 로더로 만든다) */
+type Kind = CreateLoader | "modpack";
+
+/** 고른 팩: 화면에 보여 줄 검사 결과 + 만들기 요청에 보낼 참조 */
+type PickedPack = { result: ModpackInspectResult; ref: CreateModpackRef };
+
+/** 고른 서버 종류 아래 한 줄 안내. 여섯 종류 모두 짧게 써서 카드 높이가 크게 바뀌지 않는다 */
+const LOADER_HINT: Record<Kind, string> = {
   fabric: "모드는 만든 뒤 모드 화면에서 Modrinth 로 넣을 수 있어요. 친구들도 같은 모드와 Fabric 을 깔아야 접속해요.",
   paper: "플러그인은 만든 뒤 모드 화면에서 Modrinth 로 넣을 수 있어요. 친구들은 아무것도 깔지 않아도 돼요.",
   forge: "친구들도 같은 버전의 Forge 와 모드를 깔아야 접속해요. 설치기가 만든 run 스크립트 대신 BlockPilot 의 start 스크립트로 켜요.",
   neoforge: "친구들도 같은 버전의 NeoForge 와 모드를 깔아야 접속해요. 설치기의 run 스크립트 대신 BlockPilot 의 start 스크립트로 켜요.",
   vanilla: "모드·플러그인을 쓸 수 없어요. 나중에 필요하면 Fabric 이나 Paper 로 새로 만들어 주세요.",
+  modpack: "팩이 정한 로더·버전으로 만들고 모드·설정을 자동으로 넣어요. 친구들은 같은 팩을 런처(Modrinth App 등)에 설치하면 접속해요.",
 };
 
+const MODPACK_TILE = { label: "모드팩", summary: "Modrinth 팩이나 .mrpack 파일로 모드까지 한 번에" };
+
 const MEMORY_STEPS_MB = [1024, 1536, 2048, 3072, 4096, 5120, 6144, 8192, 10240, 12288, 16384];
-const gb = (mb: number) => `${mb / 1024}GB`;
+const gb = (mb: number) => `${Number((mb / 1024).toFixed(1))}GB`;
 
 /** 서버 이름 → 폴더 이름. 어느 OS 에서도 쓸 수 있게: 공백은 -, 끝의 점 제거, Windows 예약 이름(CON 등) 피하기 */
 function folderNameOf(name: string) {
@@ -33,6 +43,7 @@ export default function NewServer() {
   const { data: options, isLoading } = useCreateOptions();
   const [jobId, setJobId] = useState<string | null>(null);
   const [lastInput, setLastInput] = useState<CreateServerInput | null>(null);
+  const [lastPack, setLastPack] = useState<PickedPack | null>(null);
 
   // 새로고침해도 진행 중인 작업으로 돌아온다
   useEffect(() => {
@@ -54,9 +65,24 @@ export default function NewServer() {
           </Callout>
         </div>
       ) : jobId ? (
-        <Progress jobId={jobId} onRetry={() => setJobId(null)} />
+        <Progress
+          jobId={jobId}
+          onRetry={(clearPack) => {
+            if (clearPack) setLastPack(null);
+            setJobId(null);
+          }}
+        />
       ) : (
-        <CreateForm options={options} initial={lastInput} onStarted={(id, input) => { setLastInput(input); setJobId(id); }} />
+        <CreateForm
+          options={options}
+          initial={lastInput}
+          initialPack={lastPack}
+          onStarted={(id, input, pack) => {
+            setLastInput(input);
+            setLastPack(pack);
+            setJobId(id);
+          }}
+        />
       )}
     </div>
   );
@@ -64,15 +90,25 @@ export default function NewServer() {
 
 // ---------- 입력 폼 ----------
 
-function CreateForm({ options, initial, onStarted }: { options: NonNullable<ReturnType<typeof useCreateOptions>["data"]>; initial: CreateServerInput | null; onStarted: (jobId: string, input: CreateServerInput) => void }) {
+function CreateForm({ options, initial, initialPack, onStarted }: { options: NonNullable<ReturnType<typeof useCreateOptions>["data"]>; initial: CreateServerInput | null; initialPack: PickedPack | null; onStarted: (jobId: string, input: CreateServerInput, pack: PickedPack | null) => void }) {
   const p = initial?.properties ?? {};
   const [name, setName] = useState(initial?.name ?? "my-server");
+  const [nameTouched, setNameTouched] = useState(!!initial);
+  /** 팩 이름으로 자동으로 채운 이름. 사용자가 그대로 두었으면 다른 팩을 고를 때 다시 바꾼다 */
+  const autoName = useRef<string | null>(initial?.modpack && initialPack && initial.name === initialPack.result.summary.name.trim().slice(0, 60) ? initial.name : null);
+  /** 팩을 처음 고르기 전의 이름·메모리. 다른 서버 종류로 돌아가면 되돌린다 */
+  const prePack = useRef<{ name: string; nameTouched: boolean; minMb: number; maxMb: number } | null>(null);
   const [path, setPath] = useState(initial?.path ?? "");
   const [pathTouched, setPathTouched] = useState(!!initial);
   const [picking, setPicking] = useState(false);
-  const [kind, setKind] = useState<CreateLoader>(initial?.loader ?? "fabric");
-  const kindInfo = options.loaders.find((l) => l.id === kind) ?? options.loaders[0];
-  const { data: releases, isLoading: rLoading, error: rError } = useCreateReleases(kind);
+  const [kind, setKind] = useState<Kind>(initial?.modpack ? "modpack" : (initial?.loader ?? "fabric"));
+  const [pack, setPack] = useState<PickedPack | null>(initial?.modpack ? initialPack : null);
+  const isPack = kind === "modpack";
+  const packSummary = isPack ? (pack?.result.summary ?? null) : null;
+  /** 실제로 설치할 로더. 모드팩은 팩이 정한 것 (고르기 전엔 Fabric 으로 목록만 불러 둔다) */
+  const loaderKind: CreateLoader = kind === "modpack" ? (pack?.result.summary.loader ?? "fabric") : kind;
+  const kindInfo = options.loaders.find((l) => l.id === loaderKind) ?? options.loaders[0];
+  const { data: releases, isLoading: rLoading, error: rError } = useCreateReleases(loaderKind);
   const [mc, setMc] = useState(initial?.mcVersion ?? "");
   const [loader, setLoader] = useState(initial?.loaderVersion ?? "");
   const [difficulty, setDifficulty] = useState(p.difficulty ?? "normal");
@@ -92,28 +128,56 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
   const start = useStartCreate();
   const here = useSystem().data?.words.thisComputer ?? "이 컴퓨터";
   const mcListed = !!releases?.some((r) => r.id === mc);
-  const { data: vinfo, isFetching: vLoading, error: vError } = useVersionInfo(mcListed ? mc : undefined, kind);
+  // 모드팩은 팩이 정한 Minecraft 를 그대로 쓴다 (목록에 없는 버전이어도 Java 안내는 받아 본다)
+  const { data: vinfo, isFetching: vLoading, error: vError } = useVersionInfo(isPack ? packSummary?.mc : mcListed ? mc : undefined, loaderKind);
   const folder = folderNameOf(name);
   const toast = useToast();
 
   // 서버 종류를 바꾸면 그 종류가 지원하는 Minecraft 목록으로 (고른 버전이 없으면 가장 새 것으로 바꾸고 알려 준다)
   useEffect(() => {
-    if (!releases || mcListed) return;
+    if (isPack || !releases || mcListed) return;
     const next = releases[0]?.id ?? "";
     if (mc && next) toast("info", `${kindInfo.label} 는 Minecraft ${mc} 를 지원하지 않아 ${next} 으로 바꿨어요.`);
     setMc(next);
-  }, [releases, mcListed, mc, kindInfo.label, toast]);
+  }, [isPack, releases, mcListed, mc, kindInfo.label, toast]);
 
   useEffect(() => {
     if (!pathTouched) setPath(`${options.defaults.parentDir}/${folder}`);
   }, [folder, pathTouched, options.defaults.parentDir]);
   useEffect(() => {
+    if (isPack) return;
     if (vinfo && vinfo.loader === kind && vinfo.mcVersion === mc && !vinfo.loaders.some((l) => l.version === loader)) setLoader(vinfo.recommendedLoader ?? "");
-  }, [vinfo, loader, kind, mc]);
+  }, [isPack, vinfo, loader, kind, mc]);
 
   const memOptions = useMemo(() => MEMORY_STEPS_MB.filter((m) => m <= options.totalMemMb * 0.75), [options.totalMemMb]);
-  const versionOk = kindInfo.hasVersions ? !!loader && !!vinfo?.loaders.some((l) => l.version === loader) : true;
-  const ready = eula && name.trim() && path.trim() && mc && versionOk && !vLoading && !start.isPending;
+  /** 메모리 칸에 있는 값 중 want 이하로 가장 큰 것 (없으면 가장 작은 것) */
+  const snapMem = (want: number) => memOptions.filter((m) => m <= want).pop() ?? memOptions[0] ?? want;
+
+  /** 팩을 고르면 Minecraft·로더 버전·메모리를 팩에 맞추고, 이름을 아직 안 바꿨으면 팩 이름으로 */
+  const pickPack = (result: ModpackInspectResult | null, ref: CreateModpackRef | null) => {
+    start.reset();
+    if (!result || !ref) return setPack(null);
+    const s = result.summary;
+    if (!prePack.current) prePack.current = { name, nameTouched, minMb, maxMb };
+    setPack({ result, ref });
+    setMc(s.mc);
+    setLoader(s.loaderVersion);
+    const max = snapMem(s.suggestedMaxMb);
+    setMaxMb(max);
+    setMinMb(Math.min(max, snapMem(Math.max(1024, Math.round(max / 2 / 512) * 512))));
+    if (!nameTouched || name.trim() === "my-server" || name === autoName.current) {
+      const next = s.name.trim().slice(0, 60) || "my-server";
+      autoName.current = next;
+      setName(next);
+    }
+  };
+  /** 팩이 원하는 메모리 (이 컴퓨터에 맞춰 자르기 전) */
+  const packIdealMb = packSummary ? (packSummary.idealMaxMb ?? packSummary.suggestedMaxMb) : 0;
+  const memShort = packSummary && memOptions.length > 0 && packIdealMb > memOptions[memOptions.length - 1];
+  const packBlocked = !!packSummary && (packSummary.blockedCount ?? 0) > 0;
+
+  const versionOk = isPack ? !!packSummary && !packBlocked : kindInfo.hasVersions ? !!loader && !!vinfo?.loaders.some((l) => l.version === loader) : true;
+  const ready = eula && name.trim() && path.trim() && (isPack ? !!packSummary : mc) && versionOk && !vLoading && !start.isPending;
 
   const submit = () => {
     const properties: Record<string, string> = {
@@ -126,21 +190,25 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
       "server-port": port,
     };
     if (seed.trim()) properties["level-seed"] = seed.trim();
+    const picked = isPack ? pack : null;
     const input = {
       path: path.trim(),
       name: name.trim(),
-      loader: kind,
-      mcVersion: mc,
-      loaderVersion: kindInfo.hasVersions ? loader : "",
+      // 모드팩은 검사 결과의 값을 그대로 보낸다 (파이프라인이 팩과 대조한다)
+      loader: picked ? picked.result.summary.loader : loaderKind,
+      mcVersion: picked ? picked.result.summary.mc : mc,
+      loaderVersion: picked ? picked.result.summary.loaderVersion : kindInfo.hasVersions ? loader : "",
       memory: { minMb, maxMb },
       properties,
       ...(owner.trim() ? { ownerName: owner.trim() } : {}),
+      ...(picked ? { modpack: picked.ref } : {}),
       eulaAccepted: eula,
     } as CreateServerInput;
-    start.mutate(input, { onSuccess: (r) => onStarted(r.jobId, input) });
+    start.mutate(input, { onSuccess: (r) => onStarted(r.jobId, input, picked) });
   };
 
   const err = start.error as ApiRequestError | null;
+  const packErr = !!err?.code?.startsWith("modpack_");
 
   return (
     <div className="space-y-5">
@@ -161,7 +229,15 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
         <SectionTitle>폴더</SectionTitle>
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
           <Field label="서버 이름">
-            <Input id="new-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+            <Input
+              id="new-name"
+              value={name}
+              maxLength={60}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameTouched(true);
+              }}
+            />
           </Field>
           <Field label="서버 폴더" hint="없는 폴더면 새로 만들고, 있는 폴더면 비어 있어야 해요. 직접 입력해도 돼요.">
             <div className="flex gap-2">
@@ -185,16 +261,55 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
       {/* 서버 종류 */}
       <Card className="space-y-4">
         <SectionTitle>서버 종류</SectionTitle>
-        <LoaderPicker loaders={options.loaders} value={kind} onChange={(k) => { setKind(k); setLoader(""); }} />
+        <LoaderPicker
+          loaders={options.loaders}
+          value={kind}
+          onChange={(k) => {
+            if (k === kind) return;
+            // 모드팩에서 다른 종류로 돌아가면 팩이 바꾼 이름·메모리를 되돌린다
+            if (kind === "modpack" && k !== "modpack") {
+              const before = prePack.current;
+              if (autoName.current && name === autoName.current) {
+                setName(before?.name ?? "my-server");
+                setNameTouched(before?.nameTouched ?? false);
+                autoName.current = null;
+              }
+              if (pack || before) {
+                setMinMb(before?.minMb ?? options.defaults.memory.minMb);
+                setMaxMb(before?.maxMb ?? options.defaults.memory.maxMb);
+              }
+              prePack.current = null;
+            }
+            if (k === "modpack" && pack && kind !== "modpack") pickPack(pack.result, pack.ref);
+            setKind(k);
+            setLoader(k === "modpack" && pack ? pack.result.summary.loaderVersion : "");
+            if (k === "modpack" && pack) setMc(pack.result.summary.mc);
+          }}
+        />
         <p className="text-[11px] text-slate-500">{LOADER_HINT[kind]}</p>
       </Card>
+
+      {/* 모드팩 */}
+      {isPack && (
+        <Card className="space-y-4">
+          <SectionTitle>모드팩</SectionTitle>
+          <ModpackPicker value={pack?.result ?? null} packRef={pack?.ref ?? null} onChange={pickPack} maxUploadBytes={options.modpackUploadMaxBytes} />
+          {memShort && !packBlocked && (
+            <Callout tone="warning" title="메모리가 모자랄 수 있어요">
+              이 팩은 최대 메모리 {gb(packIdealMb)} 를 권장하지만 {here}에서는 {gb(memOptions[memOptions.length - 1])} 까지만 고를 수 있어요. 모드가 많으면 느리거나 멈출 수 있어요.
+            </Callout>
+          )}
+        </Card>
+      )}
 
       {/* 버전 */}
       <Card className="space-y-4">
         <SectionTitle>버전</SectionTitle>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label={`Minecraft (정식 버전${kindInfo.minMc ? ` · ${kindInfo.minMc} 이상` : ""})`}>
-            {rError ? (
+          <Field label={isPack ? "Minecraft" : `Minecraft (정식 버전${kindInfo.minMc ? ` · ${kindInfo.minMc} 이상` : ""})`}>
+            {isPack ? (
+              <LockedValue id="new-mc" value={packSummary?.mc} />
+            ) : rError ? (
               <span className="text-sm text-red-300">{(rError as Error).message}</span>
             ) : (
               <Select id="new-mc" value={mc} onChange={(e) => setMc(e.target.value)} disabled={rLoading || !releases?.length}>
@@ -207,7 +322,11 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
               </Select>
             )}
           </Field>
-          {kindInfo.hasVersions && (
+          {isPack ? (
+            <Field label={packSummary ? kindInfo.versionLabel : "로더 버전"}>
+              <LockedValue id="new-loader" value={packSummary ? displayLoaderVersion(packSummary.loader, packSummary.mc, packSummary.loaderVersion) : undefined} />
+            </Field>
+          ) : kindInfo.hasVersions && (
             <Field label={kindInfo.versionLabel}>
               <Select id="new-loader" value={loader} onChange={(e) => setLoader(e.target.value)} disabled={!vinfo || vinfo.loader !== kind}>
                 {vinfo?.loader === kind &&
@@ -221,8 +340,15 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
             </Field>
           )}
         </div>
+        {isPack && (
+          <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <Lock className="h-3 w-3 shrink-0" /> {packSummary ? "모드팩이 정한 값이라 바꿀 수 없어요." : "모드팩을 고르면 정해져요."}
+          </p>
+        )}
         <div className="well flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm">
-          {vLoading || rLoading ? (
+          {isPack && !packSummary ? (
+            <span className="text-slate-500">모드팩을 고르면 필요한 Java 와 받을 파일을 알려 드려요.</span>
+          ) : vLoading || (!isPack && rLoading) ? (
             <Spinner />
           ) : vError ? (
             <span className="text-red-300">{(vError as Error).message}</span>
@@ -242,8 +368,9 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
                 </span>
               </span>
               <span className="text-slate-500">
-                {kind === "forge" || kind === "neoforge" ? "설치기" : "서버 파일"} {vinfo.downloadMb}MB
+                {loaderKind === "forge" || loaderKind === "neoforge" ? "설치기" : "서버 파일"} {vinfo.downloadMb}MB
                 {vinfo.downloadNote ? ` · ${vinfo.downloadNote}` : ""}
+                {packSummary ? ` · 모드 ${fmtSize(packSummary.totalBytes)}` : ""}
               </span>
             </>
           ) : null}
@@ -287,7 +414,7 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
               ))}
             </Select>
           </Field>
-          <Field label="최대 메모리">
+          <Field label="최대 메모리" hint={packSummary ? `모드팩에 맞춰 ${gb(snapMem(packSummary.suggestedMaxMb))} 로 정했어요` : undefined}>
             <Select id="new-maxmem" value={maxMb} onChange={(e) => { const v = Number(e.target.value); setMaxMb(v); if (minMb > v) setMinMb(v); }}>
               {memOptions.map((m) => (
                 <option key={m} value={m}>
@@ -344,11 +471,16 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
         <Callout tone="danger" title={err.message}>
           {err.hint}
           {err.detail && <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] text-slate-400">{err.detail}</pre>}
+          {packErr && pack && (
+            <Button className="mt-3" icon={PackageOpen} onClick={() => pickPack(null, null)}>
+              모드팩 다시 고르기
+            </Button>
+          )}
         </Callout>
       )}
 
       <div className="flex items-center justify-between gap-4">
-        <span className="text-sm text-slate-500">{eula ? "준비됐어요." : "EULA 에 동의해야 만들 수 있어요."}</span>
+        <span className="break-keep text-sm text-slate-500">{packBlocked ? "이 팩은 만들 수 없어요. 다른 팩을 골라 주세요." : isPack && !packSummary ? "모드팩을 골라 주세요." : !eula ? "EULA 에 동의해야 만들 수 있어요." : "준비됐어요."}</span>
         <Button variant="primary" size="lg" icon={Hammer} disabled={!ready} loading={start.isPending} onClick={submit}>
           서버 만들기
         </Button>
@@ -370,14 +502,25 @@ function CreateForm({ options, initial, onStarted }: { options: NonNullable<Retu
   );
 }
 
+/** 모드팩이 정한 값: 고를 수 없으니 셀렉트 대신 자물쇠와 함께 값만 보여 준다 */
+function LockedValue({ id, value }: { id: string; value?: string }) {
+  return (
+    <div id={id} data-value={value ?? ""} className="well flex h-9 min-w-0 items-center gap-2 px-3 text-sm" aria-readonly>
+      <Lock className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+      <span className={cx("min-w-0 truncate", value ? "font-mono text-[13px] text-slate-100" : "text-slate-500")}>{value ?? "모드팩을 고르면 정해져요"}</span>
+    </div>
+  );
+}
+
 /**
  * 서버 종류 고르기. 넓은 화면에선 인벤토리 칸처럼 다섯 칸을 늘어놓고, 좁은 화면에선 목록 줄로.
  * 고른 칸은 볼록(slab) + 램프 켜짐, 나머지는 오목(well). 알림·자동화 패널의 토글 버튼과 같은 aria-pressed 방식.
  */
-function LoaderPicker({ loaders, value, onChange }: { loaders: CreateLoaderInfo[]; value: CreateLoader; onChange: (k: CreateLoader) => void }) {
+function LoaderPicker({ loaders, value, onChange }: { loaders: CreateLoaderInfo[]; value: Kind; onChange: (k: Kind) => void }) {
+  const tiles: { id: Kind; label: string; summary: string }[] = [...loaders, { id: "modpack", ...MODPACK_TILE }];
   return (
-    <div role="group" aria-label="서버 종류" className="grid grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-5">
-      {loaders.map((l) => {
+    <div role="group" aria-label="서버 종류" className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-3 lg:grid-cols-6">
+      {tiles.map((l) => {
         const active = l.id === value;
         return (
           <button
@@ -386,7 +529,7 @@ function LoaderPicker({ loaders, value, onChange }: { loaders: CreateLoaderInfo[
             aria-pressed={active}
             onClick={() => onChange(l.id)}
             className={cx(
-              "group flex min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors focus-ring lg:min-h-[5.5rem] lg:flex-col lg:items-start lg:gap-1.5 lg:py-2.5",
+              "group flex min-w-0 items-center gap-3 px-3 py-2 text-left transition-colors focus-ring md:min-h-[5.5rem] md:flex-col md:items-start md:gap-1.5 md:py-2.5",
               active ? "slab" : "well hover:bg-ink-2",
             )}
           >
@@ -394,7 +537,7 @@ function LoaderPicker({ loaders, value, onChange }: { loaders: CreateLoaderInfo[
               <Lamp state={active ? "on" : "off"} size={10} />
               <span className={cx("font-block text-[12px]", active ? "text-white" : "text-slate-300 group-hover:text-white")}>{l.label}</span>
             </span>
-            <span className={cx("min-w-0 flex-1 truncate text-[12px] leading-snug lg:whitespace-normal", active ? "text-slate-300" : "text-slate-500")}>{l.summary}</span>
+            <span className={cx("min-w-0 flex-1 truncate break-keep text-[12px] leading-snug md:whitespace-normal", active ? "text-slate-300" : "text-slate-500")}>{l.summary}</span>
           </button>
         );
       })}
@@ -425,7 +568,7 @@ function OsNotice() {
 
 // ---------- 진행 화면 ----------
 
-function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
+function Progress({ jobId, onRetry }: { jobId: string; onRetry: (clearPack?: boolean) => void }) {
   const { data: job, error } = useCreateJob(jobId);
   const cancel = useCancelCreate();
   const qc = useQueryClient();
@@ -448,13 +591,14 @@ function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
   if (error) {
     return (
       <Callout tone="warning" title={(error as Error).message}>
-        <Button className="mt-3" onClick={onRetry}>
+        <Button className="mt-3" onClick={() => onRetry()}>
           새로 만들기
         </Button>
       </Callout>
     );
   }
   if (!job) return <Spinner />;
+  const mp = job.input.modpack;
 
   return (
     <div className="space-y-5">
@@ -462,9 +606,14 @@ function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
         icon={Hammer}
         title={job.state === "running" ? "서버를 만드는 중" : job.state === "succeeded" ? "서버를 만들었어요" : job.state === "cancelled" ? "만들기를 취소했어요" : "서버를 만들지 못했어요"}
         description={
-          <span className="font-mono text-[12px]">
-            {job.input.name} · Minecraft {job.input.mcVersion} · {CREATE_LOADER_LABEL[job.input.loader]}
-            {job.input.loaderVersion ? ` ${displayLoaderVersion(job.input.loader, job.input.mcVersion, job.input.loaderVersion)}` : ""} · {job.input.path}
+          <span className="block min-w-0 font-mono text-[12px]">
+            <span className="block break-keep">
+              {mp ? (mp.name === job.input.name ? `모드팩 ${mp.name} ${mp.versionId}` : `${job.input.name} · 모드팩 ${mp.name} ${mp.versionId}`) : job.input.name} · Minecraft {job.input.mcVersion} · {CREATE_LOADER_LABEL[job.input.loader]}
+              {job.input.loaderVersion ? ` ${displayLoaderVersion(job.input.loader, job.input.mcVersion, job.input.loaderVersion)}` : ""}
+            </span>
+            <span className="block truncate text-slate-500" title={job.input.path}>
+              {job.input.path}
+            </span>
           </span>
         }
         actions={
@@ -485,6 +634,11 @@ function Progress({ jobId, onRetry }: { jobId: string; onRetry: () => void }) {
       {job.state === "succeeded" && job.serverId && (
         <Callout tone="lamp" title="준비 끝! 서버 목록에 등록했어요">
           최초 실행으로 월드까지 만들어 두었어요. 대시보드에서 레버를 당기면 서버가 켜져요.
+          {mp && (
+            <p className="mt-2">
+              친구들도 이 팩의 <b className="text-slate-100">같은 버전({mp.name} {mp.versionId})</b> 을 Modrinth App·Prism 에 설치해야 접속할 수 있어요. 모드 화면에서 친구용 .mrpack 과 안내문도 받을 수 있어요.
+            </p>
+          )}
           <div className="mt-3 flex gap-2">
             <Button variant="primary" icon={LayoutDashboard} onClick={() => navigate(`/s/${job.serverId}`)}>
               대시보드 열기
@@ -549,14 +703,16 @@ function StepRow({ step: s }: { step: CreateStep }) {
   );
 }
 
-function FailurePanel({ job, onRetry }: { job: CreateJobStatus; onRetry: () => void }) {
+function FailurePanel({ job, onRetry }: { job: CreateJobStatus; onRetry: (clearPack?: boolean) => void }) {
   const e = job.error;
+  // 팩 자체가 문제면 같은 팩으로 다시 해도 소용없으니 팩을 비우고 다시 고르게 한다
+  const packErr = !!e?.code.startsWith("modpack_");
   return (
     <Callout tone={job.state === "cancelled" ? "warning" : "danger"} title={e?.message ?? "알 수 없는 오류"}>
       {e?.hint && <p>{e.hint}</p>}
       {e?.detail && (
-        <details className="mt-2">
-          <summary className="cursor-pointer font-block text-[12px] text-slate-400">상세 내용</summary>
+        <details className="mt-2" open={e.code === "modpack_blocked_host"}>
+          <summary className="cursor-pointer font-block text-[12px] text-slate-400">{e.code === "modpack_blocked_host" ? "허용되지 않은 주소" : "상세 내용"}</summary>
           <pre className="well mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-all p-3 font-mono text-[11px] text-slate-300">{e.detail}</pre>
         </details>
       )}
@@ -575,8 +731,8 @@ function FailurePanel({ job, onRetry }: { job: CreateJobStatus; onRetry: () => v
         </p>
       ))}
       <div className="mt-3 flex gap-2">
-        <Button variant="primary" icon={RotateCcw} onClick={onRetry}>
-          설정 고쳐서 다시 시도
+        <Button variant="primary" icon={packErr ? PackageOpen : RotateCcw} onClick={() => onRetry(packErr)}>
+          {packErr ? "모드팩 다시 고르기" : "설정 고쳐서 다시 시도"}
         </Button>
         <Link to="/" className="inline-flex">
           <Button>서버 목록</Button>

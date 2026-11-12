@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
-import type { ServerLoader } from "@blockpilot/shared";
+import type { ServerLoader, ServerSummary } from "@blockpilot/shared";
 import { badRequest } from "../lib/errors.js";
 import { platform } from "./platform/index.js";
 import { sortVersionsDesc } from "../lib/version.js";
@@ -206,4 +206,43 @@ function pinnedJavaVersion(javaPath: string, scriptMtime: number): Promise<strin
 /** 테스트 전용 */
 export function __clearPinnedJavaCacheForTests() {
   pinnedJavaCache.clear();
+}
+
+// ---------- 모드팩 표시 (.blockpilot-modpack.json) ----------
+
+/** 새 서버 만들기가 모드팩으로 만들 때 남기는 파일 (services/create/modpack.ts 의 MODPACK_MARKER 와 같음) */
+const MODPACK_MARKER_FILE = ".blockpilot-modpack.json";
+const MARKER_MAX_BYTES = 1024 * 1024;
+const markerCache = new Map<string, { mtimeMs: number; size: number; value: ServerSummary["modpack"] }>();
+
+const str = (v: unknown, max = 200): string | undefined => (typeof v === "string" && v.length > 0 && v.length <= max ? v : undefined);
+const id = (v: unknown): string | undefined => (typeof v === "string" && /^[\w-]{1,64}$/.test(v) ? v : undefined);
+
+/** 모드팩으로 만든 서버면 그 팩 이름·버전. 아니거나 파일이 이상하면 undefined (바뀌지 않았으면 캐시) */
+export async function readModpackMarker(dir: string): Promise<ServerSummary["modpack"]> {
+  const file = path.join(dir, MODPACK_MARKER_FILE);
+  const st = await fs.lstat(file).catch(() => null);
+  if (!st?.isFile() || st.size > MARKER_MAX_BYTES) {
+    markerCache.delete(file);
+    return undefined;
+  }
+  const hit = markerCache.get(file);
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.value;
+  let value: ServerSummary["modpack"];
+  try {
+    const raw = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>;
+    const name = str(raw?.name);
+    const versionId = str(raw?.versionId, 100);
+    if (name && versionId !== undefined) {
+      value = { name, versionId };
+      const projectId = id(raw.projectId);
+      const modrinthVersionId = id(raw.modrinthVersionId);
+      if (projectId) value.projectId = projectId;
+      if (modrinthVersionId) value.modrinthVersionId = modrinthVersionId;
+    }
+  } catch {
+    value = undefined;
+  }
+  markerCache.set(file, { mtimeMs: st.mtimeMs, size: st.size, value });
+  return value;
 }

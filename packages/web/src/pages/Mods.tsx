@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowUpCircle, Boxes, ClipboardList, Compass, Download, Package, Plus, Search, Trash2 } from "lucide-react";
-import type { ModInfo, ModUpdate } from "@blockpilot/shared";
+import { ArrowUpCircle, Boxes, ClipboardList, Compass, Download, ExternalLink, Package, Plus, Search, Trash2, Users } from "lucide-react";
+import { displayLoaderVersion, type ModInfo, type ModUpdate } from "@blockpilot/shared";
 import { useApplyModUpdates, useDeleteMod, useModUpdates, useMods, useServer, useToggleMod, useUploadMods } from "../api/hooks";
 import { ModrinthSearch } from "../components/ModrinthSearch";
+import { modrinthPackUrl } from "../components/ModpackPicker";
 import { withToken } from "../api/client";
 import { Badge, Button, Callout, EmptyState, HoldButton, Input, LinkButton, PageHeader, Spinner, Tabs, Toggle, cx, fmtBytes, useToast } from "../lib/ui";
 
@@ -33,6 +34,11 @@ export default function Mods() {
   const problems = enabled.filter((m) => m.missingDeps.length);
   const isPaper = server?.loader === "paper";
   const clientMods = enabled.filter((m) => m.environment !== "server");
+  // .mrpack 은 Fabric·Forge·NeoForge 만 (Paper·순정은 런처 팩으로 나눌 게 없다)
+  const packLoader = server && (server.loader === "fabric" || server.loader === "forge" || server.loader === "neoforge") ? server.loader : null;
+  const [packConfig, setPackConfig] = useState(false);
+  const showPack = !!packLoader && (mods?.length ?? 0) > 0;
+  const showOther = !isPaper && clientMods.length > 0;
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return (mods ?? []).filter((m) => !s || [m.name, m.id, m.file, m.description, ...m.authors].some((x) => x?.toLowerCase().includes(s)));
@@ -42,9 +48,32 @@ export default function Mods() {
     const text = [`${server?.name ?? "서버"} 모드 목록 (${server?.mcVersion ?? ""} ${server?.loader ?? ""})`, ...clientMods.map((m) => `- ${m.name ?? m.file}${m.version ? ` ${m.version}` : ""}  (${m.file})`)].join("\n");
     try {
       await navigator.clipboard.writeText(text);
-      toast("ok", "모드 목록을 클립보드에 복사했습니다.");
+      toast("ok", "모드 목록을 클립보드에 복사했어요.");
     } catch {
-      toast("err", "클립보드에 복사하지 못했습니다.");
+      toast("err", "클립보드에 복사하지 못했어요.");
+    }
+  };
+
+  const copyGuide = async () => {
+    if (!server || !packLoader) return;
+    const label = { fabric: "Fabric", forge: "Forge", neoforge: "NeoForge" }[packLoader];
+    const mc = server.mcVersion ?? "";
+    const ver = server.loaderVersion ? displayLoaderVersion(packLoader, mc, server.loaderVersion) : "";
+    const mp = server.modpack;
+    const text = [
+      `[${server.name}] 접속 안내`,
+      ...(mp ? [`이 서버는 모드팩 "${mp.name}" ${mp.versionId} 버전으로 만들었어요.`] : []),
+      "1. Modrinth App(https://modrinth.app) 또는 Prism Launcher 를 설치하세요.",
+      mp
+        ? `2. 런처에서 모드팩 "${mp.name}" 의 ${mp.versionId} 버전을 설치하세요${mp.projectId ? ` (${modrinthPackUrl(mp.projectId)})` : ""}. 버전이 꼭 같아야 해요. 받은 .mrpack 파일이 있으면 "파일에서 모드팩 추가" 로 열어도 돼요. (Minecraft ${mc} · ${label}${ver ? ` ${ver}` : ""})`
+        : `2. 받은 .mrpack 파일을 런처에서 "파일에서 모드팩 추가" 로 여세요. (Minecraft ${mc} · ${label}${ver ? ` ${ver}` : ""} 이 자동으로 깔려요)`,
+      '3. 멀티플레이 → 서버 추가 → 호스트가 알려 준 주소로 접속하세요. (초대코드를 받았다면 BlockPilot 의 "친구 서버에 접속" 화면에 넣고 localhost 로 들어오세요)',
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("ok", "안내문을 복사했어요.");
+    } catch {
+      toast("err", "클립보드에 복사하지 못했어요.");
     }
   };
 
@@ -61,16 +90,6 @@ export default function Mods() {
         }
         actions={
           <>
-            {!isPaper && clientMods.length > 0 && (
-              <>
-                <Button icon={ClipboardList} onClick={copyList}>
-                  목록 복사
-                </Button>
-                <LinkButton icon={Download} href={withToken(`/api/servers/${id}/mods/export`)} title="친구들에게 나눠줄 클라이언트용 모드 zip">
-                  친구용 zip
-                </LinkButton>
-              </>
-            )}
             <input
               ref={fileRef}
               type="file"
@@ -81,15 +100,72 @@ export default function Mods() {
                 const files = Array.from(e.target.files ?? []);
                 e.target.value = "";
                 if (!files.length) return;
-                upload.mutate(files, { onSuccess: (r) => toast("ok", `${r.saved.length}개 추가했습니다.`), onError: onErr });
+                upload.mutate(files, { onSuccess: (r) => toast("ok", `${r.saved.length}개 추가했어요.`), onError: onErr });
               }}
             />
-            <Button variant="primary" icon={Plus} disabled={locked} loading={upload.isPending} onClick={() => fileRef.current?.click()}>
+            <Button variant="secondary" icon={Plus} disabled={locked} loading={upload.isPending} onClick={() => fileRef.current?.click()}>
               jar 추가
             </Button>
           </>
         }
       />
+
+      {(showPack || showOther) && (
+        <section className="slab space-y-3 p-4" aria-label="친구와 같이 하기">
+          <div className="flex items-center gap-2 font-block text-[12px] text-white">
+            <Users className="h-4 w-4 text-slate-400" /> 친구와 같이 하기
+          </div>
+          {server?.modpack && (
+            <Callout tone="info">
+              이 서버는 <b className="text-slate-100">{server.modpack.name} {server.modpack.versionId}</b> 로 만들었어요. 친구들은 원래 팩을 설치하는 게 가장 정확해요.
+              {server.modpack.projectId && (
+                <a href={modrinthPackUrl(server.modpack.projectId)} target="_blank" rel="noreferrer" className="ml-1 inline-flex items-center gap-1 text-red-300 underline underline-offset-2">
+                  Modrinth 에서 보기 <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </Callout>
+          )}
+          {showPack && (
+            <div className="flex flex-wrap items-center gap-2">
+              {enabled.length > 0 ? (
+                <LinkButton variant="primary" icon={Package} href={withToken(`/api/servers/${id}/mods/export.mrpack?config=${packConfig ? 1 : 0}`)} title="Modrinth App·Prism 런처에서 바로 여는 .mrpack">
+                  .mrpack 받기
+                </LinkButton>
+              ) : (
+                <span title="켜 둔 모드가 없어서 만들 수 없어요" className="inline-flex">
+                  <Button variant="primary" icon={Package} disabled>
+                    .mrpack 받기
+                  </Button>
+                </span>
+              )}
+              <Button icon={ClipboardList} onClick={copyGuide}>
+                안내문 복사
+              </Button>
+              <label className="well inline-flex h-9 cursor-pointer items-center gap-2 pl-3 pr-1 font-block text-[12px] text-slate-400" title="config/ 폴더도 .mrpack 에 넣어요">
+                설정 파일도 넣기
+                <Toggle size="sm" checked={packConfig} onChange={setPackConfig} />
+              </label>
+              {enabled.length === 0 && <span className="text-[12px] text-amber-300">켜 둔 모드가 없어서 .mrpack 을 만들 수 없어요.</span>}
+            </div>
+          )}
+          {showPack && packConfig && (
+            <Callout tone="warning">
+              config/ 폴더가 .mrpack 에 들어가요. 이름에 token·secret·webhook·password 가 들어간 비밀 설정 파일은 자동으로 빠져요. 다른 파일에 토큰·웹훅 주소를 적어 두었다면 한 번 확인해 주세요.
+            </Callout>
+          )}
+          {showOther && (
+            <div className="flex flex-wrap items-center gap-1 text-[12px] text-slate-500">
+              <span className="mr-1">{showPack ? "다른 방법" : "친구에게 나눠 주기"}</span>
+              <LinkButton size="sm" variant="ghost" icon={Download} href={withToken(`/api/servers/${id}/mods/export`)} title="친구들에게 나눠 줄 클라이언트용 모드 zip">
+                모드 zip 받기
+              </LinkButton>
+              <Button size="sm" variant="ghost" icon={ClipboardList} onClick={copyList}>
+                모드 목록 복사
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
 
       <Tabs
         tabs={[
@@ -148,7 +224,7 @@ export default function Mods() {
               locked={locked}
               delay={i * 30}
               onToggle={(v) => toggle.mutate({ file: m.file, enabled: v }, { onError: onErr })}
-              onDelete={() => del.mutate(m.file, { onSuccess: () => toast("info", `${m.file} 삭제`), onError: onErr })}
+              onDelete={() => del.mutate(m.file, { onSuccess: () => toast("info", `${m.file} 을 지웠어요.`), onError: onErr })}
               update={updateOf.get(m.file)}
               onUpdate={() => runUpdates([m.file])}
             />

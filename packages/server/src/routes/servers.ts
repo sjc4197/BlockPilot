@@ -6,7 +6,7 @@ import { DeleteServerInput, RegisterServerInput, type DeleteServerResult, type S
 import { addServer, listServers, removeServer } from "../config/store.js";
 import { forgetPlaytime } from "../services/stats.js";
 import { forgetP2pHost } from "../services/p2p/host.js";
-import { detectServer, getServerJavaVersion, validateServerDir } from "../services/serverInfo.js";
+import { detectServer, getServerJavaVersion, readModpackMarker, validateServerDir } from "../services/serverInfo.js";
 import { readPropertiesFile, toRecord } from "../services/properties.js";
 import { modsDirName } from "../services/mods.js";
 import { deleteServerFolder } from "../services/serverDelete.js";
@@ -69,11 +69,12 @@ export async function serversRoutes(app: FastifyInstance) {
     const { server, dir, managed } = await loadContext(id);
     const exists = await fs.stat(dir).then((s) => s.isDirectory()).catch(() => false);
     const info = await detectServer(dir);
-    const [{ lines }, processStatus, javaVersion, modFiles] = await Promise.all([
+    const [{ lines }, processStatus, javaVersion, modFiles, modpack] = await Promise.all([
       readPropertiesFile(dir),
       managed.status(),
       getServerJavaVersion(dir),
       fs.readdir(path.join(dir, modsDirName(info.loader))).catch(() => [] as string[]),
+      readModpackMarker(dir),
     ]);
     const p = toRecord(lines);
     return {
@@ -89,6 +90,7 @@ export async function serversRoutes(app: FastifyInstance) {
       foreignScript: info.foreignScript,
       javaVersion,
       modCount: modFiles.filter((f) => f.endsWith(".jar")).length,
+      ...(modpack ? { modpack } : {}),
       process: processStatus,
       properties: {
         motd: p["motd"] ?? "",

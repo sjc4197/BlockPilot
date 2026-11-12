@@ -23,10 +23,14 @@ export function setModrinthFetch(f: Fetch) {
   fetchImpl = f;
 }
 
-async function mr<T>(p: string, init?: RequestInit): Promise<T> {
+/** Modrinth API 요청 (15초 제한, 오류는 한국어 HttpError). 모드팩 검색·내보내기(modrinthModpack.ts, modpackExport.ts)도 같이 쓴다 */
+export async function mr<T>(p: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetchImpl(API() + p, { ...init, headers: { ...UA, ...(init?.body ? { "content-type": "application/json" } : {}) }, signal: AbortSignal.timeout(15_000) });
+    // 부르는 쪽 signal(요청을 보낸 화면이 닫힘 등)과 15초 제한 중 먼저 오는 것
+    const timeout = AbortSignal.timeout(15_000);
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    res = await fetchImpl(API() + p, { ...init, headers: { ...UA, ...(init?.body ? { "content-type": "application/json" } : {}) }, signal });
   } catch {
     throw new HttpError(502, "modrinth_unreachable", "Modrinth 에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.");
   }
@@ -48,7 +52,7 @@ export function modrinthTarget(loader?: string): { loaders: string[]; type: "mod
   return null;
 }
 
-interface MrVersion {
+export interface MrVersion {
   id: string;
   project_id: string;
   version_number: string;
@@ -57,8 +61,10 @@ interface MrVersion {
   game_versions: string[];
   files: { url: string; filename: string; primary: boolean; size: number; hashes: { sha1: string; sha512: string } }[];
   dependencies: { project_id?: string; version_id?: string; dependency_type: string }[];
+  /** 이 버전이 어디서 도는지 (client_only · server_only · client_and_server · unknown …). 예전 응답엔 없다 */
+  environment?: string;
 }
-interface MrProject {
+export interface MrProject {
   id: string;
   title: string;
   client_side: string;

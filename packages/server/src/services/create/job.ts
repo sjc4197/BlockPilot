@@ -7,6 +7,7 @@ import { BLOCKPILOT_HOME } from "../../config/store.js";
 import { CreateError, toCreateError } from "./errors.js";
 import { cleanupTarget, removeTempPath } from "./target.js";
 import { platform } from "../platform/index.js";
+import { getUpload } from "./modpackUpload.js";
 
 /**
  * 새 서버 만들기 작업 하나.
@@ -23,16 +24,24 @@ export function stepLabels(loader: CreateLoader): Record<CreateStepId, string> {
   const name = CREATE_LOADER_LABEL[loader];
   return {
     preflight: "사전 점검",
+    "modpack-check": "모드팩 확인",
     versions: "버전 정보 확인",
     java: "Java 준비",
     "server-jar": "Minecraft 서버 받기",
     loader: loader === "paper" ? "Paper 받기" : loader === "vanilla" ? "로더 설치" : `${name} 설치`,
+    "modpack-install": "모드팩 모드·설정 넣기",
     config: "설정 파일 작성",
     "first-run": "최초 실행",
     register: "서버 목록에 등록",
   };
 }
 const STEP_ORDER: CreateStepId[] = ["preflight", "versions", "java", "server-jar", "loader", "config", "first-run", "register"];
+const MODPACK_STEP_ORDER: CreateStepId[] = ["preflight", "modpack-check", "versions", "java", "server-jar", "loader", "modpack-install", "config", "first-run", "register"];
+
+/** 단계 순서. 모드팩이면 "모드팩 확인"(사전 점검 뒤)과 "모드팩 모드·설정 넣기"(로더 설치 뒤)가 끼어든다 */
+export function stepOrder(input: Pick<CreateServerInput, "modpack">): CreateStepId[] {
+  return input.modpack ? MODPACK_STEP_ORDER : STEP_ORDER;
+}
 
 export interface Journal {
   id: string;
@@ -62,10 +71,16 @@ export class CreateJob {
 
   private ctrl = new AbortController();
   private children = new Set<ChildProcess>();
+  /** 화면 표시용 모드팩 정보 (만들기 시작 시점의 검사 결과) */
+  private readonly modpackInfo?: NonNullable<CreateJobStatus["input"]["modpack"]>;
 
   constructor(readonly input: CreateServerInput) {
     const labels = stepLabels(input.loader);
-    this.steps = STEP_ORDER.map((id) => ({ id, label: labels[id], state: "pending" }));
+    this.steps = stepOrder(input).map((id) => ({ id, label: labels[id], state: "pending" }));
+    if (input.modpack) {
+      const s = getUpload(input.modpack.uploadId)?.summary;
+      this.modpackInfo = { name: s?.name ?? "모드팩", versionId: s?.versionId ?? input.modpack.versionId ?? "", source: input.modpack.source };
+    }
   }
 
   get signal() {
@@ -82,7 +97,7 @@ export class CreateJob {
     return {
       id: this.id,
       state: this.state,
-      input: { path: this.journal?.target ?? p, name, loader, mcVersion, loaderVersion },
+      input: { path: this.journal?.target ?? p, name, loader, mcVersion, loaderVersion, ...(this.modpackInfo ? { modpack: { ...this.modpackInfo } } : {}) },
       steps: this.steps.map((s) => ({ ...s, progress: s.progress && { ...s.progress } })),
       log: [...this.log],
       error: this.error?.toJSON(),

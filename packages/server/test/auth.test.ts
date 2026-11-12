@@ -29,6 +29,7 @@ beforeAll(async () => {
   app.get("/api/ping", async () => ({ pong: true }));
   app.get("/api/servers/:id/backups/:file/download", async () => "zip");
   app.get("/api/servers/:id/mods/export", async () => "zip");
+  app.get("/api/servers/:id/mods/export.mrpack", async () => "mrpack");
   app.get("/", async () => "<html></html>");
   app.get("/api/servers/:id/console", { websocket: true }, (socket) => {
     socket.send("hello");
@@ -97,6 +98,7 @@ describe("토큰 인증", () => {
     expect((await app.inject({ url: `/api/ping?${q}` })).statusCode).toBe(401);
     expect((await app.inject({ url: `/api/servers/a/backups/b.zip/download?${q}` })).statusCode).toBe(200);
     expect((await app.inject({ url: `/api/servers/a/mods/export?${q}` })).statusCode).toBe(200);
+    expect((await app.inject({ url: `/api/servers/a/mods/export.mrpack?config=1&${q}` })).statusCode).toBe(200);
     expect((await app.inject({ url: `/api/servers/a/mods/export?token=wrong` })).statusCode).toBe(401);
   });
 

@@ -11,6 +11,9 @@ import { platform, systemInfo } from "../../src/services/platform/index.js";
 import { getManaged } from "../../src/services/process.js";
 import { deleteServerFolder } from "../../src/services/serverDelete.js";
 import { detectServer } from "../../src/services/serverInfo.js";
+import { MODPACK_MARKER, inspectMrpack } from "../../src/services/create/modpack.js";
+import { rememberSummary, storeFromUrl } from "../../src/services/create/modpackUpload.js";
+import { getModpackVersionFile } from "../../src/services/modrinthModpack.js";
 
 /**
  * 실제 E2E: 새 서버 만들기 → BlockPilot 으로 켜기 → 끄기 → 폴더째 삭제. 서버 종류(로더)마다 한 번씩.
@@ -113,5 +116,74 @@ describe.runIf(enabled && cases.length > 0)(`E2E (${systemInfo().osLabel}): 새 
       await fsp.rm(root, { recursive: true, force: true });
     },
     30 * 60_000,
+  );
+});
+
+/**
+ * 모드팩 E2E: Modrinth 모드팩 버전 하나를 받아 검사 → 만들기 → 켜기 → 끄기 → 삭제.
+ * BLOCKPILOT_E2E_MODPACK_VERSION=<Modrinth versionId> 일 때만 (CI 수동 실행의 modpack_version 입력).
+ */
+const modpackVersion = process.env.BLOCKPILOT_E2E_MODPACK_VERSION?.trim();
+
+describe.runIf(enabled && !!modpackVersion)(`E2E (${systemInfo().osLabel}): 모드팩으로 새 서버 만들기 → 켜기 → 끄기 → 삭제`, () => {
+  it(
+    `modpack ${modpackVersion}`,
+    async () => {
+      const root = await fsp.mkdtemp(path.join(os.tmpdir(), "bp-e2e-pack-"));
+      const target = path.join(root, "e2e-modpack");
+
+      // 0) Modrinth 에서 팩 받기 → 검사 (화면의 "Modrinth 에서 고르기" 와 같은 경로)
+      const version = await getModpackVersionFile(modpackVersion!);
+      const up = await storeFromUrl(version.file.url, version.file.sha512, version.file.size, version.file.filename);
+      const summary = await inspectMrpack(up.file, Math.floor(os.totalmem() / 1048576));
+      rememberSummary(up.id, version.file.filename, summary);
+      console.log(`모드팩 ${summary.name} · ${summary.loader} ${summary.loaderVersion} · MC ${summary.mc} · 모드 ${summary.serverFileCount}개 · 추천 ${summary.suggestedMaxMb}MB`);
+      for (const w of summary.warnings) console.log(`경고: ${w}`);
+
+      // 1) 만들기
+      const job = new CreateJob({
+        path: target,
+        name: "e2e-modpack",
+        loader: summary.loader,
+        mcVersion: summary.mc,
+        loaderVersion: summary.loaderVersion,
+        memory: { minMb: 1024, maxMb: summary.suggestedMaxMb },
+        properties: { "server-port": "25591", "max-players": "2" },
+        modpack: { uploadId: up.id, source: "modrinth", versionId: modpackVersion },
+        eulaAccepted: true,
+      });
+      await job.run(createPipeline(defaultDeps));
+      const st = job.status();
+      console.log(st.steps.map((s) => `[${s.state}] ${s.label}${s.note ? ` — ${s.note}` : ""}`).join("\n"));
+      if (st.state !== "succeeded") console.log(st.log.slice(-60).join("\n"));
+      expect(st.error, JSON.stringify(st.error)).toBeUndefined();
+      expect(st.state).toBe("succeeded");
+      expect(st.input.modpack?.name).toBe(summary.name);
+      const marker = JSON.parse(await fsp.readFile(path.join(target, MODPACK_MARKER), "utf8"));
+      expect(marker).toMatchObject({ name: summary.name, source: "modrinth", modrinthVersionId: modpackVersion, serverFileCount: summary.serverFileCount });
+
+      const info = await detectServer(target);
+      expect(info.loader).toBe(summary.loader);
+      expect(info.mcVersion).toBe(summary.mc);
+
+      // 2) 켜기 → 3) 끄기 (대형 팩은 모드를 불러오느라 오래 걸린다)
+      const server = (await listServers()).find((s) => s.id === st.serverId)!;
+      const managed = getManaged(server.id, server.path);
+      await managed.start();
+      await waitFor(async () => (await managed.status()).state === "running", 15 * 60_000, "모드팩 서버가 Done 까지 켜지기");
+      await managed.stop();
+      expect((await managed.status()).state).toBe("stopped");
+      expect(managed.getHistory().map((l) => l.text).join("\n")).not.toMatch(/강제 종료/);
+
+      // 4) 폴더째 삭제
+      await deleteServerFolder(server, managed, "e2e-modpack");
+      expect(await fsp.stat(target).then(() => true, () => false)).toBe(false);
+
+      if (process.env.GITHUB_ACTIONS) {
+        console.log(`::notice title=E2E ${systemInfo().osLabel} 모드팩::${summary.name} (${summary.loader} ${summary.loaderVersion}, 모드 ${summary.serverFileCount}개) 만들기·켜기·끄기·삭제 통과`);
+      }
+      await fsp.rm(root, { recursive: true, force: true });
+    },
+    60 * 60_000,
   );
 });

@@ -20,7 +20,7 @@ import { getAuthToken, setAuthToken } from "../config/store.js";
 export const WS_PROTOCOL = "blockpilot";
 export const WS_TOKEN_PREFIX = "bp.token.";
 /** ?token= 쿼리를 받아 주는 GET 경로 (브라우저가 그냥 여는 다운로드 링크) */
-const DOWNLOAD_PATHS = [/^\/api\/servers\/[^/]+\/backups\/[^/]+\/download$/, /^\/api\/servers\/[^/]+\/mods\/export$/, /^\/api\/debug\/bundle\/[^/]+$/];
+const DOWNLOAD_PATHS = [/^\/api\/servers\/[^/]+\/backups\/[^/]+\/download$/, /^\/api\/servers\/[^/]+\/mods\/export$/, /^\/api\/servers\/[^/]+\/mods\/export\.mrpack$/, /^\/api\/debug\/bundle\/[^/]+$/];
 
 /**
  * 토큰 무차별 대입 제한: 같은 IP 에서 10분 안에 서로 다른 틀린 토큰을 5개 내밀면 그다음부터 429.

@@ -50,6 +50,8 @@ export interface ServerSummary extends RegisteredServer {
   foreignScript?: string;
   javaVersion?: string;
   modCount: number;
+  /** 모드팩으로 만든 서버면 그 팩 (.blockpilot-modpack.json) */
+  modpack?: { name: string; versionId: string; projectId?: string; modrinthVersionId?: string };
   process: ProcessStatus;
   properties: {
     motd: string;
@@ -293,6 +295,140 @@ export interface CreateLoaderInfo {
   versionLabel: string;
 }
 
+// ---------- 모드팩 (.mrpack) ----------
+
+/** 모드팩으로 만들 수 있는 로더. Paper·순정·Quilt 는 .mrpack 서버 설치 대상이 아니다 */
+export const ModpackLoader = z.enum(["fabric", "forge", "neoforge"]);
+export type ModpackLoader = z.infer<typeof ModpackLoader>;
+
+/** modrinth.index.json (formatVersion 1). 모르는 키는 그대로 통과시킨다 (스펙: 새 키가 언제든 추가될 수 있음) */
+export const MrpackEnvValue = z.enum(["required", "optional", "unsupported"]);
+export const MrpackFile = z.object({
+  path: z.string().min(1),
+  hashes: z.object({ sha1: z.string().regex(/^[0-9a-f]{40}$/i), sha512: z.string().regex(/^[0-9a-f]{128}$/i) }).passthrough(),
+  env: z.object({ client: MrpackEnvValue, server: MrpackEnvValue }).partial().optional(),
+  downloads: z.array(z.string().url()).min(1),
+  fileSize: z.number().int().nonnegative(),
+});
+export type MrpackFile = z.infer<typeof MrpackFile>;
+export const MrpackIndex = z
+  .object({
+    formatVersion: z.literal(1),
+    game: z.literal("minecraft"),
+    versionId: z.string(),
+    name: z.string().min(1),
+    summary: z.string().optional(),
+    files: z.array(MrpackFile).default([]),
+    dependencies: z
+      .object({
+        minecraft: z.string().min(1),
+        "fabric-loader": z.string().optional(),
+        forge: z.string().optional(),
+        neoforge: z.string().optional(),
+        "quilt-loader": z.string().optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
+export type MrpackIndex = z.infer<typeof MrpackIndex>;
+
+/** 검사(inspect)·업로드 뒤 화면에 보여 주는 요약. loaderVersion 은 BlockPilot 표기 (Forge 는 "{mc}-{forge}") */
+export interface ModpackSummary {
+  name: string;
+  summary?: string;
+  versionId: string;
+  mc: string;
+  loader: ModpackLoader;
+  loaderVersion: string;
+  /** index.files 전체 수 */
+  fileCount: number;
+  /** env.server !== "unsupported" 인 파일 수 (실제로 받는 것) */
+  serverFileCount: number;
+  /** 받는 파일(fileSize 합) 바이트 */
+  totalBytes: number;
+  /** overrides/ + server-overrides/ 항목 수 */
+  overrideCount: number;
+  /** 팩 크기로 계산한 최대 메모리 추천값 (MB, 이 컴퓨터 메모리의 75% 로 자른 값) */
+  suggestedMaxMb: number;
+  /** 자르기 전 추천값 (MB) — 이 값이 suggestedMaxMb 보다 크면 메모리가 모자랄 수 있다 */
+  idealMaxMb: number;
+  /** 서버엔 필요 없어 받지 않는 파일 수 (클라이언트 전용 모드·리소스팩·셰이더 등) */
+  clientOnlyCount: number;
+  /** 서버에 꼭 필요한데 허용되지 않은 주소에만 있는 파일 수. 0 보다 크면 이 팩으로는 만들 수 없다 */
+  blockedCount: number;
+  /** 만들 수는 있지만 알아 둘 것 (꼭 없어도 되는 파일을 건너뜀, 팩 설정에서 뺀 위험한 값 등) */
+  warnings: string[];
+}
+
+/** 검사 결과: 임시 보관 id + 요약. uploadId 는 1시간 뒤 만료 */
+export interface ModpackInspectResult {
+  uploadId: string;
+  summary: ModpackSummary;
+  /** 업로드한 파일 이름 또는 Modrinth 파일 이름 */
+  fileName: string;
+  expiresAt: string;
+}
+
+export const ModpackInspectInput = z.object({
+  source: z.literal("modrinth"),
+  projectId: z.string().regex(/^[\w-]{1,64}$/),
+  versionId: z.string().regex(/^[\w-]{1,64}$/),
+});
+export type ModpackInspectInput = z.infer<typeof ModpackInspectInput>;
+
+/** CreateServerInput.modpack — 어느 경로로 왔든 파이프라인은 uploadId 의 캐시 파일을 읽는다 */
+export const CreateModpackRef = z.object({
+  uploadId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
+  source: z.enum(["upload", "modrinth"]),
+  projectId: z.string().regex(/^[\w-]{1,64}$/).optional(),
+  versionId: z.string().regex(/^[\w-]{1,64}$/).optional(),
+});
+export type CreateModpackRef = z.infer<typeof CreateModpackRef>;
+
+/** Modrinth 모드팩 검색 (GET /api/create/modpack/search) */
+export interface ModpackSearchHit {
+  projectId: string;
+  slug: string;
+  title: string;
+  description: string;
+  author: string;
+  iconUrl?: string;
+  downloads: number;
+  /** BlockPilot 이 지원하는 로더 중 이 팩이 쓰는 것 */
+  loaders: ModpackLoader[];
+  /** 지원 Minecraft 버전 (최신순, 최대 몇 개) */
+  gameVersions: string[];
+}
+export interface ModpackSearchResult {
+  hits: ModpackSearchHit[];
+  total: number;
+}
+/** Modrinth 모드팩 버전 (GET /api/create/modpack/versions) */
+export interface ModpackVersionEntry {
+  id: string;
+  name: string;
+  versionNumber: string;
+  versionType: "release" | "beta" | "alpha";
+  loaders: ModpackLoader[];
+  gameVersions: string[];
+  datePublished: string;
+  /** primary .mrpack 파일 */
+  file: { filename: string; url: string; size: number; sha512: string };
+}
+
+/** 서버 폴더의 .blockpilot-modpack.json (만든 뒤 표시·내보내기용) */
+export interface ModpackMarker {
+  name: string;
+  versionId: string;
+  source: "upload" | "modrinth";
+  projectId?: string;
+  modrinthVersionId?: string;
+  installedAt: string;
+  serverFileCount: number;
+  /** 받지 않은 파일과 이유 */
+  skipped: { path: string; reason: string }[];
+}
+
 export const CreateServerInput = z.object({
   path: z.string().min(1),
   name: z.string().min(1).max(60),
@@ -310,12 +446,14 @@ export const CreateServerInput = z.object({
     .string()
     .regex(/^[A-Za-z0-9_]{1,16}$/, "닉네임은 영문·숫자·밑줄 1~16자예요.")
     .optional(),
+  /** 모드팩으로 만들 때. loader/mcVersion/loaderVersion 은 검사 결과(ModpackSummary)의 값을 그대로 보낸다 — 파이프라인이 대조한다 */
+  modpack: CreateModpackRef.optional(),
   /** 사용자가 직접 체크해야 한다. 자동으로 true 를 넣는 코드 경로는 없다 */
   eulaAccepted: z.literal(true, { errorMap: () => ({ message: "Minecraft EULA 에 동의해야 서버를 만들 수 있어요." }) }),
 });
 export type CreateServerInput = z.infer<typeof CreateServerInput>;
 
-export type CreateStepId = "preflight" | "versions" | "java" | "server-jar" | "loader" | "config" | "first-run" | "register";
+export type CreateStepId = "preflight" | "modpack-check" | "versions" | "java" | "server-jar" | "loader" | "modpack-install" | "config" | "first-run" | "register";
 export type CreateStepState = "pending" | "running" | "done" | "failed" | "skipped";
 
 export interface CreateStep {
@@ -338,7 +476,7 @@ export interface CreateJobError {
 export interface CreateJobStatus {
   id: string;
   state: CreateJobState;
-  input: { path: string; name: string; loader: CreateLoader; mcVersion: string; loaderVersion: string };
+  input: { path: string; name: string; loader: CreateLoader; mcVersion: string; loaderVersion: string; modpack?: { name: string; versionId: string; source: "upload" | "modrinth" } };
   steps: CreateStep[];
   log: string[];
   error?: CreateJobError;
@@ -364,6 +502,8 @@ export interface CreateOptions {
   /** BlockPilot 이 도중에 꺼져서 다음 시작 때 정리한 작업 */
   recovered: { target: string; cleaned: string[]; at: string }[];
   activeJobId?: string;
+  /** 모드팩 업로드 상한 (바이트) — 화면에서 미리 막기 위해 */
+  modpackUploadMaxBytes: number;
 }
 
 export interface CreateRelease {

@@ -202,7 +202,7 @@ export function Callout({ tone = "info", title, children, icon: Icon }: { tone?:
   return (
     <div className={cx("flex gap-3 px-4 py-3 text-sm", TONE[tone])}>
       <I className="mt-0.5 h-4 w-4 shrink-0" />
-      <div className="min-w-0 flex-1 text-slate-200">
+      <div className="min-w-0 flex-1 break-keep text-slate-200">
         {title && <div className="font-block text-[12px]">{title}</div>}
         <div className={title ? "mt-1 text-slate-300/90" : undefined}>{children}</div>
       </div>

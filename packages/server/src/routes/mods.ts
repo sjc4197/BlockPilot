@@ -2,8 +2,19 @@ import type { FastifyInstance } from "fastify";
 import { UpdateModInput } from "@blockpilot/shared";
 import { listMods, setModEnabled, deleteMod, saveUploadedMod, buildClientModsZip } from "../services/mods.js";
 import { detectServer } from "../services/serverInfo.js";
+import { buildMrpack } from "../services/modpackExport.js";
 import { loadContext } from "../lib/context.js";
 import { badRequest, conflict } from "../lib/errors.js";
+
+/**
+ * 첨부 파일 이름 헤더. filename* 은 RFC 5987 (encodeURIComponent 가 남기는 ' ( ) * 까지 인코딩),
+ * filename 은 따옴표·비ASCII 를 못 쓰는 오래된 클라이언트를 위한 ASCII 이름
+ */
+export function attachmentHeader(fileName: string, asciiFallback: string): string {
+  const star = encodeURIComponent(fileName).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  const ascii = asciiFallback.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${star}`;
+}
 
 export async function modsRoutes(app: FastifyInstance) {
   app.get("/api/servers/:id/mods", async (req) => {
@@ -22,7 +33,23 @@ export async function modsRoutes(app: FastifyInstance) {
     if (!files.length) throw badRequest("내보낼 클라이언트 모드가 없습니다.");
     const name = `${server.name}-client-mods.zip`;
     reply.header("content-type", "application/zip");
-    reply.header("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+    reply.header("content-disposition", attachmentHeader(name, "client-mods.zip"));
+    return reply.send(stream);
+  });
+
+  /** 친구용 Modrinth 모드팩(.mrpack). ?config=1 이면 config/ 도 (비밀처럼 보이는 파일은 빼고) */
+  app.get("/api/servers/:id/mods/export.mrpack", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { config } = req.query as { config?: string };
+    const { server, dir } = await loadContext(id);
+    const includeConfig = config === "1" || config === "true";
+    const { stream, fileName, stats, offline, versionId, excluded } = await buildMrpack({ dir, name: server.name, includeConfig });
+    if (!stats.modrinth && !stats.bundled) throw badRequest("내보낼 모드가 없어요.");
+    reply.header("content-type", "application/x-modrinth-modpack+zip");
+    reply.header("content-disposition", attachmentHeader(fileName, `modpack-${versionId}.mrpack`));
+    if (offline) reply.header("x-blockpilot-note", "modrinth-offline");
+    // 비밀이 있어 보여 뺀 설정 파일 수 (README.txt 에 목록)
+    if (includeConfig) reply.header("x-blockpilot-excluded", String(excluded.length));
     return reply.send(stream);
   });
 

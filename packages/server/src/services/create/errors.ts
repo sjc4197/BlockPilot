@@ -26,6 +26,10 @@ export type CreateErrorCode =
   | "first_run_timeout"
   | "cancelled"
   | "interrupted"
+  | "modpack_invalid"
+  | "modpack_unsupported"
+  | "modpack_blocked_host"
+  | "modpack_expired"
   | "internal";
 
 export class CreateError extends Error {

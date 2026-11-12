@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   RegisteredServer,
   ServerSummary,
@@ -40,6 +40,10 @@ import type {
   ModrinthSearchResult,
   ModrinthInstallResult,
   ModUpdate,
+  ModpackSearchResult,
+  ModpackVersionEntry,
+  ModpackInspectInput,
+  ModpackInspectResult,
 } from "@blockpilot/shared";
 import { api } from "./client";
 
@@ -502,3 +506,43 @@ export function useAcceptEula(id: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.server(id) }),
   });
 }
+
+// ---------- 모드팩 (.mrpack) ----------
+
+/** Modrinth 모드팩 검색. 빈 검색어면 인기순. 서버가 한 번에 20개씩 주므로 "더 보기" 는 다음 쪽(offset)을 받아 온다 */
+export const MODPACK_SEARCH_PAGE = 20;
+export const useModpackSearch = (q: string, enabled: boolean) =>
+  useInfiniteQuery({
+    queryKey: ["create", "modpack", "search", q],
+    queryFn: ({ pageParam }) => api<ModpackSearchResult>(`/api/create/modpack/search?${new URLSearchParams({ q, offset: String(pageParam) })}`),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.length * MODPACK_SEARCH_PAGE;
+      return last.hits.length >= MODPACK_SEARCH_PAGE && loaded < last.total ? loaded : undefined;
+    },
+    enabled,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+  });
+
+export const useModpackVersions = (projectId: string | null) =>
+  useQuery({
+    queryKey: ["create", "modpack", "versions", projectId],
+    queryFn: () => api<ModpackVersionEntry[]>(`/api/create/modpack/versions?project=${encodeURIComponent(projectId!)}`),
+    enabled: !!projectId,
+    staleTime: 5 * 60_000,
+  });
+
+/** 서버가 Modrinth 에서 팩을 받아 검사한다 (큰 팩은 수십 초) */
+export const useInspectModpack = () =>
+  useMutation({ mutationFn: (input: ModpackInspectInput) => api<ModpackInspectResult>("/api/create/modpack/inspect", { method: "POST", json: input }) });
+
+/** .mrpack(.zip) 파일을 올려 검사한다 */
+export const useUploadModpack = () =>
+  useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      return api<ModpackInspectResult>("/api/create/modpack/upload", { method: "POST", body: fd });
+    },
+  });
