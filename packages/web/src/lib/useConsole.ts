@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConsoleLine, ConsoleServerMessage, ProcessStatus } from "@blockpilot/shared";
-import { withToken } from "../api/client";
+import { wsProtocols } from "../api/client";
 
 const MAX_LINES = 2000;
 
@@ -17,7 +17,8 @@ export function useConsole(serverId: string) {
 
     const connect = () => {
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      const ws = new WebSocket(withToken(`${proto}://${location.host}/api/servers/${serverId}/console`));
+      // 토큰은 URL 이 아니라 서브프로토콜로 (wsProtocols 참고). 재접속 때마다 다시 읽어서 그 사이 바뀐 토큰도 반영된다
+      const ws = new WebSocket(`${proto}://${location.host}/api/servers/${serverId}/console`, wsProtocols());
       wsRef.current = ws;
       ws.onopen = () => setConnected(true);
       ws.onmessage = (ev) => {

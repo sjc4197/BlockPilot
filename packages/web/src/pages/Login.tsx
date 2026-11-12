@@ -14,7 +14,8 @@ export default function Login({ onLogin }: { onLogin: (token: string) => void })
     setError(null);
     try {
       const res = await fetch("/api/auth", { headers: { authorization: `Bearer ${token.trim()}` } });
-      const data = (await res.json()) as { authenticated: boolean };
+      const data = (await res.json()) as { authenticated?: boolean; message?: string };
+      if (res.status === 429) return setError(data.message ?? "토큰을 너무 많이 틀렸어요. 잠시 뒤에 다시 시도해 주세요.");
       if (data.authenticated) onLogin(token.trim());
       else setError("토큰이 올바르지 않습니다.");
     } catch {

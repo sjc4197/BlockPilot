@@ -290,7 +290,12 @@ BLOCKPILOT_HOST=0.0.0.0 npm start            # macOS · Linux
 $env:BLOCKPILOT_HOST="0.0.0.0"; npm start   # Windows PowerShell
 ```
 
-외부 주소에 바인딩하면 접속 토큰이 자동 생성되어 터미널 로그에 출력되고, 대시보드가 토큰 입력 화면을 띄웁니다. 토큰을 직접 정하려면 `BLOCKPILOT_TOKEN=원하는값` 을 함께 넘기세요.
+외부 주소에 바인딩하면 접속 토큰이 자동 생성되어 터미널에 출력되고(앱 로그 파일에는 남지 않아요), 대시보드가 토큰 입력 화면을 띄웁니다. 토큰을 직접 정하려면 `BLOCKPILOT_TOKEN=원하는값` 을 함께 넘기세요.
+
+> **알아 두세요**
+> - 토큰을 틀리면 IP 별로 제한됩니다 — 10분 안에 서로 다른 틀린 토큰을 5개 내밀면 그 IP 는 10분 동안 잠깁니다 (맞는 토큰을 내밀어도).
+> - 리버스 프록시(nginx 등) 뒤에 두는 건 지원하지 않습니다. `trustProxy` 가 꺼져 있어 모든 접속이 프록시의 IP 하나로 보이고, 한 사람이 틀리면 모두가 함께 잠깁니다.
+> - 콘솔 WebSocket 은 토큰을 URL 이 아니라 `Sec-WebSocket-Protocol` 헤더(`bp.token.<base64url>` 서브프로토콜)로 보냅니다. 서버는 응답에 `blockpilot` 만 돌려줍니다.
 
 ## 환경 변수
 
