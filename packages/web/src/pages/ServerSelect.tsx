@@ -1,7 +1,8 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, FolderOpen, Hammer, Link2, Plus, Power, Server, Trash2 } from "lucide-react";
-import { useAutostart, useCreateOptions, useP2pSupport, useRegisterServer, useRemoveServer, useServers, useSetAutostart, useSystem, useUpdateCheck } from "../api/hooks";
+import { ArrowRight, FolderOpen, Hammer, LifeBuoy, Link2, Plus, Power, Server, Trash2 } from "lucide-react";
+import { useAutostart, useCreateOptions, useDebugBundle, useP2pSupport, useRegisterServer, useRemoveServer, useServers, useSetAutostart, useSystem, useUpdateCheck } from "../api/hooks";
+import { withToken } from "../api/client";
 import { Logo } from "../App";
 import { Badge, Button, Callout, Card, ConfirmButton, EmptyState, Field, Input, Spinner, Toggle, cx, useToast } from "../lib/ui";
 import { usePlayOnce } from "../lib/fx";
@@ -16,6 +17,7 @@ export default function ServerSelect() {
   const { data: p2p } = useP2pSupport();
   const { data: sys } = useSystem();
   const update = useUpdateCheck();
+  const bundle = useDebugBundle();
   const [path, setPath] = useState("");
   const [name, setName] = useState("");
   const place = usePlayOnce("server-list");
@@ -163,6 +165,25 @@ export default function ServerSelect() {
               업데이트 확인
             </Button>
           )}
+          <span className="text-slate-600">·</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={LifeBuoy}
+            loading={bundle.isPending}
+            title="로그 · 설정 · 서버 정보를 zip 하나로 모아요. 토큰 · 웹훅 · 초대코드 같은 비밀은 가려요"
+            onClick={() =>
+              bundle.mutate(undefined, {
+                onSuccess: (r) => {
+                  toast("ok", "문제 신고 파일을 만들었어요. 깃허브 이슈에 첨부해 주세요 (비밀 정보는 가렸어요)");
+                  window.location.assign(withToken(r.downloadPath));
+                },
+                onError: (e) => toast("err", (e as Error).message),
+              })
+            }
+          >
+            문제 신고 파일 만들기
+          </Button>
         </footer>
       )}
     </div>

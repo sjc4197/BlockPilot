@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyBaseLogger } from "fastify";
 import websocket from "@fastify/websocket";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
@@ -8,6 +8,8 @@ import { ZodError } from "zod";
 import { HttpError } from "./lib/errors.js";
 import { initAuth } from "./lib/auth.js";
 import { installOriginGuard } from "./lib/originGuard.js";
+import { installSecurityHeaders } from "./lib/securityHeaders.js";
+import { installCrashGuard } from "./lib/crashGuard.js";
 import { authRoutes } from "./routes/auth.js";
 import { serversRoutes } from "./routes/servers.js";
 import { propertiesRoutes } from "./routes/properties.js";
@@ -41,7 +43,10 @@ import { joinRoutes } from "./routes/join.js";
 import { stopJoin } from "./services/p2p/join.js";
 import { isAutostarted } from "./services/platform/autostart/index.js";
 import { APP_VERSION, isSingleExecutable, webRoot } from "./lib/appInfo.js";
+import { BLOCKPILOT_HOME } from "./config/store.js";
 import { alreadyRunning, openBrowser } from "./lib/launch.js";
+import { createAppLogger } from "./lib/logger.js";
+import { debugRoutes } from "./routes/debug.js";
 
 const PORT = Number(process.env.BLOCKPILOT_PORT ?? 4800);
 const HOST = process.env.BLOCKPILOT_HOST ?? "127.0.0.1";
@@ -58,11 +63,17 @@ async function main() {
     return;
   }
 
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" } });
+  // 콘솔엔 사람이 읽는 한 줄, 파일(~/.blockpilot/logs/blockpilot.log)엔 JSON. LOG_FORMAT=json 이면 콘솔도 JSON
+  const appLog = createAppLogger({ level: process.env.LOG_LEVEL ?? "info", toConsole: process.env.LOG_FORMAT === "json" ? "json" : "pretty" });
+  // pino Logger 그대로 넘기면 라우트 플러그인의 FastifyBaseLogger 타입과 어긋나므로 기본 로거 타입으로 좁힌다
+  const app = Fastify({ loggerInstance: appLog.logger as FastifyBaseLogger });
+  app.log.info({ version: APP_VERSION, home: BLOCKPILOT_HOME, logFile: appLog.file, node: process.version, platform: `${process.platform}-${process.arch}` }, `BlockPilot ${APP_VERSION} 시작`);
 
   // CORS 는 일부러 켜지 않는다. 대시보드는 같은 출처에서 서빙되고, 다른 출처(악성 페이지 등)의 요청은 아래 가드가 막는다.
   installOriginGuard(app, HOST);
-  await app.register(websocket);
+  installSecurityHeaders(app);
+  // 응답 Sec-WebSocket-Protocol 에는 항상 "blockpilot" 만 돌려준다 (토큰이 든 서브프로토콜을 되돌려 주지 않게)
+  await app.register(websocket, { options: { handleProtocols: (protocols: Set<string>) => (protocols.has("blockpilot") ? "blockpilot" : false) } });
   await app.register(multipart);
 
   app.setErrorHandler((err, _req, reply) => {
@@ -104,6 +115,7 @@ async function main() {
   await app.register(autostartRoutes);
   await app.register(p2pRoutes);
   await app.register(joinRoutes);
+  await app.register(debugRoutes);
 
   // 프로덕션: 빌드된 프론트엔드 서빙 (packages/web/dist, 단일 실행 파일은 안에 든 파일을 풀어서)
   const webDist = await webRoot(path.dirname(fileURLToPath(import.meta.url)));
@@ -127,7 +139,8 @@ async function main() {
   // 지난번에 만들기 도중 꺼졌다면 그때 만들던 파일을 정리
   await recoverInterruptedJobs(app.log);
 
-  const stop = async () => {
+  // code: 신호로 끌 때 0, 치명적 오류로 끌 때 1 (launchd·systemd 가 "실패" 로 보고 다시 띄우도록)
+  const stop = async (code = 0) => {
     app.log.info("종료 중: 실행 중인 서버를 정리합니다");
     stopScheduler();
     stopScheduledRestarts();
@@ -138,12 +151,15 @@ async function main() {
     await stopJoin();
     await shutdownAll();
     await app.close();
-    process.exit(0);
+    appLog.flush();
+    process.exit(code);
   };
-  process.on("SIGINT", stop);
-  process.on("SIGTERM", stop);
+  process.on("SIGINT", () => stop(0));
+  process.on("SIGTERM", () => stop(0));
   // 터미널 창을 닫을 때 (macOS·Linux SIGHUP, Windows 콘솔 닫기도 Node 에서는 SIGHUP)
-  process.on("SIGHUP", stop);
+  process.on("SIGHUP", () => stop(0));
+  // BlockPilot 자체가 오류로 죽을 때도 같은 경로로 서버를 먼저 끈다 (고아 프로세스 방지)
+  installCrashGuard(() => stop(1));
 
   await app.listen({ port: PORT, host: HOST });
   if (single) {

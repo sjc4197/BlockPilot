@@ -304,8 +304,9 @@ $env:BLOCKPILOT_HOST="0.0.0.0"; npm start   # Windows PowerShell
 | `BLOCKPILOT_PORT` | `4800` | 대시보드 포트 |
 | `BLOCKPILOT_HOST` | `127.0.0.1` | 바인딩 주소. 루프백이 아니면 토큰 인증이 자동으로 켜짐 |
 | `BLOCKPILOT_TOKEN` | (없음) | 접속 토큰 지정. 설정하면 루프백에서도 토큰 필요 |
-| `BLOCKPILOT_HOME` | `~/.blockpilot` | 앱 폴더: 등록된 서버 목록 · 자동 백업·알림·자동화 설정(디스코드 웹훅 포함, 나만 읽기) · 토큰 · 받아 둔 JDK(`runtimes/`) · 만들기 작업 일지(`jobs/`) · 접속 시간 기록(`playtime/`) |
-| `LOG_LEVEL` | `info` | Fastify 로그 레벨 |
+| `BLOCKPILOT_HOME` | `~/.blockpilot` | 앱 폴더: 등록된 서버 목록 · 자동 백업·알림·자동화 설정(디스코드 웹훅 포함, 나만 읽기) · 토큰 · 받아 둔 JDK(`runtimes/`) · 만들기 작업 일지(`jobs/`) · 접속 시간 기록(`playtime/`) · 앱 로그(`logs/`) |
+| `LOG_LEVEL` | `info` | 로그 레벨 (콘솔과 파일 모두) |
+| `LOG_FORMAT` | (없음) | `json` 이면 콘솔에도 파일과 같은 JSON 한 줄씩. 기본은 사람이 읽는 한 줄 |
 | `BLOCKPILOT_DHT_BOOTSTRAP` | (hyperdht 기본 노드) | P2P 초대가 호스트를 찾는 부트스트랩 노드. `host:port,host:port` |
 | `BLOCKPILOT_JOIN_PORT` | `25565` (쓰고 있으면 빈 포트) | 친구 서버에 접속할 때 여는 로컬 포트. `0` 이면 항상 빈 포트 |
 | `BLOCKPILOT_NO_BROWSER` | (없음) | `1` 이면 실행 파일로 켤 때 브라우저를 자동으로 열지 않음 (로그인 자동 실행은 `--autostart` 인자로 같은 효과) |
@@ -382,6 +383,10 @@ npm run build:sea    # 이 컴퓨터용 단일 실행 파일 → release/ (node 
 ```
 
 릴리스: `package.json` 버전을 올리고 `v1.2.3` 태그를 push 하면 GitHub Actions 가 6개 OS 실행 파일을 만들고, 각 OS 에서 직접 켜서 확인한 뒤 릴리스로 올려요.
+
+### 문제가 생기면
+
+BlockPilot 자체 로그는 `~/.blockpilot/logs/blockpilot.log` 에 JSON 한 줄씩 남아요 (5 MB 를 넘으면 켤 때 `.1` … `.5` 로 돌려 두고, `Authorization` 헤더 · `?token=` 은 기록할 때부터 가려요). 이슈를 올릴 땐 첫 화면 맨 아래 **문제 신고 파일 만들기** 를 누르면 앱 로그 꼬리 · 설정 · 시스템 정보 · 서버마다 `latest.log` 꼬리 · 최근 크래시 리포트 · 시작 스크립트 · `server.properties` 를 zip 하나로 받아요. 접속 토큰 · 디스코드 웹훅 · P2P 키와 초대코드 · RCON 비밀번호는 가리고, 월드 · 모드 · 백업은 넣지 않아요. 그래도 첨부하기 전에 한 번 열어 보세요.
 
 테스트 전용 환경 변수: `BLOCKPILOT_DISCORD_ALLOW_LOCAL=1`(디스코드 대신 `http://127.0.0.1` 가짜 수신기 허용), `BLOCKPILOT_PUBLIC_IP_URL` · `BLOCKPILOT_SERVER_CHECK_URL` · `BLOCKPILOT_MODRINTH_URL`(외부 서비스 대신 가짜 서버). 평소에는 쓰지 않아요.
 
