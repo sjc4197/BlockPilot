@@ -7,6 +7,7 @@ import { getToken, setToken, setUnauthorizedHandler } from "./api/client";
 import { StatusBadge, cx } from "./lib/ui";
 import { DustLoader, Lamp, LeverGlyph } from "./lib/pixel";
 import { ProcessControls } from "./components/ProcessControls";
+import { PendingApprovals } from "./components/PendingApprovals";
 import ServerSelect from "./pages/ServerSelect";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
@@ -134,7 +135,7 @@ function ServerLayout() {
   if (error) {
     return (
       <div className="mx-auto mt-24 max-w-md text-center">
-        <p className="font-block text-[12px] text-slate-300">서버 정보를 불러오지 못했습니다.</p>
+        <p className="font-block text-[12px] text-slate-300">서버 정보를 불러오지 못했어요.</p>
         <p className="mt-1 text-sm text-slate-500">{(error as Error).message}</p>
         <Link to="/" className="mt-5 inline-flex items-center gap-1.5 text-sm text-red-300 hover:underline">
           <ArrowLeft className="h-4 w-4" /> 서버 목록으로
@@ -185,7 +186,11 @@ function ServerLayout() {
             <ChevronRight className="hidden h-3.5 w-3.5 text-slate-600 sm:inline" />
             <span className="truncate text-slate-200">{current?.label ?? ""}</span>
           </div>
-          {server && <ProcessControls serverId={id} status={server.process} size="sm" />}
+          <div className="ml-auto flex shrink-0 items-center gap-3">
+            {/* 친구 P2P 접속 요청: 어느 화면에서든 보이고 여기서 바로 승인 */}
+            <PendingApprovals serverId={id} serverName={server?.name} />
+            {server && <ProcessControls serverId={id} status={server.process} size="sm" />}
+          </div>
         </header>
         <main className="flex-1 px-3 py-4 sm:px-6 sm:py-6">
           <div key={location.pathname} className="mx-auto max-w-6xl animate-fade-in">

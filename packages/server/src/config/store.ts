@@ -348,6 +348,7 @@ export async function getAutomation(id: string): Promise<AutomationSettings> {
     discord: { ...d.discord, ...a.discord, events: { ...d.discord.events, ...a.discord?.events } },
     autoRestart: { ...d.autoRestart, ...a.autoRestart },
     scheduledRestart: { ...d.scheduledRestart, ...a.scheduledRestart },
+    idleShutdown: { ...d.idleShutdown, ...a.idleShutdown },
   };
 }
 

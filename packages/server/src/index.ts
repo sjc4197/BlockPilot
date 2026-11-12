@@ -30,6 +30,7 @@ import { startPlaytimeTracker } from "./services/stats.js";
 import { startDiscordNotifier } from "./services/discord.js";
 import { startAutoRestart } from "./services/autoRestart.js";
 import { startScheduledRestarts, stopScheduledRestarts } from "./services/scheduledRestart.js";
+import { startIdleShutdown, stopIdleShutdown } from "./services/idleShutdown.js";
 import { startPerfSampler, stopPerfSampler } from "./services/perf.js";
 import { CreateError } from "./services/create/errors.js";
 import { shutdownAll } from "./services/process.js";
@@ -133,6 +134,7 @@ async function main() {
   startDiscordNotifier();
   startAutoRestart();
   startScheduledRestarts();
+  startIdleShutdown();
   startPerfSampler();
   startPlaytimeTracker();
   startP2pHostLifecycle();
@@ -144,6 +146,7 @@ async function main() {
     app.log.info("종료 중: 실행 중인 서버를 정리합니다");
     stopScheduler();
     stopScheduledRestarts();
+    stopIdleShutdown();
     stopPerfSampler();
     // 만들던 서버가 있으면 취소하고 이번에 만든 파일을 지운 뒤 끈다
     await cancelAllJobs();

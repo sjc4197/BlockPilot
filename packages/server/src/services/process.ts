@@ -116,6 +116,11 @@ export class ManagedServer extends EventEmitter {
     return this.history;
   }
 
+  /** 다른 서비스(자동 끄기 등)가 콘솔에 남기는 안내 줄 */
+  note(text: string) {
+    this.pushLine("system", text);
+  }
+
   isManaged() {
     return this.child !== null;
   }

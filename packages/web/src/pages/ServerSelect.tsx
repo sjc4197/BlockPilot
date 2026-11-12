@@ -1,9 +1,10 @@
 import { useState, type CSSProperties, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, FolderOpen, Hammer, LifeBuoy, Link2, Plus, Power, Server, Trash2 } from "lucide-react";
+import { ArrowRight, FolderOpen, FolderSearch, Hammer, LifeBuoy, Link2, Plus, Power, Server, Trash2 } from "lucide-react";
 import { useAutostart, useCreateOptions, useDebugBundle, useP2pSupport, useRegisterServer, useRemoveServer, useServers, useSetAutostart, useSystem, useUpdateCheck } from "../api/hooks";
 import { withToken } from "../api/client";
 import { Logo } from "../App";
+import { FolderPicker } from "../components/FolderPicker";
 import { Badge, Button, Callout, Card, ConfirmButton, EmptyState, Field, Input, Spinner, Toggle, cx, useToast } from "../lib/ui";
 import { usePlayOnce } from "../lib/fx";
 
@@ -20,6 +21,7 @@ export default function ServerSelect() {
   const bundle = useDebugBundle();
   const [path, setPath] = useState("");
   const [name, setName] = useState("");
+  const [picking, setPicking] = useState(false);
   const place = usePlayOnce("server-list");
 
   const submit = (e: FormEvent) => {
@@ -28,7 +30,7 @@ export default function ServerSelect() {
       { path: path.trim(), name: name.trim() || undefined },
       {
         onSuccess: (s) => {
-          toast("ok", `'${s.name}' 서버를 등록했습니다.`, { icon: "grass", first: "register" });
+          toast("ok", `'${s.name}' 서버를 등록했어요.`, { icon: "grass", first: "register" });
           setPath("");
           setName("");
         },
@@ -79,9 +81,14 @@ export default function ServerSelect() {
         <form onSubmit={submit} className="space-y-3">
           <div className="grid gap-3 md:grid-cols-[1fr_200px_auto] md:items-end">
             <Field label="서버 폴더 경로">
-              <div className="relative">
-                <FolderOpen className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <Input className="pl-9" mono placeholder="/Users/me/minecraft/servers/survival" value={path} onChange={(e) => setPath(e.target.value)} required />
+              <div className="flex gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <FolderOpen className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <Input className="pl-9" mono placeholder={sys?.pathExample ?? "/Users/me/minecraft/servers/survival"} value={path} onChange={(e) => setPath(e.target.value)} required />
+                </div>
+                <Button type="button" icon={FolderSearch} onClick={() => setPicking(true)} title="폴더를 눌러서 골라요">
+                  폴더 찾기
+                </Button>
               </div>
             </Field>
             <Field label="표시 이름 (선택)">
@@ -91,9 +98,21 @@ export default function ServerSelect() {
               등록
             </Button>
           </div>
-          <p className="text-[11px] text-slate-500">server.properties 와 eula.txt 가 있는 폴더의 절대 경로를 입력하세요.</p>
+          <p className="text-[11px] text-slate-500">server.properties 가 있는 서버 폴더를 고르거나 전체 경로를 직접 입력하세요. eula.txt 는 나중에 대시보드에서 동의할 수 있어요.</p>
         </form>
       </Card>
+
+      {picking && (
+        <FolderPicker
+          mode="register"
+          initialPath={path.trim()}
+          onClose={() => setPicking(false)}
+          onPick={(p) => {
+            setPath(p);
+            setPicking(false);
+          }}
+        />
+      )}
 
       <section>
         <h2 className="mb-3 font-block text-[12px] text-slate-200">등록된 서버</h2>
@@ -126,7 +145,7 @@ export default function ServerSelect() {
                   confirmLabel="해제할까요?"
                   onConfirm={() =>
                     remove.mutate(s.id, {
-                      onSuccess: () => toast("info", "등록을 해제했습니다. 서버 파일은 그대로 남아 있어요."),
+                      onSuccess: () => toast("info", "등록을 해제했어요. 서버 파일은 그대로 남아 있어요."),
                       onError: (err) => toast("err", (err as Error).message),
                     })
                   }

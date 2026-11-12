@@ -5,6 +5,7 @@ import type { P2pHostInfo, ProcessState } from "@blockpilot/shared";
 import { useP2pHost, useP2pHostUpdate, useSystem } from "../api/hooks";
 import { Badge, Button, Callout, Card, ConfirmButton, HoldButton, Input, SectionTitle, Toggle, useToast } from "../lib/ui";
 import { Lamp } from "../lib/pixel";
+import { requestPermission } from "../lib/notify";
 
 /**
  * 대시보드 "포트포워딩 없이 초대" 카드. 초대를 켜면 서버가 켜져 있는 동안 P2P 터널이 돌고,
@@ -35,12 +36,14 @@ export function InviteCard({ serverId, state }: { serverId: string; state: Proce
             <Toggle
               checked={info.enabled}
               disabled={!info.supported || busy}
-              onChange={(v) =>
+              onChange={(v) => {
+                // 초대를 켜는 클릭(사용자 동작)에 맞춰 브라우저 알림 권한을 한 번만 묻는다 → 다른 탭에 있어도 승인 요청을 알 수 있게
+                if (v) void requestPermission();
                 setEnabled.mutate(v, {
                   onError: onErr,
                   onSuccess: (r) => toast(v ? "ok" : "info", v ? (r.state === "listening" ? "초대를 켰어요. 초대코드를 친구에게 보내 주세요." : "초대를 켰어요. 서버를 켜면 친구가 들어올 수 있어요.") : "초대를 껐어요. 접속 중이던 친구는 끊겨요.", v ? { icon: "lever" } : undefined),
-                })
-              }
+                });
+              }}
             />
           </span>
         }

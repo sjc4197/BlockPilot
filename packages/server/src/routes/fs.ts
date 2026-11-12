@@ -67,7 +67,7 @@ export async function fsRoutes(app: FastifyInstance) {
       const st = await fsp.stat(full).catch(() => null);
       if (!st?.isDirectory()) continue;
       const inner = await fsp.readdir(full).catch(() => null);
-      dirs.push({ name, path: full, empty: inner ? inner.every((n) => IGNORABLE.has(n)) : null, isServer: servers.has(platform.pathKey(full)) });
+      dirs.push({ name, path: full, empty: inner ? inner.every((n) => IGNORABLE.has(n)) : null, isServer: servers.has(platform.pathKey(full)), hasServerProperties: !!inner?.includes("server.properties") });
     }
 
     const shortcuts: FsListing["shortcuts"] = [];
@@ -82,6 +82,7 @@ export async function fsRoutes(app: FastifyInstance) {
       crumbs: crumbsOf(dir),
       empty: names.every((n) => IGNORABLE.has(n)),
       isServer: servers.has(platform.pathKey(dir)),
+      hasServerProperties: names.includes("server.properties"),
       entries: dirs,
       truncated: dirs.length >= MAX_ENTRIES,
       shortcuts,

@@ -3,7 +3,8 @@ import type { P2pHostInfo, P2pPeerView } from "@blockpilot/shared";
 import { getP2p, getServer, listServers, setP2p, type P2pSettings } from "../../config/store.js";
 import { badRequest, conflict } from "../../lib/errors.js";
 import { getManaged } from "../process.js";
-import { onServerEvent } from "../events.js";
+import { emitServerEvent, onServerEvent } from "../events.js";
+import { osNotifyThrottled } from "../notify.js";
 import { readPropertiesFile, toRecord } from "../properties.js";
 import { createDht, loadHyperdht, p2pSupport } from "./native.js";
 import { encodeInvite, newSecret, shortKey } from "./invite.js";
@@ -29,6 +30,78 @@ const generation = new Map<string, number>();
 const DASHBOARD_PORT = Number(process.env.BLOCKPILOT_PORT ?? 4800);
 const MAX_PEERS = 10;
 const RECONCILE_MS = 30_000;
+
+// ---------- 승인 대기 사건 묶기 ----------
+// 친구가 접속을 되풀이하거나 매번 새 키로 오면 peer-pending 이 끝없이 올라와 디스코드 웹훅·OS 알림이 쏟아진다.
+// 서버마다 60초에 한 번만 p2p_pending 사건을 올리고, 그 사이 온 것은 세어 두었다가 창이 끝날 때 "외 N명" 으로 한 번에 올린다.
+export const PENDING_WINDOW_MS = 60_000;
+export interface PendingSummary {
+  player: string;
+  detail?: string;
+}
+interface PendingFold {
+  windowStart: number;
+  /** 창 안에서 접어 둔 친구 (짧은 키). 같은 친구가 되풀이해도 한 번만 */
+  folded: string[];
+  timer?: NodeJS.Timeout;
+}
+const pendingFolds = new Map<string, PendingFold>();
+
+/**
+ * 승인 대기 하나를 접수한다. 돌려주는 값이 있으면 그 사건을 바로 올리고, null 이면 접어 둔 것 (창이 끝날 때 flushPending 이 올린다).
+ * schedule 은 창이 끝날 때 flush 를 부를 타이머 (실제 코드는 setTimeout, 시험은 직접 flushPending 을 부른다)
+ */
+export function notePendingPeer(id: string, name: string, now = Date.now(), schedule?: (ms: number) => void): PendingSummary | null {
+  const f = pendingFolds.get(id);
+  if (!f || now - f.windowStart >= PENDING_WINDOW_MS) {
+    if (f?.timer) clearTimeout(f.timer);
+    pendingFolds.set(id, { windowStart: now, folded: [] });
+    return { player: name };
+  }
+  if (f.folded.includes(name)) return null;
+  f.folded.push(name);
+  // 처음 접을 때 한 번만 창 끝 타이머를 건다
+  if (f.folded.length === 1 && schedule) schedule(f.windowStart + PENDING_WINDOW_MS - now);
+  return null;
+}
+
+/** 창이 끝났을 때 접어 둔 것이 있으면 한 번에 올릴 사건을 돌려주고 새 창을 연다 (그래서 60초에 하나를 넘지 않는다). 없으면 null */
+export function flushPendingPeers(id: string, now = Date.now()): PendingSummary | null {
+  const f = pendingFolds.get(id);
+  if (!f || !f.folded.length) return null;
+  if (now - f.windowStart < PENDING_WINDOW_MS) return null;
+  const names = f.folded;
+  pendingFolds.set(id, { windowStart: now, folded: [] });
+  return { player: names[names.length - 1], detail: names.length > 1 ? `외 ${names.length - 1}명` : undefined };
+}
+
+/** 시험·서버 삭제용 */
+export function resetPendingPeers(id: string) {
+  const f = pendingFolds.get(id);
+  if (f?.timer) clearTimeout(f.timer);
+  pendingFolds.delete(id);
+}
+
+function emitPending(id: string, p: PendingSummary) {
+  emitServerEvent({ serverId: id, type: "p2p_pending", player: p.player, detail: p.detail });
+}
+
+/** 실제 경로: 바로 올리거나, 접어 두고 창이 끝날 때 타이머로 올린다 */
+function handlePendingPeer(id: string, name: string) {
+  const now = Date.now();
+  const p = notePendingPeer(id, name, now, (ms) => {
+    const f = pendingFolds.get(id);
+    if (!f) return;
+    f.timer = setTimeout(() => {
+      const f2 = pendingFolds.get(id);
+      if (f2) f2.timer = undefined;
+      const late = flushPendingPeers(id);
+      if (late) emitPending(id, late);
+    }, Math.max(0, ms));
+    f.timer.unref();
+  });
+  if (p) emitPending(id, p);
+}
 
 async function mcPortOf(dir: string) {
   const props = toRecord((await readPropertiesFile(dir)).lines);
@@ -102,6 +175,12 @@ async function startTunnel(id: string) {
       const now = Date.now();
       rt.authFailures = [...rt.authFailures.filter((t) => now - t < 10 * 60_000), now];
     });
+    // 친구가 승인을 기다린다 → 사건(디스코드·화면 배지, 서버당 60초에 한 번) + OS 알림(서버·친구 각각 2분에 한 번). 상대 주소(IP)는 사건에 싣지 않는다
+    tunnel.on("peer-pending", (p) => {
+      const name = shortKey(p.publicKey);
+      handlePendingPeer(id, name);
+      osNotifyThrottled([`p2p_pending:${id}`, `p2p_pending:${id}:${p.publicKey}`], "친구 접속 요청 · BlockPilot", `${name} 님이 ${server.name} 서버 접속 승인을 기다려요. 대시보드에서 승인해 주세요.`);
+    });
     try {
       await tunnel.start();
       rt.state = "listening";
@@ -121,6 +200,8 @@ async function stopTunnel(id: string) {
   const rt = runtimes.get(id);
   if (!rt) return;
   runtimes.delete(id);
+  // 터널이 끝나면 접어 둔 승인 대기도 더는 뜻이 없다
+  resetPendingPeers(id);
   await rt.tunnel.stop().catch(() => {});
   await rt.dht.destroy({ force: true }).catch(() => {});
 }
@@ -274,4 +355,5 @@ export async function forgetP2pHost(id: string) {
   await stopTunnel(id);
   approvedKeys.delete(id);
   blockedKeys.delete(id);
+  resetPendingPeers(id);
 }

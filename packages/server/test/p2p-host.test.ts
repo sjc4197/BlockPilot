@@ -4,11 +4,12 @@ import type DHT from "hyperdht";
 import { makeFakeServer, waitFor } from "./helpers/fakeServer.js";
 import { addServer, getP2p, removeServer } from "../src/config/store.js";
 import { getManaged } from "../src/services/process.js";
-import { emitServerEvent } from "../src/services/events.js";
+import { emitServerEvent, onServerEvent } from "../src/services/events.js";
+import { shortKey } from "../src/services/p2p/invite.js";
 import { loadHyperdht } from "../src/services/p2p/native.js";
 import { decodeInvite } from "../src/services/p2p/invite.js";
 import { JoinTunnel } from "../src/services/p2p/tunnel.js";
-import { p2pHostView, peerAction, rotateInvite, setP2pEnabled, startP2pHostLifecycle, stopAllP2pHosts } from "../src/services/p2p/host.js";
+import { PENDING_WINDOW_MS, flushPendingPeers, notePendingPeer, p2pHostView, peerAction, resetPendingPeers, rotateInvite, setP2pEnabled, startP2pHostLifecycle, stopAllP2pHosts } from "../src/services/p2p/host.js";
 
 /**
  * 호스트 관리자: 초대 켜기 → (서버가 켜져 있으면) 터널 시작 → 초대코드로 친구 접속 → 승인 저장 → 재발급 → 끄기.
@@ -75,9 +76,14 @@ describe("P2P host manager", () => {
     nodes.push(dht);
     const kp = Dht.keyPair();
     const join = new JoinTunnel({ dht, invite, keyPair: kp, localPort: 0 });
+    // 승인 대기가 생기면 알림용 사건(p2p_pending)이 올라온다 (디스코드·OS 알림이 이걸 받아 쓴다)
+    const pendingEvents: string[] = [];
+    const off = onServerEvent((e) => { if (e.serverId === serverId && e.type === "p2p_pending") pendingEvents.push(e.player ?? ""); });
     const started = join.start();
     await waitFor(async () => (await p2pHostView(serverId)).peers.some((p) => p.state === "pending"), 10_000, "승인 대기");
     const key = kp.publicKey.toString("hex");
+    off();
+    expect(pendingEvents).toEqual([shortKey(key)]);
     const after = await peerAction(serverId, key, "approve", "철수");
     expect(after.approved).toEqual([expect.objectContaining({ publicKey: key, name: "철수" })]);
     await started;
@@ -114,4 +120,40 @@ describe("P2P host manager", () => {
     const managed = getManaged(serverId, fake.dir);
     await managed.stop();
   }, 30_000);
+});
+
+/** 승인 대기 사건 묶기: 서버마다 60초에 하나, 그 사이 것은 창이 끝날 때 "외 N명" 으로 */
+describe("p2p_pending suppression", () => {
+  const id = "fold-test";
+  const t0 = 10_000_000;
+  afterAll(() => resetPendingPeers(id));
+
+  it("emits the first request right away and folds the rest of the window into one summary", () => {
+    resetPendingPeers(id);
+    const scheduled: number[] = [];
+    const schedule = (ms: number) => scheduled.push(ms);
+    expect(notePendingPeer(id, "aaaa", t0, schedule)).toEqual({ player: "aaaa" });
+    expect(notePendingPeer(id, "bbbb", t0 + 1000, schedule)).toBeNull();
+    expect(notePendingPeer(id, "bbbb", t0 + 2000, schedule)).toBeNull(); // 같은 친구가 되풀이해도 한 번만 센다
+    expect(notePendingPeer(id, "cccc", t0 + 3000, schedule)).toBeNull();
+    // 창이 끝날 때 한 번만 타이머를 건다
+    expect(scheduled).toEqual([PENDING_WINDOW_MS - 1000]);
+    // 창이 끝나기 전에는 내놓지 않는다
+    expect(flushPendingPeers(id, t0 + 30_000)).toBeNull();
+    expect(flushPendingPeers(id, t0 + PENDING_WINDOW_MS)).toEqual({ player: "cccc", detail: "외 1명" }); // cccc 와 그 밖의 bbbb
+    // 요약이 새 창을 열었으므로 바로 뒤에 온 것은 또 접힌다 (60초에 하나를 넘지 않는다)
+    expect(notePendingPeer(id, "dddd", t0 + PENDING_WINDOW_MS + 1000, schedule)).toBeNull();
+    expect(flushPendingPeers(id, t0 + 2 * PENDING_WINDOW_MS)).toEqual({ player: "dddd", detail: undefined });
+    // 접힌 것이 없으면 요약도 없다
+    expect(flushPendingPeers(id, t0 + 3 * PENDING_WINDOW_MS)).toBeNull();
+  });
+
+  it("after a quiet window the next request is emitted immediately again", () => {
+    resetPendingPeers(id);
+    expect(notePendingPeer(id, "aaaa", t0)).toEqual({ player: "aaaa" });
+    expect(notePendingPeer(id, "bbbb", t0 + PENDING_WINDOW_MS)).toEqual({ player: "bbbb" });
+    expect(notePendingPeer(id, "cccc", t0 + PENDING_WINDOW_MS + 10)).toBeNull();
+    resetPendingPeers(id);
+    expect(flushPendingPeers(id, t0 + 5 * PENDING_WINDOW_MS)).toBeNull();
+  });
 });

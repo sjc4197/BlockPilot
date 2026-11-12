@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { z } from "zod";
 import { DeleteServerInput, RegisterServerInput, type DeleteServerResult, type ServerSummary } from "@blockpilot/shared";
 import { addServer, listServers, removeServer } from "../config/store.js";
 import { forgetPlaytime } from "../services/stats.js";
@@ -9,8 +10,13 @@ import { detectServer, getServerJavaVersion, validateServerDir } from "../servic
 import { readPropertiesFile, toRecord } from "../services/properties.js";
 import { modsDirName } from "../services/mods.js";
 import { deleteServerFolder } from "../services/serverDelete.js";
+import { acceptEula } from "../services/eula.js";
+import { forgetIdleShutdown } from "../services/idleShutdown.js";
 import { loadContext } from "../lib/context.js";
-import { conflict } from "../lib/errors.js";
+import { badRequest, conflict } from "../lib/errors.js";
+
+/** 새 서버 만들기와 같은 원칙: 사용자가 직접 체크한 true 만 받는다 */
+const AcceptEulaInput = z.object({ accepted: z.literal(true) });
 
 export async function serversRoutes(app: FastifyInstance) {
   app.get("/api/servers", async () => listServers());
@@ -30,6 +36,7 @@ export async function serversRoutes(app: FastifyInstance) {
     // 지난번 BlockPilot 이 띄우고 남은 서버가 돌고 있으면 기록(running.json)을 잃어버리게 되니 먼저 정리하게 한다
     if ((await managed.status()).state === "orphan") throw conflict("지난번 BlockPilot 이 띄운 서버가 아직 돌고 있어요. 먼저 안전하게 끄거나 그냥 두기를 고른 뒤 등록 해제해 주세요.");
     await forgetP2pHost(id);
+    forgetIdleShutdown(id);
     await removeServer(id);
     await forgetPlaytime(id);
     return { ok: true };
@@ -44,6 +51,17 @@ export async function serversRoutes(app: FastifyInstance) {
     await forgetP2pHost(id);
     req.log.warn({ server: server.name, deleted: result.deletedPath }, "서버 폴더를 삭제했어요");
     return result;
+  });
+
+  /** eula.txt 에 eula=true 를 쓴다. 본문에 accepted: true 가 명시돼 있어야만 (BlockPilot 이 대신 동의하지 않음) */
+  app.post("/api/servers/:id/eula", async (req) => {
+    const { id } = req.params as { id: string };
+    const parsed = AcceptEulaInput.safeParse(req.body ?? {});
+    if (!parsed.success) throw badRequest("Minecraft EULA 를 읽고 동의 체크박스를 직접 체크해 주세요.");
+    const { server, dir } = await loadContext(id);
+    await acceptEula(dir);
+    req.log.info({ server: server.name }, "EULA 동의를 eula.txt 에 저장했어요");
+    return { ok: true };
   });
 
   app.get("/api/servers/:id", async (req): Promise<ServerSummary> => {

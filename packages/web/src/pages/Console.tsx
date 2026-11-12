@@ -5,6 +5,7 @@ import type { ConsoleLine } from "@blockpilot/shared";
 import { useConsole } from "../lib/useConsole";
 import { Lamp } from "../lib/pixel";
 import { Button, Card, Kbd, StatusBadge, Toggle, cx, useToast } from "../lib/ui";
+import { PlayerSuggestions, QuickCommands, completePlayer, suggestPlayers } from "../components/QuickCommands";
 
 export default function Console() {
   const { id = "" } = useParams();
@@ -16,6 +17,10 @@ export default function Console() {
   const [autoScroll, setAutoScroll] = useState(true);
   const [showTime, setShowTime] = useState(false);
   const [clearedAt, setClearedAt] = useState(0);
+  // 접속자 이름 자동완성: 후보 중 고른 칸, Esc 로 닫았는지
+  const [sugIdx, setSugIdx] = useState(0);
+  const [sugClosed, setSugClosed] = useState(false);
+  const [focused, setFocused] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -26,6 +31,24 @@ export default function Console() {
   }, [visible.length, autoScroll]);
 
   const canSend = status?.state === "running" || status?.state === "starting" || status?.state === "stopping" || ((status?.state === "external" || status?.state === "orphan") && status.rcon === "connected");
+
+  const online = status?.onlinePlayers ?? [];
+  const sug = canSend && focused && !sugClosed ? suggestPlayers(cmd, online) : { prefix: "", matches: [] };
+  const sugOpen = sug.matches.length > 0;
+  const activeSug = Math.min(sugIdx, Math.max(0, sug.matches.length - 1));
+
+  /** 입력칸 내용을 바꾸고 커서를 끝에 둔다 (칩·자동완성 공용) */
+  const putCmd = (value: string) => {
+    setCmd(value);
+    setHistIdx(-1);
+    setSugClosed(false);
+    setSugIdx(0);
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    requestAnimationFrame(() => el.setSelectionRange(value.length, value.length));
+  };
+  const pickPlayer = (name: string) => putCmd(completePlayer(cmd, sug.prefix, name));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -39,6 +62,29 @@ export default function Console() {
   };
 
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (sugOpen) {
+      // Enter 는 그대로 보내기 — 다 적은 이름이 다른 이름의 앞부분일 때 엉뚱한 이름으로 바뀌지 않게 Tab 으로만 완성
+      if (e.key === "Tab") {
+        e.preventDefault();
+        pickPlayer(sug.matches[activeSug]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSugClosed(true);
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSugIdx((activeSug + 1) % sug.matches.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSugIdx((activeSug - 1 + sug.matches.length) % sug.matches.length);
+        return;
+      }
+    }
     if (e.key === "ArrowUp") {
       e.preventDefault();
       const i = Math.min(histIdx + 1, history.length - 1);
@@ -109,25 +155,47 @@ export default function Console() {
           )}
         </div>
         {!autoScroll && (
-          <button onClick={() => setAutoScroll(true)} className="glass absolute bottom-20 right-7 inline-flex items-center gap-1.5 px-3 py-1.5 font-block text-[12px] text-slate-200 hover:bg-ink-3">
+          <button onClick={() => setAutoScroll(true)} className="glass absolute bottom-[6.5rem] right-7 inline-flex items-center gap-1.5 px-3 py-1.5 font-block text-[12px] text-slate-200 hover:bg-ink-3">
             <ArrowDownToLine className="h-3.5 w-3.5" /> 최신으로
           </button>
         )}
-        <form onSubmit={submit} className="well m-3 flex items-center gap-2 px-3 py-1.5">
+        {/* 입력칸 위 한 줄: 평소엔 빠른 명령 칩, 이름 후보가 있으면 그 자리에 후보가 들어온다 (높이 고정) */}
+        <div className="mx-3 mt-3 h-7">
+          {sugOpen ? <PlayerSuggestions id="console-player-suggest" matches={sug.matches} active={activeSug} onPick={pickPlayer} onHover={setSugIdx} /> : <QuickCommands disabled={!canSend} onPick={putCmd} />}
+        </div>
+        <form onSubmit={submit} className="well m-3 mt-2 flex items-center gap-2 px-3 py-1.5">
           <span className="font-mono text-sm text-redstone">›</span>
           <input
             ref={inputRef}
             className="terminal min-w-0 flex-1 bg-transparent text-slate-100 placeholder-slate-600 focus:outline-none"
             placeholder={canSend ? "명령어 입력 — 예: list, say 안녕, whitelist add Steve" : "서버가 실행 중이 아니에요"}
             value={cmd}
-            onChange={(e) => setCmd(e.target.value)}
+            onChange={(e) => {
+              setCmd(e.target.value);
+              setSugClosed(false);
+              setSugIdx(0);
+            }}
             onKeyDown={onKey}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             disabled={!canSend}
             autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={sugOpen}
+            aria-controls={sugOpen ? "console-player-suggest" : undefined}
           />
           <span className="hidden items-center gap-1 text-[11px] text-slate-600 md:flex">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd> 히스토리
+            {online.length > 0 && (
+              <>
+                <span className="mx-1" />
+                <Kbd>Tab</Kbd> 이름
+              </>
+            )}
           </span>
           <Button size="sm" variant="primary" type="submit" icon={SendHorizonal} disabled={!canSend}>
             전송

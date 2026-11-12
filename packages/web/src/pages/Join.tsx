@@ -4,6 +4,7 @@ import { ArrowLeft, Copy, ExternalLink, Link2, RefreshCw, Unplug, X } from "luci
 import type { P2pJoinInfo } from "@blockpilot/shared";
 import { useP2pJoin, useP2pJoinActions, useSystem } from "../api/hooks";
 import { Lamp } from "../lib/pixel";
+import { notify, requestPermission } from "../lib/notify";
 import { Badge, Button, Callout, Card, Field, Input, PageHeader, SectionTitle, Spinner, cx, inputCls, useToast } from "../lib/ui";
 
 /**
@@ -38,9 +39,24 @@ export default function Join() {
   }, [code, info?.state]);
 
   const active = !!info && (info.state === "connecting" || info.state === "pending" || info.state === "connected");
+  const addr = info?.localPort ? (info.localPort === 25565 ? "localhost" : `localhost:${info.localPort}`) : undefined;
+
+  // 승인 기다리다 연결되면 (다른 탭을 보고 있어도) 알리고, 접속 주소를 바로 복사해 둔다
+  const prevState = useRef(info?.state);
+  useEffect(() => {
+    const prev = prevState.current;
+    prevState.current = info?.state;
+    if (prev !== "pending" || info?.state !== "connected") return;
+    notify("승인됐어요", `마인크래프트에서 ${addr ?? "localhost"} 로 접속하세요`, { tag: "p2p-approved" });
+    if (addr && navigator.clipboard) navigator.clipboard.writeText(addr).then(() => toast("ok", `주소를 복사했어요: ${addr}`, { icon: "grass" }), () => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [info?.state]);
+
   // 이름 칸을 비우면 "" 를 보내 지난 이름을 지운다
   const connect = () => {
     if (!code.trim() || active) return;
+    // 접속 버튼(사용자 동작)에 맞춰 알림 권한을 한 번만 묻는다 → 승인되면 다른 탭에 있어도 알 수 있게
+    void requestPermission();
     start.mutate({ inviteCode: code.trim(), name: name.trim() }, { onError: onErr });
   };
   const onSubmit = (e: FormEvent) => {

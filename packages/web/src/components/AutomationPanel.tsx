@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { AlarmClock, BellRing, RotateCcw, Send, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlarmClock, BellRing, PowerOff, RotateCcw, Send, Trash2 } from "lucide-react";
 import { DISCORD_EVENTS, DISCORD_EVENT_LABEL, type AutomationView } from "@blockpilot/shared";
 import { useDiscordTest, useSkipScheduledRestart, useUpdateAutomation } from "../api/hooks";
 import { Badge, Button, Callout, Card, Field, Input, SectionTitle, Select, Toggle, cx, fmtDate, useToast } from "../lib/ui";
@@ -11,6 +11,7 @@ export function AutomationPanel({ serverId, view }: { serverId: string; view: Au
       <DiscordCard serverId={serverId} view={view} />
       <AutoRestartCard serverId={serverId} view={view} />
       <ScheduledRestartCard serverId={serverId} view={view} />
+      <IdleShutdownCard serverId={serverId} view={view} />
     </div>
   );
 }
@@ -42,7 +43,7 @@ function DiscordCard({ serverId, view }: { serverId: string; view: AutomationVie
           <BellRing className="h-4 w-4 text-redstone" /> 디스코드 알림
         </span>
       </SectionTitle>
-      <p className="text-sm text-slate-400">서버가 켜지고 꺼질 때, 친구가 들어오고 나갈 때, 서버가 죽었을 때 디스코드 채널에 글을 올려요.</p>
+      <p className="text-sm text-slate-400">서버가 켜지고 꺼질 때, 친구가 들어오고 나갈 때, 서버가 죽었을 때, 친구가 접속 요청을 보냈을 때 디스코드 채널에 글을 올려요.</p>
 
       <div className="flex flex-wrap items-end gap-2">
         <Field
@@ -193,6 +194,64 @@ function ScheduledRestartCard({ serverId, view }: { serverId: string; view: Auto
           {s.onlyWhenEmpty && <span className="text-[11px] text-slate-500">그 시각에 누가 접속해 있으면 공지 없이 건너뛰어요.</span>}
         </div>
       )}
+    </Card>
+  );
+}
+
+/** "12분" / "1시간 5분" */
+function fmtMinutes(min: number) {
+  const m = Math.max(0, Math.round(min));
+  return m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ""}` : `${m}분`;
+}
+
+function IdleShutdownCard({ serverId, view }: { serverId: string; view: AutomationView }) {
+  const update = useUpdateAutomation(serverId);
+  const toast = useToast();
+  const i = view.idleShutdown;
+  const onErr = (e: unknown) => toast("err", (e as Error).message);
+  const [minutes, setMinutes] = useState(String(i.afterMinutes));
+  useEffect(() => setMinutes(String(i.afterMinutes)), [i.afterMinutes]);
+  const commit = () => {
+    const n = Number(minutes);
+    if (!Number.isInteger(n) || n < 5 || n > 720) {
+      setMinutes(String(i.afterMinutes));
+      return toast("info", "5분부터 720분(12시간)까지 쓸 수 있어요.");
+    }
+    if (n !== i.afterMinutes) update.mutate({ idleShutdown: { afterMinutes: n } }, { onError: onErr });
+  };
+  const now = Date.now();
+  const emptyFor = i.emptySince ? (now - new Date(i.emptySince).getTime()) / 60_000 : undefined;
+  const left = i.willStopAt ? (new Date(i.willStopAt).getTime() - now) / 60_000 : undefined;
+  // 서버가 1분 전 경고를 보냈으면 알려 준다 (서버가 아직 안 주는 버전이면 그냥 없음)
+  const warnedAt = i.warnedAt;
+  return (
+    <Card className="space-y-4">
+      <SectionTitle right={<Toggle checked={i.enabled} onChange={(v) => update.mutate({ idleShutdown: { enabled: v } }, { onError: onErr })} />}>
+        <span className="inline-flex items-center gap-2">
+          <PowerOff className="h-4 w-4 text-redstone" /> 아무도 없으면 끄기
+        </span>
+      </SectionTitle>
+      <p className="text-sm text-slate-400">접속자가 한 명도 없는 채로 정한 시간이 지나면 서버를 곱게 꺼서 컴퓨터를 쉬게 해요. 다시 켜려면 레버를 올리면 돼요. BlockPilot 이 켠 서버에만 동작해요.</p>
+      <div className="flex flex-wrap items-end gap-4">
+        <Field label="비어 있은 지" className="w-56">
+          <div className="flex items-center gap-2">
+            <Input id="idle-minutes" className="w-24" type="number" min={5} max={720} step={1} inputMode="numeric" value={minutes} disabled={!i.enabled} onChange={(e) => setMinutes(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
+            <span className="shrink-0 text-sm text-slate-400">분 뒤에 끄기</span>
+          </div>
+        </Field>
+        {i.enabled && (
+          <span className="pb-2 text-[12px] text-slate-500">
+            {emptyFor !== undefined && left !== undefined ? (
+              <Badge tone="lamp">
+                아무도 없은 지 {fmtMinutes(emptyFor)} · {warnedAt ? "1분 뒤 꺼져요 (경고 보냄)" : left <= 0 ? "곧 꺼져요" : `${fmtMinutes(left)} 뒤 꺼져요`}
+              </Badge>
+            ) : (
+              "서버가 켜져 있고 아무도 없을 때부터 세기 시작해요"
+            )}
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-500">5분부터 720분(12시간)까지 쓸 수 있어요. P2P 초대는 서버가 켜져 있어야 하니, 친구가 들어올 때까지 기다려야 하면 끄지 마세요.</p>
     </Card>
   );
 }

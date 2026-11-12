@@ -1,23 +1,25 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Activity, Boxes, Coffee, Copy, Gamepad2, Globe, Layers, Swords, Users, type LucideIcon } from "lucide-react";
-import { useAutomation, useOrphanAction, useSendCommand, useServer, useSkipScheduledRestart } from "../api/hooks";
+import { useAutomation, useOrphanAction, useServer, useSkipScheduledRestart } from "../api/hooks";
 import { fmtSchedule } from "../components/AutomationPanel";
 import { CrashBanner } from "../components/CrashBanner";
+import { EulaCard } from "../components/EulaCard";
+import { FirstStepsCard } from "../components/FirstStepsCard";
 import { ConnectCard } from "../components/ConnectCard";
 import { InviteCard } from "../components/InviteCard";
+import { OnlinePlayers } from "../components/OnlinePlayers";
 import { PerfCard } from "../components/PerfCard";
 import { loaderLabel } from "../App";
 import { useConsole } from "../lib/useConsole";
 import { Lamp, SignalBar, type LampState } from "../lib/pixel";
 import { JoinFeed, PlayerHearts, RedstoneParticles, usePlayOnce } from "../lib/fx";
 import { ProcessControls } from "../components/ProcessControls";
-import { Avatar, Badge, Button, Callout, Card, ConfirmButton, SectionTitle, StatusBadge, cx, fmtAgo, useToast } from "../lib/ui";
+import { Badge, Button, Callout, Card, ConfirmButton, SectionTitle, StatusBadge, cx, fmtAgo, useToast } from "../lib/ui";
 
 export default function Dashboard() {
   const { id = "" } = useParams();
   const { data: s } = useServer(id);
-  const sendCmd = useSendCommand(id);
   const toast = useToast();
   const { lines, status } = useConsole(id);
   const place = usePlayOnce(`dash-${id}`);
@@ -47,17 +49,11 @@ export default function Dashboard() {
   const signal = players.length === 0 ? 0 : Math.max(1, Math.round((players.length / maxPlayers) * 15));
   // 전원 회로: 켜지면 신호가 가루를 타고 흘러 카드 윗변이 차례로 켜진다
   const power = state === "running" || unmanagedLive ? "on" : state === "starting" || state === "stopping" ? state : "off";
-  const cmd = (c: string, okMsg: string) => sendCmd.mutate(c, { onSuccess: () => toast("ok", okMsg), onError: (e) => toast("err", (e as Error).message) });
-  const copyPath = () => navigator.clipboard?.writeText(s.path).then(() => toast("info", "경로를 복사했습니다."));
+  const copyPath = () => navigator.clipboard?.writeText(s.path).then(() => toast("info", "경로를 복사했어요."));
 
   return (
     <div className="space-y-5">
       {automation && <CrashBanner serverId={id} view={automation} state={state} />}
-      {!s.eulaAccepted && (
-        <Callout tone="warning" title="EULA 미동의">
-          <code className="font-mono">eula.txt</code> 에 <code className="font-mono">eula=true</code> 가 없어 서버를 시작할 수 없습니다.
-        </Callout>
-      )}
       {state === "orphan" && (
         <Callout tone="warning" title="지난번 BlockPilot 이 띄운 서버가 아직 돌고 있어요">
           <div>
@@ -102,9 +98,10 @@ export default function Dashboard() {
             서버 설정 → 네트워크
           </Link>
           에서 <b>RCON 사용</b>을 켜고 비밀번호를 정한 뒤 서버를 재시작하면 여기서 명령·중지·접속자 조회가 가능해요.
-          {rcon === "failed" && <div className="mt-1 text-amber-300">RCON 설정은 있지만 연결에 실패했습니다. 비밀번호/포트를 확인해 주세요.</div>}
+          {rcon === "failed" && <div className="mt-1 text-amber-300">RCON 설정은 있지만 연결에 실패했어요. 비밀번호/포트를 확인해 주세요.</div>}
         </Callout>
       )}
+      {!s.eulaAccepted && <EulaCard serverId={id} />}
 
       <div className="power" data-power={power}>
         {/* 히어로 */}
@@ -150,6 +147,9 @@ export default function Dashboard() {
           </div>
         </section>
 
+        {/* 처음 할 일: 레버 바로 아래. 체크리스트 힌트가 "위의 레버" 를 가리키므로 순서를 바꾸지 말 것 */}
+        <FirstStepsCard className="mt-5" serverId={id} server={s} discordSet={automation?.discord.webhookSet} />
+
         <div className="power-wire" aria-hidden>
           {Array.from({ length: 40 }, (_, i) => (
             <span key={i} className="dust" style={{ "--i": i } as CSSProperties} />
@@ -183,7 +183,7 @@ export default function Dashboard() {
         <PerfCard serverId={id} />
         <ConnectCard serverId={id} state={reachState} />
         {/* 초대코드·목록이 길어서 두 열을 다 쓴다 */}
-        <div className="lg:col-span-2">
+        <div id="invite" className="lg:col-span-2 scroll-mt-20">
           <InviteCard serverId={id} state={reachState} />
         </div>
       </div>
@@ -194,22 +194,9 @@ export default function Dashboard() {
           <SectionTitle right={<Badge tone={players.length ? "lamp" : "neutral"}>{players.length}명</Badge>}>접속 중인 플레이어</SectionTitle>
           <JoinFeed players={players} />
           {players.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-500">{canCommand ? "아무도 접속해 있지 않아요." : "서버가 실행 중일 때 표시됩니다."}</p>
+            <p className="py-8 text-center text-sm text-slate-500">{canCommand ? "아무도 접속해 있지 않아요." : "서버가 켜져 있을 때 보여요."}</p>
           ) : (
-            <ul className="mt-3 space-y-1.5">
-              {players.map((p) => (
-                <li key={p} className="well flex items-center gap-3 px-3 py-2">
-                  <Avatar id={p} size={28} />
-                  <span className="flex-1 truncate text-sm font-medium">{p}</span>
-                  {canCommand && (
-                    <div className="flex gap-1">
-                      <ConfirmButton size="sm" variant="ghost" label="킥" confirmLabel="킥?" onConfirm={() => cmd(`kick ${p}`, `${p} 추방`)} />
-                      <ConfirmButton size="sm" variant="ghost" label="밴" confirmLabel="밴?" className="text-red-300" onConfirm={() => cmd(`ban ${p}`, `${p} 밴`)} />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <OnlinePlayers serverId={id} players={players} canCommand={canCommand} />
           )}
         </Card>
 
@@ -227,7 +214,7 @@ export default function Dashboard() {
             </SectionTitle>
           </div>
           <pre className="well terminal mx-3 mb-3 max-h-64 overflow-auto px-4 py-3 text-slate-300">
-            {lines.length ? lines.slice(-14).map((l) => l.text).join("\n") : <span className="text-slate-600">아직 출력이 없습니다. 서버를 시작하면 여기에 로그가 흘러요.</span>}
+            {lines.length ? lines.slice(-14).map((l) => l.text).join("\n") : <span className="text-slate-600">아직 출력이 없어요. 서버를 시작하면 여기에 로그가 흘러요.</span>}
           </pre>
         </Card>
       </div>

@@ -66,6 +66,8 @@ export function formatEvent(e: ServerEvent, serverName: string): DiscordMessage 
       return { title: `${escapeMd(e.player ?? "누군가")} 님이 들어왔어요`, description: [n, online].filter(Boolean).join(" · "), color: COLOR.green };
     case "left":
       return { title: `${escapeMd(e.player ?? "누군가")} 님이 나갔어요`, description: [n, online].filter(Boolean).join(" · "), color: COLOR.gray };
+    case "p2p_pending":
+      return { title: `🙋 ${escapeMd(e.player ?? "친구")} 님이 접속 승인을 기다려요`, description: `${n} — 대시보드에서 승인해 주세요`, color: COLOR.yellow };
   }
 }
 
@@ -136,12 +138,52 @@ async function send(serverId: string, url: string, messages: DiscordMessage[]) {
   else status.set(serverId, { ...s, lastError: r.error });
 }
 
-// 서버마다 순서대로 보내도록 줄을 세운다
-const chains = new Map<string, Promise<unknown>>();
-function enqueue(serverId: string, job: () => Promise<unknown>) {
-  const next = (chains.get(serverId) ?? Promise.resolve()).then(job, job);
-  chains.set(serverId, next.catch(() => {}));
-  return next;
+// 서버마다 순서대로 보내도록 줄을 세운다. 줄이 너무 길어지면(디스코드가 막혀 있거나 사건이 쏟아질 때) 오래된 것부터 버린다
+export const DISCORD_QUEUE_MAX = 50;
+interface Queue {
+  jobs: { run: () => Promise<unknown>; done: () => void }[];
+  running: boolean;
+  /** 이번에 줄이 비기 전까지 버린 개수 */
+  dropped: number;
+}
+const queues = new Map<string, Queue>();
+
+/** 시험용: 기다리는 개수와 이번에 버린 개수 */
+export function discordQueueStats(serverId: string) {
+  const q = queues.get(serverId);
+  return { waiting: q?.jobs.length ?? 0, dropped: q?.dropped ?? 0 };
+}
+
+function enqueue(serverId: string, job: () => Promise<unknown>): Promise<void> {
+  return new Promise((resolve) => {
+    let q = queues.get(serverId);
+    if (!q) queues.set(serverId, (q = { jobs: [], running: false, dropped: 0 }));
+    q.jobs.push({ run: job, done: resolve });
+    let dropped = 0;
+    while (q.jobs.length > DISCORD_QUEUE_MAX) {
+      q.jobs.shift()!.done();
+      dropped++;
+    }
+    if (dropped) {
+      // 한 번만 알린다 (줄이 다시 빌 때까지)
+      if (!q.dropped) console.warn(`[discord] 알림이 너무 많이 밀려 오래된 것부터 건너뛰어요 (서버 ${serverId}, 줄 ${DISCORD_QUEUE_MAX}개 초과)`);
+      q.dropped += dropped;
+    }
+    if (!q.running) void drain(q);
+  });
+}
+
+async function drain(q: Queue) {
+  q.running = true;
+  try {
+    for (let j = q.jobs.shift(); j; j = q.jobs.shift()) {
+      await j.run().catch(() => {});
+      j.done();
+    }
+  } finally {
+    q.running = false;
+    q.dropped = 0;
+  }
 }
 
 let batchMs = 3000;

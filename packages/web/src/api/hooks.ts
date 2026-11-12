@@ -411,12 +411,15 @@ export interface UpdateCheck {
   url: string;
   note?: string;
 }
-/** 포트포워딩 없는 친구 초대 (P2P) — 호스트 쪽. 켜져 있으면 2초마다 승인 대기·접속자를 갱신 */
+/**
+ * 포트포워딩 없는 친구 초대 (P2P) — 호스트 쪽. 켜져 있을 때만 2초마다 승인 대기·접속자를 갱신하고,
+ * 꺼져 있으면 60초 (토글은 응답으로 캐시를 바로 바꾸므로 켜는 즉시 2초 주기로 넘어간다)
+ */
 export const useP2pHost = (id: string) =>
   useQuery({
     queryKey: ["server", id, "p2p"],
     queryFn: () => api<P2pHostInfo>(`/api/servers/${id}/p2p`),
-    refetchInterval: (q) => (q.state.data?.enabled ? 2000 : 10_000),
+    refetchInterval: (q) => (q.state.data?.enabled ? 2000 : 60_000),
   });
 export function useP2pHostUpdate(id: string) {
   const qc = useQueryClient();
@@ -488,3 +491,14 @@ export interface DebugBundleResult {
 }
 /** 로그·설정·서버 정보를 비밀은 가린 채 zip 하나로 모은다 (깃허브 이슈 첨부용) */
 export const useDebugBundle = () => useMutation({ mutationFn: () => api<DebugBundleResult>("/api/debug/bundle", { method: "POST" }) });
+
+// ---------- EULA 동의 ----------
+
+/** eula.txt 에 eula=true 를 쓴다. 서버가 명시적 동의(accepted: true)만 받으니 본문은 고정 */
+export function useAcceptEula(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ ok: true }>(`/api/servers/${id}/eula`, { method: "POST", json: { accepted: true } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.server(id) }),
+  });
+}

@@ -6,6 +6,7 @@ import { badRequest, HttpError } from "../lib/errors.js";
 import { discordStatus, isWebhookUrl, sendTestMessage, webhookHint } from "../services/discord.js";
 import { automationRuntime } from "../services/automationState.js";
 import { refreshSchedule, setSkipNext } from "../services/scheduledRestart.js";
+import { forgetIdleShutdown, idleShutdownStatus } from "../services/idleShutdown.js";
 
 /** 화면용: 웹훅 주소는 절대 돌려주지 않는다 */
 export async function automationView(id: string): Promise<AutomationView> {
@@ -15,6 +16,7 @@ export async function automationView(id: string): Promise<AutomationView> {
     discord: { webhookSet: !!a.discord.webhookUrl, webhookHint: webhookHint(a.discord.webhookUrl), events: a.discord.events, ...discordStatus(id) },
     autoRestart: { ...a.autoRestart, recentAttempts: rt.recentAttempts, gaveUp: rt.gaveUp, pendingAt: rt.pendingRestartAt },
     scheduledRestart: { ...a.scheduledRestart, nextAt: rt.nextScheduledAt, skipNext: rt.skipNext },
+    idleShutdown: { ...a.idleShutdown, ...idleShutdownStatus(id, a.idleShutdown) },
     lastCrash: rt.lastCrash,
   };
 }
@@ -38,8 +40,11 @@ export async function automationRoutes(app: FastifyInstance) {
       discord: { webhookUrl: url === undefined ? cur.discord.webhookUrl : url, events: { ...cur.discord.events, ...u.discord?.events } },
       autoRestart: { ...cur.autoRestart, ...u.autoRestart },
       scheduledRestart: { ...cur.scheduledRestart, ...u.scheduledRestart },
+      idleShutdown: { ...cur.idleShutdown, ...u.idleShutdown },
     });
     await setAutomation(id, next);
+    // 자동 끄기를 끄면 세던 시간·"곧 꺼요" 경고도 바로 지운다 (다시 켜면 처음부터)
+    if (!next.idleShutdown.enabled) forgetIdleShutdown(id);
     await refreshSchedule(id);
     return automationView(id);
   });

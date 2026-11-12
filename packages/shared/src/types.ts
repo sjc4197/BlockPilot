@@ -400,7 +400,9 @@ export interface FsListing {
   /** 이 폴더가 비었는지 (.DS_Store 등 제외) */
   empty: boolean;
   isServer: boolean;
-  entries: { name: string; path: string; empty: boolean | null; isServer: boolean }[];
+  /** server.properties 가 있어 마인크래프트 서버 폴더로 보이는지 */
+  hasServerProperties: boolean;
+  entries: { name: string; path: string; empty: boolean | null; isServer: boolean; hasServerProperties: boolean }[];
   truncated: boolean;
   shortcuts: { label: string; path: string; kind: "home" | "folder" | "drive" }[];
 }
@@ -571,7 +573,7 @@ export interface DeleteServerResult {
 // ---------- 서버 사건 · 알림 · 자동화 ----------
 
 /** 서버에서 일어난 일. 디스코드 알림·자동 재시작·통계가 모두 이것을 듣는다 */
-export type ServerEventType = "started" | "stopped" | "crashed" | "auto-restart" | "auto-restart-failed" | "scheduled-restart" | "joined" | "left" | "backup";
+export type ServerEventType = "started" | "stopped" | "crashed" | "auto-restart" | "auto-restart-failed" | "scheduled-restart" | "joined" | "left" | "backup" | "p2p_pending";
 
 export interface CrashSuspect {
   id?: string;
@@ -606,7 +608,7 @@ export interface ServerEvent {
   detail?: string;
 }
 
-export const DISCORD_EVENTS = ["started", "stopped", "crashed", "restarted", "joined", "left", "backup"] as const;
+export const DISCORD_EVENTS = ["started", "stopped", "crashed", "restarted", "joined", "left", "backup", "p2p_pending"] as const;
 export type DiscordEventKey = (typeof DISCORD_EVENTS)[number];
 export const DISCORD_EVENT_LABEL: Record<DiscordEventKey, string> = {
   started: "서버 켜짐",
@@ -616,6 +618,7 @@ export const DISCORD_EVENT_LABEL: Record<DiscordEventKey, string> = {
   joined: "입장",
   left: "퇴장",
   backup: "백업 완료",
+  p2p_pending: "친구 접속 요청",
 };
 
 const DiscordEvents = z.object(Object.fromEntries(DISCORD_EVENTS.map((k) => [k, z.boolean()])) as Record<DiscordEventKey, z.ZodBoolean>);
@@ -638,13 +641,20 @@ export const AutomationSettings = z.object({
     days: z.array(z.number().int().min(0).max(6)).min(1, "요일을 하나 이상 골라 주세요."),
     onlyWhenEmpty: z.boolean(),
   }),
+  /** 아무도 없으면 자동으로 끄기 */
+  idleShutdown: z.object({
+    enabled: z.boolean(),
+    /** 접속자가 0명인 채로 이만큼 지나면 끈다 (분) */
+    afterMinutes: z.number().int().min(5, "5분 이상으로 써 주세요.").max(720, "12시간(720분)까지만 돼요."),
+  }),
 });
 export type AutomationSettings = z.infer<typeof AutomationSettings>;
 
 export const DEFAULT_AUTOMATION: AutomationSettings = {
-  discord: { webhookUrl: "", events: { started: true, stopped: true, crashed: true, restarted: true, joined: true, left: true, backup: false } },
+  discord: { webhookUrl: "", events: { started: true, stopped: true, crashed: true, restarted: true, joined: true, left: true, backup: false, p2p_pending: true } },
   autoRestart: { enabled: false, delaySeconds: 30 },
   scheduledRestart: { enabled: false, time: "05:00", days: [0, 1, 2, 3, 4, 5, 6], onlyWhenEmpty: true },
+  idleShutdown: { enabled: false, afterMinutes: 30 },
 };
 
 /** 화면에 돌려주는 모양: 웹훅 주소 대신 설정 여부와 끝 네 글자만 */
@@ -652,6 +662,9 @@ export interface AutomationView {
   discord: { webhookSet: boolean; webhookHint?: string; events: AutomationSettings["discord"]["events"]; lastSentAt?: string; lastError?: string };
   autoRestart: AutomationSettings["autoRestart"] & { recentAttempts: number; gaveUp: boolean; pendingAt?: string };
   scheduledRestart: AutomationSettings["scheduledRestart"] & { nextAt?: string; skipNext: boolean };
+  /** emptySince: 아무도 없어진 시각, willStopAt: 이대로면 꺼질 시각 (켜져 있고 비어 있을 때만) */
+  /** warnedAt: "1분 뒤에 꺼요" 경고를 보낸 시각 (다음 틱에 접속자가 없으면 끈다) */
+  idleShutdown: AutomationSettings["idleShutdown"] & { emptySince?: string; warnedAt?: string; willStopAt?: string };
   lastCrash?: CrashSummary;
 }
 
@@ -660,6 +673,7 @@ export const AutomationUpdate = z.object({
   discord: z.object({ webhookUrl: z.string().optional(), events: DiscordEvents.partial().optional() }).optional(),
   autoRestart: AutomationSettings.shape.autoRestart.partial().optional(),
   scheduledRestart: AutomationSettings.shape.scheduledRestart.partial().optional(),
+  idleShutdown: AutomationSettings.shape.idleShutdown.partial().optional(),
 });
 export type AutomationUpdate = z.infer<typeof AutomationUpdate>;
 
