@@ -11,7 +11,9 @@ const ALTERNATIVES: P2pDiagnosis["alternatives"] = [
   { label: "Tailscale", url: "https://tailscale.com", note: "호스트와 친구 모두 설치해 같은 가상 네트워크에 들어가는 VPN. 무료 플랜으로 친구 몇 명까지 충분해요." },
 ];
 
-export type DiagnosisKind = "bad_code" | "host_off" | "rejected" | "timeout_approval" | "full" | "nat" | "network" | "unknown";
+const RELEASES_URL = "https://github.com/sjc4197/BlockPilot/releases";
+
+export type DiagnosisKind = "bad_code" | "host_off" | "rejected" | "timeout_approval" | "full" | "nat" | "network" | "version_mismatch" | "unknown";
 
 export function diagnoseJoinFailure(err: unknown): P2pDiagnosis {
   const e = err as { code?: string; message?: string } | undefined;
@@ -20,6 +22,13 @@ export function diagnoseJoinFailure(err: unknown): P2pDiagnosis {
 
   const base = (kind: DiagnosisKind, title: string, cause: string, hints: string[], withAlternatives = false): P2pDiagnosis => ({ kind, title, cause, hints, alternatives: withAlternatives ? ALTERNATIVES : [] });
 
+  // 핸드셰이크 규칙 버전이 다르다 (한쪽만 업데이트했을 때). P2pDiagnosis.kind 에 "version_mismatch" 가 생기면 그걸로 바꾼다 — 화면은 kind 로 갈라 보지 않는다
+  if (code === "PROTO_VERSION_MISMATCH") {
+    return base("version_mismatch", "친구와 BlockPilot 버전이 달라요.", "한쪽만 BlockPilot 을 업데이트해서 서로 다른 규칙으로 말하고 있어요.", [
+      "둘 다 최신 버전으로 올린 뒤 다시 해 보세요.",
+      `대시보드의 업데이트 알림이나 ${RELEASES_URL} 에서 최신 버전을 받을 수 있어요.`,
+    ]);
+  }
   if (code === "PROTO_BAD_MAC") return base("bad_code", "초대코드가 맞지 않아요.", "친구가 초대코드를 다시 만들었거나, 글자가 바뀌었어요.", ["친구에게 지금 보이는 초대코드를 다시 받아 통째로 붙여 넣으세요."]);
   if (code === "PROTO_CLOSED") return base("host_off", "호스트가 연결을 끊었어요.", "친구의 BlockPilot 에서 초대가 꺼져 있거나 서버가 꺼져 있을 수 있어요.", ["친구에게 대시보드의 '포트포워딩 없이 초대' 가 켜져 있고 서버가 켜져 있는지 물어보세요."]);
   if (code === "PEER_NOT_FOUND" || /PEER_NOT_FOUND/.test(msg)) return base("host_off", "호스트를 찾지 못했어요.", "친구의 BlockPilot 이 꺼져 있거나 초대가 꺼져 있어요. 켠 지 얼마 안 됐다면 네트워크에 알려지는 데 몇 초 걸려요.", ["친구에게 초대가 켜져 있는지(초대 중 표시) 확인하고 10초 뒤 다시 접속하세요.", "초대코드를 다시 받아 보세요 (코드 앞부분이 호스트 주소예요)."]);

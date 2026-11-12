@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { diagnoseJoinFailure, diagnoseStatus } from "../src/services/p2p/diagnose.js";
-import { ProtocolError } from "../src/services/p2p/protocol.js";
+import { ProtocolError, VERSION_MISMATCH_MESSAGE } from "../src/services/p2p/protocol.js";
 
 const dhtErr = (code: string) => Object.assign(new Error(`${code}: x`), { code });
 
@@ -19,6 +19,14 @@ describe("diagnoseJoinFailure", () => {
     expect(unknown.kind).toBe("unknown");
     expect(unknown.cause).toBe("weird thing");
     expect(unknown.hints.length).toBeGreaterThan(0);
+  });
+
+  it("tells both sides to update when the protocol version differs, with the releases link and no third-party alternatives", () => {
+    const d = diagnoseJoinFailure(new ProtocolError(VERSION_MISMATCH_MESSAGE, "version_mismatch"));
+    expect(d.title).toMatch(/BlockPilot 버전이 달라요/);
+    expect(d.hints.some((h) => /최신 버전/.test(h))).toBe(true);
+    expect(d.hints.some((h) => h.includes("https://github.com/sjc4197/BlockPilot/releases"))).toBe(true);
+    expect(d.alternatives).toEqual([]);
   });
 
   it("explains host decisions without pointing at other services", () => {

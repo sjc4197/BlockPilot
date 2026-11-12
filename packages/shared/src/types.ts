@@ -519,7 +519,7 @@ export type P2pJoinState = "idle" | "connecting" | "pending" | "connected" | "fa
 
 /** 연결 실패 진단: 무슨 일 · 왜 · 해 볼 것 · 그래도 안 되면(대안 서비스, 안내만) */
 export interface P2pDiagnosis {
-  kind: "bad_code" | "host_off" | "rejected" | "timeout_approval" | "full" | "nat" | "network" | "unknown";
+  kind: "bad_code" | "host_off" | "rejected" | "timeout_approval" | "full" | "nat" | "network" | "version_mismatch" | "unknown";
   title: string;
   cause: string;
   hints: string[];

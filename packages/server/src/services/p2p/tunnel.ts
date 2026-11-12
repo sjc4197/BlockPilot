@@ -218,8 +218,9 @@ export class HostTunnel extends EventEmitter<HostEvents> {
       if (!(e instanceof ProtocolError && e.code === "closed")) {
         this.recordFailure(key, remoteHost);
         this.emit("auth-failed", { publicKey: key, remote, reason });
-        // 틀린 초대코드라는 것만 알려 준다 (어차피 실패한 쪽은 실패를 안다)
+        // 틀린 초대코드·버전 차이만 알려 준다 (어차피 실패한 쪽은 실패를 안다). 버전 차이도 실패로 세어 같은 상대가 계속 두드리면 firewall 이 막는다
         if (e instanceof ProtocolError && e.code === "bad_mac") sendStatus(sock, STATUS.BAD_SECRET);
+        if (e instanceof ProtocolError && e.code === "version_mismatch") sendStatus(sock, STATUS.VERSION_MISMATCH);
       }
       endSoon(sock);
       return;
@@ -340,7 +341,7 @@ export class JoinTunnel extends EventEmitter<JoinEvents> {
   state: JoinState = "connecting";
   detail?: string;
   localPort?: number;
-  /** 실패 원인 (진단용): 원본 오류 또는 호스트 상태 코드 */
+  /** 실패 원인 (진단용): 원본 오류 또는 호스트 상태 코드. 버전 차이는 ProtocolError(version_mismatch) 로 error 에 담긴다 */
   failure?: { error?: unknown; status?: "rejected" | "timeout_approval" | "full" | "bad_secret" };
   private control: SecretStream | null = null;
   private listener: net.Server | null = null;
@@ -508,6 +509,7 @@ export class JoinTunnel extends EventEmitter<JoinEvents> {
 export function explainJoinError(e: unknown): string {
   if (e instanceof ProtocolError) {
     if (e.code === "bad_mac") return "초대코드가 맞지 않아요.";
+    if (e.code === "version_mismatch") return e.message;
     if (e.code === "timeout") return e.message;
     if (e.code === "closed") return "호스트가 연결을 끊었어요. 초대코드가 바뀌었거나 초대가 꺼져 있을 수 있어요.";
     return e.message;

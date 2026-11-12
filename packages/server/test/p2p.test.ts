@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import net from "node:net";
 import type DHT from "hyperdht";
 import { decodeInvite, encodeInvite, newSecret, zbase32Decode, zbase32Encode, InviteError } from "../src/services/p2p/invite.js";
-import { computeMac, FrameReader, STATUS } from "../src/services/p2p/protocol.js";
+import { computeMac, encodeChallenge, encodeResponse, FrameReader, hostChallenge, joinRespond, KIND, MSG, PROTOCOL_VERSION, STATUS, VERSION_MISMATCH_MESSAGE } from "../src/services/p2p/protocol.js";
 import { HostTunnel, JoinTunnel, type HostPeer } from "../src/services/p2p/tunnel.js";
 import { loadHyperdht, bootstrapFromEnv } from "../src/services/p2p/native.js";
 import { PassThrough } from "node:stream";
@@ -61,12 +61,97 @@ describe("FrameReader", () => {
     await expect(p).rejects.toMatchObject({ code: "closed" });
   });
 
-  it("binds the MAC to nonce, joiner key and session hash", () => {
+  it("binds the MAC to nonce, joiner key, session hash and protocol version", () => {
     const secret = newSecret();
     const a = computeMac(secret, Buffer.alloc(32, 1), Buffer.alloc(32, 2), Buffer.alloc(32, 3));
     expect(computeMac(secret, Buffer.alloc(32, 1), Buffer.alloc(32, 2), Buffer.alloc(32, 3))).toEqual(a);
     expect(computeMac(secret, Buffer.alloc(32, 1), Buffer.alloc(32, 2), Buffer.alloc(32, 4))).not.toEqual(a);
     expect(computeMac(newSecret(), Buffer.alloc(32, 1), Buffer.alloc(32, 2), Buffer.alloc(32, 3))).not.toEqual(a);
+    // 버전을 MAC 에 넣어 두었으니 낮은 버전으로 속여도 MAC 이 맞지 않는다
+    expect(computeMac(secret, Buffer.alloc(32, 1), Buffer.alloc(32, 2), Buffer.alloc(32, 3), PROTOCOL_VERSION + 1)).not.toEqual(a);
+  });
+});
+
+// ---------- 핸드셰이크 규칙 버전 (스트림 한 쌍으로 호스트·참가자 역할을 직접) ----------
+
+describe("protocol version", () => {
+  const secret = newSecret();
+  const joinerKey = Buffer.alloc(32, 7);
+  const hash = Buffer.alloc(32, 9);
+  /** 호스트 → 참가자 / 참가자 → 호스트 스트림 */
+  const pair = () => ({ h2j: new PassThrough(), j2h: new PassThrough() });
+
+  it("round-trips: CHALLENGE [0x01][ver][nonce], RESPONSE [0x02][ver][mac][kind], both carrying PROTOCOL_VERSION", async () => {
+    // 양쪽 바이트를 엿보면서 그대로 상대에게 넘겨 준다
+    const { h2j, j2h } = pair();
+    const toJoin = new PassThrough();
+    const toHost = new PassThrough();
+    const sent: Buffer[] = [];
+    const hostRecv: Buffer[] = [];
+    h2j.on("data", (c: Buffer) => (sent.push(c), toJoin.write(c)));
+    j2h.on("data", (c: Buffer) => (hostRecv.push(c), toHost.write(c)));
+
+    const host = hostChallenge(new FrameReader(toHost), h2j, secret, joinerKey, hash, 2000);
+    const joined = joinRespond(new FrameReader(toJoin), j2h, secret, joinerKey, hash, KIND.DATA, { timeoutMs: 2000 });
+    const { kind } = await host;
+    expect(kind).toBe(KIND.DATA);
+    const challenge = Buffer.concat(sent);
+    expect(challenge).toHaveLength(2 + 32);
+    expect(challenge[0]).toBe(MSG.CHALLENGE);
+    expect(challenge[1]).toBe(PROTOCOL_VERSION);
+    const response = Buffer.concat(hostRecv);
+    expect(response).toHaveLength(2 + 32 + 1);
+    expect(response[0]).toBe(MSG.RESPONSE);
+    expect(response[1]).toBe(PROTOCOL_VERSION);
+    expect(response.subarray(2, 34)).toEqual(computeMac(secret, challenge.subarray(2), joinerKey, hash));
+    expect(response[34]).toBe(KIND.DATA);
+    // 호스트가 GO 를 주면 참가자도 끝난다
+    h2j.write(Buffer.from([MSG.STATUS, STATUS.GO]));
+    expect(await joined).toBe(STATUS.GO);
+  });
+
+  it("host rejects a RESPONSE with another version as version_mismatch before looking at the MAC", async () => {
+    const { h2j, j2h } = pair();
+    const host = hostChallenge(new FrameReader(j2h), h2j, secret, joinerKey, hash, 2000);
+    const challenge = await new FrameReader(h2j).read(2 + 32, 2000);
+    // MAC 은 (상대 버전 기준으로) 맞게 만들어도 버전이 다르면 거절
+    const other = PROTOCOL_VERSION + 1;
+    j2h.write(encodeResponse(computeMac(secret, challenge.subarray(2), joinerKey, hash, other), KIND.CONTROL, other));
+    await expect(host).rejects.toMatchObject({ code: "version_mismatch", message: VERSION_MISMATCH_MESSAGE });
+  });
+
+  it("joiner treats a CHALLENGE with another version as version_mismatch and does not answer", async () => {
+    const { h2j, j2h } = pair();
+    const answered: Buffer[] = [];
+    j2h.on("data", (c: Buffer) => answered.push(c));
+    const joined = joinRespond(new FrameReader(h2j), j2h, secret, joinerKey, hash, KIND.CONTROL, { timeoutMs: 2000 });
+    h2j.write(encodeChallenge(Buffer.alloc(32, 5), PROTOCOL_VERSION + 1));
+    await expect(joined).rejects.toMatchObject({ code: "version_mismatch" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(answered).toEqual([]);
+  });
+
+  it("joiner maps STATUS VERSION_MISMATCH to the same version_mismatch reason", async () => {
+    const { h2j, j2h } = pair();
+    const joined = joinRespond(new FrameReader(h2j), j2h, secret, joinerKey, hash, KIND.CONTROL, { timeoutMs: 2000 });
+    h2j.write(encodeChallenge(Buffer.alloc(32, 5)));
+    await new FrameReader(j2h).read(2 + 32 + 1, 2000);
+    h2j.write(Buffer.from([MSG.STATUS, STATUS.VERSION_MISMATCH]));
+    await expect(joined).rejects.toMatchObject({ code: "version_mismatch", message: /버전이 달라요/ });
+  });
+
+  it("1.3.0 frames without a version byte land on version_mismatch, not a generic bad_message", async () => {
+    // 옛 호스트: [0x01][nonce 32] — nonce[0] 가 버전 자리에 온다
+    const a = pair();
+    const joined = joinRespond(new FrameReader(a.h2j), a.j2h, secret, joinerKey, hash, KIND.CONTROL, { timeoutMs: 2000 });
+    a.h2j.write(Buffer.concat([Buffer.from([MSG.CHALLENGE]), Buffer.alloc(32, 0xc3)]));
+    await expect(joined).rejects.toMatchObject({ code: "version_mismatch" });
+    // 옛 참가자: [0x02][mac 32][kind] — mac[0] 가 버전 자리에 온다
+    const b = pair();
+    const host = hostChallenge(new FrameReader(b.j2h), b.h2j, secret, joinerKey, hash, 2000);
+    await new FrameReader(b.h2j).read(2 + 32, 2000);
+    b.j2h.write(Buffer.concat([Buffer.from([MSG.RESPONSE]), Buffer.alloc(32, 0xc3), Buffer.from([KIND.CONTROL])]));
+    await expect(host).rejects.toMatchObject({ code: "version_mismatch" });
   });
 });
 
@@ -382,6 +467,48 @@ describe("P2P tunnel (isolated local DHT)", () => {
     await j1.stop();
     await jNew.stop();
     await host.stop();
+  }, 60_000);
+
+  it("answers a joiner speaking another protocol version with STATUS VERSION_MISMATCH and counts it as a failure", async () => {
+    const host = new HostTunnel({ dht: await newNode(), keyPair: Dht.keyPair(), secret: newSecret(), mcPort, policy: policy(new Set()) });
+    const failed: string[] = [];
+    host.on("auth-failed", (i) => failed.push(i.reason));
+    await host.start();
+    const dht = await newNode();
+    const sock = dht.connect(host.publicKey, { keyPair: Dht.keyPair() });
+    sock.on("error", () => {});
+    await new Promise<void>((r) => sock.once("open", () => r()));
+    const reader = new FrameReader(sock);
+    const challenge = await reader.read(2 + 32, 10_000);
+    expect(challenge[1]).toBe(PROTOCOL_VERSION);
+    const other = PROTOCOL_VERSION + 1;
+    sock.write(encodeResponse(computeMac(host["o"].secret, challenge.subarray(2), sock.publicKey, sock.handshakeHash, other), KIND.CONTROL, other));
+    const status = await reader.read(2, 10_000);
+    expect([...status]).toEqual([MSG.STATUS, STATUS.VERSION_MISMATCH]);
+    await waitFor(() => failed.length >= 1, 5000, "auth-failed 이벤트");
+    expect(failed[0]).toMatch(/버전이 달라요/);
+    await waitFor(() => sock.destroyed, 5000, "호스트가 끊기");
+    expect(host.listPeers()).toHaveLength(0);
+    sock.destroy();
+    await host.stop();
+  }, 60_000);
+
+  it("the joiner fails with a clear Korean reason when the host speaks another protocol version", async () => {
+    // 다른 버전의 호스트를 흉내: 챌린지에 다른 버전 바이트를 담아 보낸다
+    const dht = await newNode();
+    const hostKeys = Dht.keyPair();
+    const fake = dht.createServer({}, (sock) => {
+      sock.on("error", () => {});
+      sock.write(encodeChallenge(Buffer.alloc(32, 1), PROTOCOL_VERSION + 1));
+    });
+    await fake.listen(hostKeys);
+    const join = new JoinTunnel({ dht: await newNode(), invite: { publicKey: hostKeys.publicKey, secret: newSecret() }, keyPair: Dht.keyPair(), localPort: 0 });
+    await join.start();
+    expect(join.state).toBe("failed");
+    expect(join.detail).toMatch(/BlockPilot 버전이 달라요/);
+    expect(join.failure?.error).toMatchObject({ code: "version_mismatch" });
+    expect(join.localPort).toBeUndefined();
+    await fake.close();
   }, 60_000);
 
   it("refuses to proxy to a forbidden port (the dashboard itself)", async () => {
