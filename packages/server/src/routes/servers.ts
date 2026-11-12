@@ -27,6 +27,8 @@ export async function serversRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { managed } = await loadContext(id);
     if (managed.isManaged()) throw conflict("실행 중인 서버는 먼저 중지해야 합니다.");
+    // 지난번 BlockPilot 이 띄우고 남은 서버가 돌고 있으면 기록(running.json)을 잃어버리게 되니 먼저 정리하게 한다
+    if ((await managed.status()).state === "orphan") throw conflict("지난번 BlockPilot 이 띄운 서버가 아직 돌고 있어요. 먼저 안전하게 끄거나 그냥 두기를 고른 뒤 등록 해제해 주세요.");
     await forgetP2pHost(id);
     await removeServer(id);
     await forgetPlaytime(id);

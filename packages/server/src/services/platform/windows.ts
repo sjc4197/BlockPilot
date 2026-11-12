@@ -1,8 +1,8 @@
-import { spawnSync, type ChildProcess } from "node:child_process";
+import { execFile, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { Platform, Shortcut } from "./types.js";
+import type { Platform, ProcessInfo, Shortcut } from "./types.js";
 import { subdirs } from "./posix.js";
 
 const utf8Strict = new TextDecoder("utf-8", { fatal: true });
@@ -42,6 +42,38 @@ function forbiddenList(): string[] {
     .map(key);
 }
 
+/**
+ * PowerShell 로 프로세스 시작 시각(UTC, ISO 8601)과 이름(ProcessName, 확장자 없음)을 한 번에 읽는다.
+ * 다른 사용자의 프로세스는 StartTime 접근이 거부될 수 있어 그 부분만 따로 감싸 이름만이라도 돌려준다.
+ * 실행 실패·시간 초과(5 초)·출력 형식 불일치는 모두 "모름"(null) 으로 — 호출 쪽이 보수적으로 판단한다.
+ */
+export function windowsProcessInfo(pid: number): Promise<ProcessInfo> {
+  const unknown: ProcessInfo = { startedAt: null, name: null };
+  if (!Number.isInteger(pid) || pid <= 0) return Promise.resolve(unknown);
+  const script = [
+    `$p = Get-Process -Id ${pid} -ErrorAction Stop`,
+    "$t = ''",
+    "try { $t = $p.StartTime.ToUniversalTime().ToString('o') } catch { }",
+    "Write-Output ('BP|' + $t + '|' + $p.ProcessName)",
+  ].join("; ");
+  const exe = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  return new Promise((resolve) => {
+    execFile(
+      existsSync(exe) ? exe : "powershell.exe",
+      // 따옴표 문제를 피하려고 스크립트를 UTF-16LE base64 로 넘긴다
+      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")],
+      { timeout: 5000, windowsHide: true, encoding: "utf8" },
+      (err, out) => {
+        if (err) return resolve(unknown);
+        const m = String(out).match(/^BP\|([^|\r\n]*)\|([^\r\n]*)$/m);
+        if (!m) return resolve(unknown);
+        const d = m[1] ? new Date(m[1]) : null;
+        resolve({ startedAt: d && !Number.isNaN(d.getTime()) ? d : null, name: m[2].trim() || null });
+      },
+    );
+  });
+}
+
 /** OneDrive 로 옮겨진 바탕 화면·문서까지 고려해 실제 있는 위치 */
 function firstExisting(...candidates: (string | undefined)[]) {
   return candidates.find((c): c is string => !!c && existsSync(c));
@@ -73,6 +105,8 @@ export const windows: Platform = {
     // 여기서는 바로 강제 종료(/F)한다. cmd.exe 만 죽이면 java 가 남으니 /T 로 자식까지
     spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true });
   },
+  canStopGracefully: false,
+  processInfo: windowsProcessInfo,
   decode: decodeWindows,
 
   javaExe: "java.exe",

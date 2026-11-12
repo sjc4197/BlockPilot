@@ -463,3 +463,28 @@ export function useSetAutostart() {
 }
 
 export const useUpdateCheck = () => useMutation({ mutationFn: () => api<UpdateCheck>("/api/update-check", { method: "POST" }) });
+
+// ---------- 지난번 BlockPilot 이 띄우고 남은 서버 (orphan) ----------
+
+/** "안전하게 끄기"(stop) 또는 "그냥 두기"(ignore: 이제부터 외부 실행 중으로 본다) */
+export function useOrphanAction(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (action: "stop" | "ignore") => api<ProcessStatus>(`/api/servers/${id}/process/orphan/${action}`, { method: "POST" }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: keys.server(id) });
+      qc.invalidateQueries({ queryKey: keys.process(id) });
+    },
+  });
+}
+
+// ---------- 문제 신고 파일 ----------
+
+export interface DebugBundleResult {
+  fileName: string;
+  sizeBytes: number;
+  /** GET 으로 내려받는 경로. <a href> 로 열어야 하니 withToken() 을 붙인다 */
+  downloadPath: string;
+}
+/** 로그·설정·서버 정보를 비밀은 가린 채 zip 하나로 모은다 (깃허브 이슈 첨부용) */
+export const useDebugBundle = () => useMutation({ mutationFn: () => api<DebugBundleResult>("/api/debug/bundle", { method: "POST" }) });

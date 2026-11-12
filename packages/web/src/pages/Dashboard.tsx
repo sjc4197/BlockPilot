@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Activity, Boxes, Coffee, Copy, Gamepad2, Globe, Layers, Swords, Users, type LucideIcon } from "lucide-react";
-import { useAutomation, useSendCommand, useServer, useSkipScheduledRestart } from "../api/hooks";
+import { useAutomation, useOrphanAction, useSendCommand, useServer, useSkipScheduledRestart } from "../api/hooks";
 import { fmtSchedule } from "../components/AutomationPanel";
 import { CrashBanner } from "../components/CrashBanner";
 import { ConnectCard } from "../components/ConnectCard";
@@ -12,7 +12,7 @@ import { useConsole } from "../lib/useConsole";
 import { Lamp, SignalBar, type LampState } from "../lib/pixel";
 import { JoinFeed, PlayerHearts, RedstoneParticles, usePlayOnce } from "../lib/fx";
 import { ProcessControls } from "../components/ProcessControls";
-import { Avatar, Badge, Callout, Card, ConfirmButton, SectionTitle, StatusBadge, cx, fmtAgo, useToast } from "../lib/ui";
+import { Avatar, Badge, Button, Callout, Card, ConfirmButton, SectionTitle, StatusBadge, cx, fmtAgo, useToast } from "../lib/ui";
 
 export default function Dashboard() {
   const { id = "" } = useParams();
@@ -23,6 +23,7 @@ export default function Dashboard() {
   const place = usePlayOnce(`dash-${id}`);
   const { data: automation } = useAutomation(id);
   const skipRestart = useSkipScheduledRestart(id);
+  const orphanAction = useOrphanAction(id);
   // "N분 전 시작" 이 멈춰 보이지 않게 30초마다 다시 그린다
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -32,15 +33,20 @@ export default function Dashboard() {
   if (!s) return null;
 
   const state = status?.state ?? s.process.state;
-  const players = state === "external" ? s.process.onlinePlayers : (status?.onlinePlayers ?? s.process.onlinePlayers);
+  // 직접 띄운 게 아닌 서버(외부 실행·지난번에 남은 것)는 콘솔 스트림이 없어 RCON 으로 본 접속자를 쓴다
+  const unmanagedLive = state === "external" || state === "orphan";
+  const players = unmanagedLive ? s.process.onlinePlayers : (status?.onlinePlayers ?? s.process.onlinePlayers);
   const rcon = s.process.rcon;
-  const canCommand = state === "running" || (state === "external" && rcon === "connected");
+  const canCommand = state === "running" || (unmanagedLive && rcon === "connected");
+  const orphan = state === "orphan" ? (status?.orphan ?? s.process.orphan) : undefined;
+  // 접속·초대 카드는 "닿을 수 있는 서버" 만 보면 되므로 지난번에 남은 서버도 외부 실행과 같게 넘긴다
+  const reachState = state === "orphan" ? "external" : state;
   const startedAt = status?.startedAt ?? s.process.startedAt;
   const maxPlayers = Math.max(1, s.properties.maxPlayers);
   // 비교기처럼 0~15 로 환산 (한 명이라도 있으면 최소 1칸)
   const signal = players.length === 0 ? 0 : Math.max(1, Math.round((players.length / maxPlayers) * 15));
   // 전원 회로: 켜지면 신호가 가루를 타고 흘러 카드 윗변이 차례로 켜진다
-  const power = state === "running" || state === "external" ? "on" : state === "starting" || state === "stopping" ? state : "off";
+  const power = state === "running" || unmanagedLive ? "on" : state === "starting" || state === "stopping" ? state : "off";
   const cmd = (c: string, okMsg: string) => sendCmd.mutate(c, { onSuccess: () => toast("ok", okMsg), onError: (e) => toast("err", (e as Error).message) });
   const copyPath = () => navigator.clipboard?.writeText(s.path).then(() => toast("info", "경로를 복사했습니다."));
 
@@ -50,6 +56,43 @@ export default function Dashboard() {
       {!s.eulaAccepted && (
         <Callout tone="warning" title="EULA 미동의">
           <code className="font-mono">eula.txt</code> 에 <code className="font-mono">eula=true</code> 가 없어 서버를 시작할 수 없습니다.
+        </Callout>
+      )}
+      {state === "orphan" && (
+        <Callout tone="warning" title="지난번 BlockPilot 이 띄운 서버가 아직 돌고 있어요">
+          <div>
+            BlockPilot 은 꺼졌지만 서버는 계속 돌고 있었어요 (PID {orphan?.pid ?? s.process.pid ?? "?"}
+            {orphan?.startedAt ? `, ${fmtAgo(orphan.startedAt)} 전부터` : ""}). 안전하게 끄면 월드를 저장한 뒤 종료하고, 그냥 두면 이제부터 외부에서 실행 중인 서버로
+            봐요.
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ConfirmButton
+              size="sm"
+              label="안전하게 끄기"
+              confirmLabel="정말 끌까요? 월드를 저장하고 종료해요"
+              disabled={orphanAction.isPending}
+              onConfirm={() =>
+                orphanAction.mutate("stop", {
+                  onSuccess: () => toast("ok", "지난번에 띄운 서버를 껐어요.", { icon: "lever" }),
+                  onError: (e) => toast("err", (e as Error).message),
+                })
+              }
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={orphanAction.isPending}
+              onClick={() =>
+                orphanAction.mutate("ignore", {
+                  onSuccess: () => toast("info", "그냥 두기로 했어요. 이제 외부 실행 중인 서버로 보여요."),
+                  onError: (e) => toast("err", (e as Error).message),
+                })
+              }
+            >
+              그냥 두기
+            </Button>
+          </div>
+          {orphanAction.isPending && orphanAction.variables === "stop" && <div className="mt-1 text-amber-300">월드 저장을 기다리는 중이에요. 응답이 없으면 종료 요청까지 이어져 최대 1분 반쯤 걸릴 수 있어요.</div>}
         </Callout>
       )}
       {state === "external" && rcon !== "connected" && (
@@ -138,10 +181,10 @@ export default function Dashboard() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <PerfCard serverId={id} />
-        <ConnectCard serverId={id} state={state} />
+        <ConnectCard serverId={id} state={reachState} />
         {/* 초대코드·목록이 길어서 두 열을 다 쓴다 */}
         <div className="lg:col-span-2">
-          <InviteCard serverId={id} state={state} />
+          <InviteCard serverId={id} state={reachState} />
         </div>
       </div>
 

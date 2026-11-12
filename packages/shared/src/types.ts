@@ -19,7 +19,8 @@ export const RegisterServerInput = z.object({
 });
 export type RegisterServerInput = z.infer<typeof RegisterServerInput>;
 
-export const ProcessState = z.enum(["stopped", "starting", "running", "stopping", "external"]);
+/** orphan: 지난번 BlockPilot 이 띄웠는데 BlockPilot 만 꺼져서 혼자 남은 서버 */
+export const ProcessState = z.enum(["stopped", "starting", "running", "stopping", "external", "orphan"]);
 export type ProcessState = z.infer<typeof ProcessState>;
 
 export interface ProcessStatus {
@@ -31,6 +32,8 @@ export interface ProcessStatus {
   onlinePlayers: string[];
   /** 외부 실행 중일 때 RCON으로 제어 가능한지 */
   rcon?: "connected" | "disabled" | "failed";
+  /** state 가 orphan 일 때: 지난번 BlockPilot 이 기록해 둔 프로세스 */
+  orphan?: { pid: number; startedAt: string };
 }
 
 export interface ServerSummary extends RegisteredServer {

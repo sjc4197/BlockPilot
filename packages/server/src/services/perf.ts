@@ -70,7 +70,7 @@ async function sample(id: string, dir: string) {
   s.lags = s.lags.filter((x) => now - x.t < 60 * 60_000);
   if (now - s.viewedAt > VIEW_MS || s.busy) return;
   const status = await m.status();
-  if (status.state !== "running" && !(status.state === "external" && status.rcon === "connected")) return;
+  if (status.state !== "running" && !((status.state === "external" || status.state === "orphan") && status.rcon === "connected")) return;
   s.busy = true;
   try {
     const point: PerfSample = { t: now };
@@ -101,7 +101,7 @@ export async function perfInfo(id: string, dir: string): Promise<PerfInfo> {
   if (first) await sample(id, dir).catch(() => {});
   const m = getManaged(id, dir);
   const status = await m.status();
-  const measuring = status.state === "running" || (status.state === "external" && status.rcon === "connected");
+  const measuring = status.state === "running" || ((status.state === "external" || status.state === "orphan") && status.rcon === "connected");
   let maxMemMb: number | undefined;
   try {
     const info = await detectServer(dir);

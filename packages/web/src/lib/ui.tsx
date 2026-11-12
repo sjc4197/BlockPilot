@@ -183,6 +183,7 @@ const STATE: Record<ProcessState, { label: string; tone: Tone; lamp: LampState }
   running: { label: "실행 중", tone: "lamp", lamp: "on" },
   stopping: { label: "중지 중", tone: "warning", lamp: "blink" },
   external: { label: "외부 실행 중", tone: "info", lamp: "on" },
+  orphan: { label: "지난번 서버 실행 중", tone: "warning", lamp: "on" },
 };
 
 /** 서버 상태 = 레드스톤 램프 */

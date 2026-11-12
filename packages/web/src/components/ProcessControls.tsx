@@ -36,7 +36,8 @@ export function ProcessControls({ serverId, status, size = "md" }: { serverId: s
     : state === "stopped" ? "off"
     : "on";
 
-  const externalLocked = state === "external" && rcon !== "connected";
+  // 외부 실행(RCON 없음)·지난번에 남은 서버(orphan)는 레버로 못 끈다. orphan 은 대시보드 안내에서 안전하게 끄기/그냥 두기로
+  const externalLocked = (state === "external" && rcon !== "connected") || state === "orphan";
   const busy = action.isPending || visual === "starting" || visual === "stopping";
 
   const run = (a: "start" | "stop" | "restart") =>
@@ -68,8 +69,11 @@ export function ProcessControls({ serverId, status, size = "md" }: { serverId: s
     : visual === "starting" ? "켜는 중…"
     : visual === "stopping" ? "끄는 중…"
     : state === "external" ? "외부 실행 중"
+    : state === "orphan" ? "지난번 서버 실행 중"
     : "켜짐";
-  const title = externalLocked
+  const title = state === "orphan"
+    ? "지난번 BlockPilot 이 띄운 서버예요. 안내에서 안전하게 끄거나 그냥 두기를 골라 주세요."
+    : externalLocked
     ? "BlockPilot 밖에서 실행 중이에요. RCON을 켜야 여기서 끌 수 있어요."
     : visual === "off" ? "레버를 당겨 서버 시작"
     : visual === "on" ? "레버를 두 번 당기면 서버 중지"

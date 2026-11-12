@@ -89,5 +89,5 @@ export async function playersRoutes(app: FastifyInstance) {
 /** 직접 띄운 서버가 준비됐거나, 외부 서버인데 RCON이 되면 명령으로 처리 */
 async function isLive(managed: { status(): Promise<{ state: string; rcon?: string }> }) {
   const st = await managed.status();
-  return st.state === "running" || (st.state === "external" && st.rcon === "connected");
+  return st.state === "running" || ((st.state === "external" || st.state === "orphan") && st.rcon === "connected");
 }

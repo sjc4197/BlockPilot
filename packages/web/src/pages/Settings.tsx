@@ -32,7 +32,7 @@ export default function Settings() {
       return next;
     });
   const dirtyCount = Object.keys(draft).length;
-  const live = server?.process.state === "running" || (server?.process.state === "external" && server.process.rcon === "connected");
+  const live = server?.process.state === "running" || ((server?.process.state === "external" || server?.process.state === "orphan") && server.process.rcon === "connected");
 
   const save = () =>
     update.mutate(draft, {

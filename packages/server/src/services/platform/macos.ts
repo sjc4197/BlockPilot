@@ -3,7 +3,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Platform, Shortcut } from "./types.js";
-import { posixHidden, posixKillTree, posixPinnedJava, posixShell, posixSpawnOptions, posixStartScript, utf8 } from "./posix.js";
+import { posixHidden, posixKillTree, posixPinnedJava, posixProcessInfo, posixShell, posixSpawnOptions, posixStartScript, utf8 } from "./posix.js";
 
 const FORBIDDEN = ["/", "/System", "/Library", "/usr", "/bin", "/sbin", "/etc", "/var", "/private", "/Applications", "/Users", "/Volumes", "/opt", "/cores", "/dev"];
 
@@ -16,6 +16,8 @@ export const macos: Platform = {
   spawnOptions: posixSpawnOptions,
   childEnv: () => ({}),
   killTree: posixKillTree,
+  canStopGracefully: true,
+  processInfo: posixProcessInfo,
   decode: utf8,
 
   javaExe: "java",

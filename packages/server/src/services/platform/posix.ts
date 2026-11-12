@@ -1,7 +1,7 @@
-import type { ChildProcess } from "node:child_process";
+import { execFile, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import fsp from "node:fs/promises";
-import type { LaunchSpec } from "./types.js";
+import type { LaunchSpec, ProcessInfo } from "./types.js";
 
 /** macOS·Linux 가 함께 쓰는 부분 */
 
@@ -21,6 +21,25 @@ export function posixKillTree(child: ChildProcess, force: boolean) {
       /* 이미 종료 */
     }
   }
+}
+
+/**
+ * ps 로 프로세스 시작 시각과 실행 파일 이름을 한 번에 읽는다.
+ * lstart 는 "Wed Nov 12 10:11:12 2025" 꼴(토큰 5개), 그 뒤가 comm (macOS 는 전체 경로라 공백이 섞일 수 있어 나머지를 통째로).
+ * ps 가 없거나 프로세스를 못 보면 둘 다 null.
+ */
+export function posixProcessInfo(pid: number): Promise<ProcessInfo> {
+  const unknown: ProcessInfo = { startedAt: null, name: null };
+  if (!Number.isInteger(pid) || pid <= 0) return Promise.resolve(unknown);
+  return new Promise((resolve) => {
+    execFile("ps", ["-o", "lstart=", "-o", "comm=", "-p", String(pid)], { timeout: 5000, env: { ...process.env, LC_ALL: "C" } }, (err, out) => {
+      if (err) return resolve(unknown);
+      const tokens = String(out).trim().split(/\s+/);
+      if (tokens.length < 5) return resolve(unknown);
+      const d = new Date(tokens.slice(0, 5).join(" "));
+      resolve({ startedAt: Number.isNaN(d.getTime()) ? null : d, name: tokens.slice(5).join(" ") || null });
+    });
+  });
 }
 
 export const utf8 = (b: Buffer) => b.toString("utf8");

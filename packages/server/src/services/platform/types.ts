@@ -43,6 +43,14 @@ export interface StartScript {
   mode?: number;
 }
 
+/** 살아 있는 프로세스에 대해 OS 에 물어본 것. 못 구한 항목은 null ("모름") */
+export interface ProcessInfo {
+  /** 프로세스가 시작된 시각 (pid 재사용 판별용) */
+  startedAt: Date | null;
+  /** 실행 파일 이름 (java, bash, cmd …). 경로가 붙어 있을 수도 있다 */
+  name: string | null;
+}
+
 export interface Platform {
   id: OsId;
 
@@ -58,6 +66,10 @@ export interface Platform {
   childEnv(): Record<string, string>;
   /** 자식 프로세스까지 종료. force=false 면 정상 종료 요청, true 면 강제 */
   killTree(child: ChildProcess, force: boolean): void;
+  /** killTree(force=false) 가 정말 '정상 종료 요청'인지. Windows 는 콘솔 프로그램에 보낼 신호가 없어 바로 강제 종료가 된다 */
+  canStopGracefully: boolean;
+  /** pid 의 시작 시각·실행 파일 이름. 조회에 실패해도 던지지 않고 null 로 돌려준다 (5 초 안에) */
+  processInfo(pid: number): Promise<ProcessInfo>;
   /** 서버 출력 한 줄(바이트)을 문자열로 */
   decode(line: Buffer): string;
 

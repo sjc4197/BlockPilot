@@ -30,7 +30,7 @@ export async function propertiesRoutes(app: FastifyInstance) {
     await writePropertiesChanges(dir, changes);
     const status = await managed.status();
     const result: UpdatePropertiesResult = { saved: Object.keys(changes), appliedLive: [], needsRestart: [] };
-    if (status.state === "running" || status.state === "external") {
+    if (status.state === "running" || status.state === "external" || status.state === "orphan") {
       for (const [key, value] of Object.entries(changes)) {
         const meta = PROPERTY_META_BY_KEY[key];
         if (meta?.liveCommand && (await managed.tryCommand(meta.liveCommand(value)).catch(() => false))) result.appliedLive.push(key);

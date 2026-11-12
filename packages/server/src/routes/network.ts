@@ -22,7 +22,7 @@ export async function networkRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { dir, managed } = await loadContext(id);
     const st = await managed.status();
-    if (st.state !== "running" && st.state !== "external") throw conflict("서버를 켠 뒤에 검사할 수 있어요.");
+    if (st.state !== "running" && st.state !== "external" && st.state !== "orphan") throw conflict("서버를 켠 뒤에 검사할 수 있어요.");
     const { ip } = (req.body ?? {}) as { ip?: string };
     if (ip !== undefined && typeof ip !== "string") throw badRequest("IP 가 올바르지 않아요.");
     const props = toRecord((await readPropertiesFile(dir)).lines);

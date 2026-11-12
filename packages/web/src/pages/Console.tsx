@@ -25,7 +25,7 @@ export default function Console() {
     if (autoScroll && boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
   }, [visible.length, autoScroll]);
 
-  const canSend = status?.state === "running" || status?.state === "starting" || status?.state === "stopping" || (status?.state === "external" && status.rcon === "connected");
+  const canSend = status?.state === "running" || status?.state === "starting" || status?.state === "stopping" || ((status?.state === "external" || status?.state === "orphan") && status.rcon === "connected");
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

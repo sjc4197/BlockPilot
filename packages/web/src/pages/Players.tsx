@@ -20,7 +20,7 @@ export default function Players() {
   const { data: server } = useServer(id);
   const updateProps = useUpdateProperties(id);
   const toast = useToast();
-  const live = server?.process.state === "running" || (server?.process.state === "external" && server.process.rcon === "connected");
+  const live = server?.process.state === "running" || ((server?.process.state === "external" || server?.process.state === "orphan") && server.process.rcon === "connected");
 
   return (
     <div className="space-y-5">

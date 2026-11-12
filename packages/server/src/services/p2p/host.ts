@@ -131,7 +131,7 @@ const blockedKeys = new Map<string, Set<string>>();
 async function serverRunning(id: string) {
   const server = await getServer(id);
   const st = await getManaged(id, server.path).status();
-  return st.state === "running" || st.state === "external";
+  return st.state === "running" || st.state === "external" || st.state === "orphan";
 }
 
 export async function p2pHostView(id: string): Promise<P2pHostInfo> {

@@ -38,6 +38,21 @@ export async function processRoutes(app: FastifyInstance) {
     return managed.status();
   });
 
+  // 지난번 BlockPilot 이 띄우고 남은 서버(orphan): 안전하게 끄기 / 그냥 두기(외부 실행으로 취급)
+  app.post("/api/servers/:id/process/orphan/stop", async (req) => {
+    const { id } = req.params as { id: string };
+    const { managed } = await loadContext(id);
+    await managed.stopOrphan();
+    return managed.status();
+  });
+
+  app.post("/api/servers/:id/process/orphan/ignore", async (req) => {
+    const { id } = req.params as { id: string };
+    const { managed } = await loadContext(id);
+    await managed.ignoreOrphan();
+    return managed.status();
+  });
+
   app.post("/api/servers/:id/process/command", async (req) => {
     const { id } = req.params as { id: string };
     const { command } = (req.body ?? {}) as { command?: string };
